@@ -9,7 +9,6 @@ type TopUpItem = {
   currency: string;
   status: string;
   method?: string | null;
-  referenceCode?: string | null;
   note?: string | null;
   adminNote?: string | null;
   createdAt: string;
@@ -18,25 +17,15 @@ type TopUpItem = {
 type Step = 'select' | 'transfer' | 'waiting' | 'approved' | 'rejected';
 
 const AMOUNTS = [100, 300, 500, 1000, 3000, 5000];
-
 const METHODS = [
-  {
-    code: 'bank_transfer',
-    label: 'โอนธนาคาร',
-    title: 'บัญชีรับเงิน',
-    detail: 'โอนตามยอดที่เลือก แล้วกลับมาแนบสลิป',
-  },
-  {
-    code: 'qr_promptpay',
-    label: 'QR PromptPay',
-    title: 'สแกน QR เพื่อโอนเงิน',
-    detail: 'สแกน QR ตามยอดที่เลือก แล้วกลับมาแนบสลิป',
-  },
+  { code: 'bank_transfer', label: 'โอนธนาคาร', title: 'บัญชีรับเงิน', detail: 'โอนตามยอดที่เลือก แล้วกลับมาแนบสลิป' },
+  { code: 'qr_promptpay', label: 'QR PromptPay', title: 'สแกน QR เพื่อโอนเงิน', detail: 'สแกน QR ตามยอดที่เลือก แล้วกลับมาแนบสลิป' },
 ];
 
 export default function DepositPage() {
   const [step, setStep] = useState<Step>('select');
   const [amount, setAmount] = useState('500');
+  const [selectedAmount, setSelectedAmount] = useState(500);
   const [method, setMethod] = useState('bank_transfer');
   const [note, setNote] = useState('');
   const [slipImageData, setSlipImageData] = useState('');
@@ -45,6 +34,10 @@ export default function DepositPage() {
   const [message, setMessage] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [pendingRequest, setPendingRequest] = useState<TopUpItem | null>(null);
+
+  const selectedMethod = useMemo(() => METHODS.find((item) => item.code === method) ?? METHODS[0], [method]);
+  const parsedAmount = useMemo(() => parseAmount(amount), [amount]);
+  const transferAmount = selectedAmount > 0 ? selectedAmount : parsedAmount;
 
   useEffect(() => {
     loadHistory();
@@ -82,9 +75,6 @@ export default function DepositPage() {
     return () => window.clearInterval(interval);
   }, [pendingRequest?.id, step]);
 
-  const selectedMethod = useMemo(() => METHODS.find((item) => item.code === method) ?? METHODS[0], [method]);
-  const parsedAmount = useMemo(() => Number(amount.trim().replace(/,/g, '')), [amount]);
-
   async function loadHistory() {
     const token = window.localStorage.getItem('member_access_token');
     if (!token) {
@@ -102,11 +92,13 @@ export default function DepositPage() {
   function goToTransfer(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
-    if (!Number.isFinite(parsedAmount) || parsedAmount <= 0) {
+    const nextAmount = parseAmount(amount);
+    if (!Number.isFinite(nextAmount) || nextAmount <= 0) {
       setMessage('กรุณาเลือกหรือใส่จำนวนเงินมากกว่า 0');
       return;
     }
 
+    setSelectedAmount(nextAmount);
     setMessage('');
     setStep('transfer');
   }
@@ -114,7 +106,6 @@ export default function DepositPage() {
   async function handleSlipChange(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
     if (!file) return;
-
     if (!file.type.startsWith('image/')) {
       setMessage('กรุณาเลือกไฟล์รูปภาพสลิป');
       return;
@@ -127,8 +118,9 @@ export default function DepositPage() {
   }
 
   async function submitAfterTransfer() {
-    if (!Number.isFinite(parsedAmount) || parsedAmount <= 0) {
-      setMessage('กรุณาเลือกหรือใส่จำนวนเงินมากกว่า 0');
+    const finalAmount = Number(selectedAmount);
+    if (!Number.isFinite(finalAmount) || finalAmount <= 0) {
+      setMessage('จำนวนเงินหาย กรุณาย้อนกลับไปเลือกยอดใหม่');
       setStep('select');
       return;
     }
@@ -147,19 +139,11 @@ export default function DepositPage() {
     setIsSubmitting(true);
     setMessage('กำลังส่งรายการให้แอดมินตรวจสอบ...');
 
-    const proofNote = JSON.stringify({
-      userNote: note,
-      slipImageName,
-      slipImageData,
-    });
-
+    const proofNote = JSON.stringify({ userNote: note, slipImageName, slipImageData });
     const res = await fetch(`${API_URL}/member/topups`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${token}`,
-      },
-      body: JSON.stringify({ amount: parsedAmount, method, note: proofNote }),
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ amount: finalAmount, method, note: proofNote }),
     });
 
     const data = await res.json().catch(() => null);
@@ -196,7 +180,7 @@ export default function DepositPage() {
           <h2>เลือกจำนวนเงิน</h2>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(110px, 1fr))', gap: 10 }}>
             {AMOUNTS.map((value) => (
-              <button key={value} type="button" onClick={() => setAmount(String(value))} style={amountButtonStyle(amount === String(value))}>
+              <button key={value} type="button" onClick={() => { setAmount(String(value)); setSelectedAmount(value); }} style={amountButtonStyle(parseAmount(amount) === value)}>
                 ฿{value.toLocaleString('th-TH')}
               </button>
             ))}
@@ -227,7 +211,7 @@ export default function DepositPage() {
           <h2>{selectedMethod.title}</h2>
           <div style={summaryStyle}>
             <p>ยอดที่ต้องโอน</p>
-            <h1>฿{parsedAmount.toLocaleString('th-TH', { minimumFractionDigits: 2 })}</h1>
+            <h1>฿{transferAmount.toLocaleString('th-TH', { minimumFractionDigits: 2 })}</h1>
             <p>ช่องทาง: {selectedMethod.label}</p>
           </div>
 
@@ -245,7 +229,7 @@ export default function DepositPage() {
             <section style={paymentBoxStyle}>
               <strong>QR Code</strong>
               <div style={qrBoxStyle}>QR</div>
-              <p>สแกน QR แล้วโอนตามยอด ฿{parsedAmount.toLocaleString('th-TH', { minimumFractionDigits: 2 })}</p>
+              <p>สแกน QR แล้วโอนตามยอด ฿{transferAmount.toLocaleString('th-TH', { minimumFractionDigits: 2 })}</p>
             </section>
           )}
 
@@ -269,9 +253,7 @@ export default function DepositPage() {
 
           <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
             <button type="button" onClick={() => setStep('select')} style={secondaryButtonStyle}>ย้อนกลับ</button>
-            <button type="button" onClick={submitAfterTransfer} disabled={isSubmitting} style={primaryButtonStyle}>
-              {isSubmitting ? 'กำลังส่ง...' : 'เสร็จ'}
-            </button>
+            <button type="button" onClick={submitAfterTransfer} disabled={isSubmitting} style={primaryButtonStyle}>{isSubmitting ? 'กำลังส่ง...' : 'เสร็จ'}</button>
           </div>
           {message && <p>{message}</p>}
         </section>
@@ -281,10 +263,10 @@ export default function DepositPage() {
         <section style={panelStyle}>
           <h2>รอแอดมินอนุมัติ</h2>
           <p>รายการของคุณถูกส่งแล้ว สถานะตอนนี้: {pendingRequest?.status ?? 'PENDING'}</p>
-          <p>หน้านี้จะเช็กสถานะให้อัตโนมัติทุก 5 วินาที หลังแอดมินอนุมัติจะขึ้นแจ้งเตือนว่าทำรายการสำเร็จ</p>
+          <p>หน้านี้จะเช็กสถานะให้อัตโนมัติทุก 5 วินาที</p>
           <div style={summaryStyle}>
             <p>ยอดรายการ</p>
-            <h1>฿{Number(pendingRequest?.amount ?? parsedAmount).toLocaleString('th-TH', { minimumFractionDigits: 2 })}</h1>
+            <h1>฿{Number(pendingRequest?.amount ?? selectedAmount).toLocaleString('th-TH', { minimumFractionDigits: 2 })}</h1>
           </div>
           {message && <p>{message}</p>}
         </section>
@@ -327,6 +309,11 @@ export default function DepositPage() {
   );
 }
 
+function parseAmount(value: string) {
+  const normalized = String(value).replace(/[０-９]/g, (char) => String.fromCharCode(char.charCodeAt(0) - 65248)).replace(/,/g, '').trim();
+  return Number(normalized);
+}
+
 function parseProofNote(value?: string | null) {
   if (!value) return { userNote: '', slipImageData: '', slipImageName: '' };
   try {
@@ -352,10 +339,7 @@ function resizeImage(file: File, maxSize: number, quality: number) {
         canvas.width = Math.round(img.width * scale);
         canvas.height = Math.round(img.height * scale);
         const ctx = canvas.getContext('2d');
-        if (!ctx) {
-          reject(new Error('ไม่สามารถอ่านรูปสลิปได้'));
-          return;
-        }
+        if (!ctx) return reject(new Error('ไม่สามารถอ่านรูปสลิปได้'));
         ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
         resolve(canvas.toDataURL('image/jpeg', quality));
       };
@@ -367,119 +351,25 @@ function resizeImage(file: File, maxSize: number, quality: number) {
   });
 }
 
-const panelStyle = {
-  display: 'grid',
-  gap: 14,
-  border: '1px solid #ddd',
-  borderRadius: 16,
-  padding: 20,
-  marginBottom: 24,
-} as const;
-
-const inputStyle = {
-  display: 'block',
-  width: '100%',
-  maxWidth: '100%',
-  padding: 10,
-  marginTop: 6,
-  borderRadius: 10,
-  border: '1px solid #ccc',
-  boxSizing: 'border-box',
-} as const;
-
-const primaryButtonStyle = {
-  padding: 12,
-  borderRadius: 10,
-  cursor: 'pointer',
-  background: '#0a84ff',
-  color: '#fff',
-  border: 0,
-} as const;
-
-const primaryLinkStyle = {
-  display: 'inline-block',
-  textAlign: 'center' as const,
-  padding: 12,
-  borderRadius: 10,
-  cursor: 'pointer',
-  background: '#0a84ff',
-  color: '#fff',
-  border: 0,
-  textDecoration: 'none',
-} as const;
-
-const secondaryButtonStyle = {
-  padding: 12,
-  borderRadius: 10,
-  cursor: 'pointer',
-} as const;
-
-const stepWrapStyle = {
-  display: 'grid',
-  gridTemplateColumns: 'repeat(3, 1fr)',
-  gap: 8,
-  margin: '18px 0',
-} as const;
+const panelStyle = { display: 'grid', gap: 14, border: '1px solid #ddd', borderRadius: 16, padding: 20, marginBottom: 24 } as const;
+const inputStyle = { display: 'block', width: '100%', maxWidth: '100%', padding: 10, marginTop: 6, borderRadius: 10, border: '1px solid #ccc', boxSizing: 'border-box' } as const;
+const primaryButtonStyle = { padding: 12, borderRadius: 10, cursor: 'pointer', background: '#0a84ff', color: '#fff', border: 0 } as const;
+const primaryLinkStyle = { display: 'inline-block', textAlign: 'center' as const, padding: 12, borderRadius: 10, cursor: 'pointer', background: '#0a84ff', color: '#fff', border: 0, textDecoration: 'none' } as const;
+const secondaryButtonStyle = { padding: 12, borderRadius: 10, cursor: 'pointer' } as const;
+const stepWrapStyle = { display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8, margin: '18px 0' } as const;
+const summaryStyle = { border: '1px solid #ddd', borderRadius: 14, padding: 16 } as const;
+const paymentBoxStyle = { border: '1px solid #ddd', borderRadius: 14, padding: 16 } as const;
+const previewBoxStyle = { border: '1px solid #ddd', borderRadius: 14, padding: 16 } as const;
+const qrBoxStyle = { width: 180, height: 180, border: '1px dashed #999', borderRadius: 16, display: 'grid', placeItems: 'center', fontSize: 36, margin: '12px 0' } as const;
 
 function stepItemStyle(active: boolean) {
-  return {
-    padding: 10,
-    borderRadius: 12,
-    textAlign: 'center' as const,
-    border: '1px solid #ddd',
-    background: active ? '#0a84ff' : '#fff',
-    color: active ? '#fff' : '#111',
-  };
+  return { padding: 10, borderRadius: 12, textAlign: 'center' as const, border: '1px solid #ddd', background: active ? '#0a84ff' : '#fff', color: active ? '#fff' : '#111' };
 }
 
 function amountButtonStyle(active: boolean) {
-  return {
-    padding: 12,
-    borderRadius: 12,
-    border: active ? '2px solid #0a84ff' : '1px solid #ddd',
-    cursor: 'pointer',
-    background: active ? '#e8f2ff' : '#fff',
-  };
+  return { padding: 12, borderRadius: 12, border: active ? '2px solid #0a84ff' : '1px solid #ddd', cursor: 'pointer', background: active ? '#e8f2ff' : '#fff' };
 }
 
 function methodButtonStyle(active: boolean) {
-  return {
-    display: 'grid',
-    gap: 4,
-    textAlign: 'left' as const,
-    padding: 14,
-    borderRadius: 12,
-    border: active ? '2px solid #0a84ff' : '1px solid #ddd',
-    cursor: 'pointer',
-    background: active ? '#e8f2ff' : '#fff',
-  };
+  return { display: 'grid', gap: 4, textAlign: 'left' as const, padding: 14, borderRadius: 12, border: active ? '2px solid #0a84ff' : '1px solid #ddd', cursor: 'pointer', background: active ? '#e8f2ff' : '#fff' };
 }
-
-const summaryStyle = {
-  border: '1px solid #ddd',
-  borderRadius: 14,
-  padding: 16,
-} as const;
-
-const paymentBoxStyle = {
-  border: '1px solid #ddd',
-  borderRadius: 14,
-  padding: 16,
-} as const;
-
-const previewBoxStyle = {
-  border: '1px solid #ddd',
-  borderRadius: 14,
-  padding: 16,
-} as const;
-
-const qrBoxStyle = {
-  width: 180,
-  height: 180,
-  border: '1px dashed #999',
-  borderRadius: 16,
-  display: 'grid',
-  placeItems: 'center',
-  fontSize: 36,
-  margin: '12px 0',
-} as const;
