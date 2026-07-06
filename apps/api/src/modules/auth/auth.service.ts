@@ -1,4 +1,4 @@
-import { ConflictException, Injectable, UnauthorizedException } from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import * as argon2 from 'argon2';
@@ -17,6 +17,11 @@ export class AuthService {
   ) {}
 
   async register(dto: RegisterDto, meta: RequestMeta = {}) {
+    const rawSecret = dto.secret ?? dto.password;
+    if (!rawSecret) {
+      throw new BadRequestException('secret is required');
+    }
+
     const exists = await this.prisma.user.findFirst({
       where: {
         OR: [
@@ -31,7 +36,6 @@ export class AuthService {
       throw new ConflictException('Member already exists');
     }
 
-    const rawSecret = dto.secret;
     const hash = await argon2.hash(rawSecret);
 
     const user = await this.prisma.user.create({
@@ -53,6 +57,11 @@ export class AuthService {
   }
 
   async signIn(dto: MemberSignInDto, meta: RequestMeta = {}) {
+    const rawSecret = dto.secret ?? dto.password;
+    if (!rawSecret) {
+      throw new BadRequestException('secret is required');
+    }
+
     const user = await this.prisma.user.findFirst({
       where: {
         OR: [{ username: dto.identifier }, { phone: dto.identifier }, { email: dto.identifier }],
@@ -64,7 +73,7 @@ export class AuthService {
       throw new UnauthorizedException('Invalid credentials');
     }
 
-    const valid = await argon2.verify(user.passwordHash, dto.secret);
+    const valid = await argon2.verify(user.passwordHash, rawSecret);
     if (!valid) {
       await this.writeLoginHistory('MEMBER', user.id, false, meta, 'INVALID_SECRET');
       throw new UnauthorizedException('Invalid credentials');
