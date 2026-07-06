@@ -54,19 +54,55 @@ Status: completed
 
 ## Phase 2: Website Settings, Wallet, Ledger, Transaction
 
+Website settings must be implemented before or alongside the Admin Panel foundation and must be clearly separated from money, wallet, deposit, withdraw, and provider balance settings.
+
+Full specification: `docs/WEBSITE_SETTINGS.md`
+
 ### Website Settings
 
-- Site identity: website name, logo, favicon
-- Public contact settings: support phone, email, social links
-- Member web settings: maintenance mode, registration toggle, login toggle
-- Admin web settings: dashboard display settings, security notice text
-- Theme settings: primary color, secondary color, default language
-- SEO defaults: title, description, keywords, Open Graph image
-- Legal pages config: terms URL, privacy URL, responsible-use notice
-- Announcement banner: message, active window, target page
-- Feature flags: enable or disable features per environment
-- Admin settings page with RBAC permission
-- Audit log for every website setting change
+Admin routes:
+
+- /admin/settings/website
+- /admin/settings/branding
+- /admin/settings/theme
+- /admin/settings/seo
+- /admin/settings/contact
+- /admin/settings/maintenance
+- /admin/settings/scripts
+- /admin/settings/features
+- /admin/settings/legal
+
+Backend requirements:
+
+- site_settings key-value table
+- site_setting_histories table
+- Public settings APIs for safe frontend values
+- Admin settings APIs with RBAC permissions
+- Audit log for every change
+- Dual approval for high-risk changes
+- Redis cache for public/theme/seo/maintenance/features settings
+
+Required permission groups:
+
+- settings.website.view / settings.website.update
+- settings.branding.view / settings.branding.update
+- settings.theme.view / settings.theme.update
+- settings.seo.view / settings.seo.update
+- settings.contact.view / settings.contact.update
+- settings.maintenance.view / settings.maintenance.update
+- settings.scripts.view / settings.scripts.update
+- settings.features.view / settings.features.update
+- settings.legal.view / settings.legal.update
+
+Dual approval required for:
+
+- Enable/disable deposit
+- Enable/disable withdraw
+- Enable full-site maintenance
+- Update custom scripts
+- Update domain settings
+- Update provider feature flags
+- Enable/disable registration
 
 ### Wallet Foundation
 
