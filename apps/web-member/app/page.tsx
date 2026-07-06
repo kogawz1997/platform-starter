@@ -1,4 +1,5 @@
 import { boolSetting, loadPublicSiteSettings, textSetting } from './site-settings';
+import WalletCard from './wallet-card';
 
 export default async function Page() {
   const settings = await loadPublicSiteSettings();
@@ -47,18 +48,7 @@ export default async function Page() {
           </nav>
         </header>
 
-        {showBalanceHeader && (
-          <section style={{ background: cardColor, borderRadius: 22, padding: 20 }}>
-            <p style={{ margin: 0 }}>ยอดเงิน</p>
-            <h2 style={{ marginTop: 8 }}>฿0.00</h2>
-            {showButtons && (
-              <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-                <button style={{ background: primaryColor, border: 0, borderRadius: 12, padding: '10px 18px' }}>ฝากเงิน</button>
-                <button style={{ borderRadius: 12, padding: '10px 18px' }}>ถอนเงิน</button>
-              </div>
-            )}
-          </section>
-        )}
+        {showBalanceHeader && <WalletCard primaryColor={primaryColor} cardColor={cardColor} showButtons={showButtons} />}
 
         {showPromotion && <Card title="Promotion Banner" text="พื้นที่แสดงโปรโมชั่นจาก Settings" color={cardColor} />}
         {showCategories && <Card title="Game Categories" text="หมวดหมู่เกมจะแสดงตรงนี้" color={cardColor} />}
