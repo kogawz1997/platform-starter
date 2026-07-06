@@ -15,7 +15,7 @@
     "@nestjs/jwt": "latest",
     "@nestjs/passport": "latest",
     "@nestjs/platform-express": "latest",
-    "@prisma/client": "latest",
+    "@prisma/client": "6.14.0",
     "argon2": "latest",
     "class-transformer": "latest",
     "class-validator": "latest",
@@ -31,6 +31,7 @@
     "@types/node": "latest",
     "@types/passport-jwt": "latest",
     "jest": "latest",
+    "prisma": "6.14.0",
     "ts-jest": "latest",
     "typescript": "latest"
   }
