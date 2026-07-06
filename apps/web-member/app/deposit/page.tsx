@@ -15,7 +15,7 @@ type TopUpItem = {
   createdAt: string;
 };
 
-type Step = 'select' | 'pay' | 'done';
+type Step = 'select' | 'transfer' | 'waiting' | 'approved' | 'rejected';
 
 const AMOUNTS = [100, 300, 500, 1000, 3000, 5000];
 
@@ -24,13 +24,13 @@ const METHODS = [
     code: 'bank_transfer',
     label: 'โอนธนาคาร',
     title: 'บัญชีรับเงิน',
-    detail: 'กรุณาโอนตามยอดที่เลือก แล้วกดเสร็จสิ้น',
+    detail: 'โอนตามยอดที่เลือก แล้วกลับมากดปุ่มโอนเรียบร้อย',
   },
   {
-    code: 'manual',
-    label: 'Manual',
-    title: 'Manual Top Up',
-    detail: 'ส่งคำขอให้แอดมินตรวจสอบและปรับยอด',
+    code: 'qr_promptpay',
+    label: 'QR PromptPay',
+    title: 'สแกน QR เพื่อโอนเงิน',
+    detail: 'สแกน QR ตามยอดที่เลือก แล้วกลับมากดปุ่มโอนเรียบร้อย',
   },
 ];
 
@@ -43,10 +43,43 @@ export default function DepositPage() {
   const [items, setItems] = useState<TopUpItem[]>([]);
   const [message, setMessage] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [pendingRequest, setPendingRequest] = useState<TopUpItem | null>(null);
 
   useEffect(() => {
     loadHistory();
   }, []);
+
+  useEffect(() => {
+    if (!pendingRequest?.id || step !== 'waiting') return;
+
+    const interval = window.setInterval(async () => {
+      const token = window.localStorage.getItem('member_access_token');
+      if (!token) return;
+
+      const res = await fetch(`${API_URL}/member/topups/${pendingRequest.id}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok || !data) return;
+
+      setPendingRequest(data);
+      setItems((current) => current.map((item) => (item.id === data.id ? data : item)));
+
+      if (data.status === 'APPROVED') {
+        setMessage('ทำรายการสำเร็จ ยอดถูกอนุมัติแล้ว');
+        setStep('approved');
+        window.clearInterval(interval);
+      }
+
+      if (data.status === 'REJECTED') {
+        setMessage(data.adminNote ? `รายการไม่ผ่าน: ${data.adminNote}` : 'รายการไม่ผ่านการตรวจสอบ');
+        setStep('rejected');
+        window.clearInterval(interval);
+      }
+    }, 5000);
+
+    return () => window.clearInterval(interval);
+  }, [pendingRequest?.id, step]);
 
   const selectedMethod = useMemo(() => METHODS.find((item) => item.code === method) ?? METHODS[0], [method]);
   const parsedAmount = useMemo(() => Number(amount.trim().replace(/,/g, '')), [amount]);
@@ -65,7 +98,7 @@ export default function DepositPage() {
     if (res.ok) setItems(data.items ?? []);
   }
 
-  function goToPay(event: FormEvent<HTMLFormElement>) {
+  function goToTransfer(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
     if (!Number.isFinite(parsedAmount) || parsedAmount <= 0) {
@@ -74,10 +107,10 @@ export default function DepositPage() {
     }
 
     setMessage('');
-    setStep('pay');
+    setStep('transfer');
   }
 
-  async function finishTopUp() {
+  async function submitAfterTransfer() {
     if (!Number.isFinite(parsedAmount) || parsedAmount <= 0) {
       setMessage('กรุณาเลือกหรือใส่จำนวนเงินมากกว่า 0');
       setStep('select');
@@ -91,7 +124,7 @@ export default function DepositPage() {
     }
 
     setIsSubmitting(true);
-    setMessage('กำลังส่งคำขอให้แอดมินตรวจสอบ...');
+    setMessage('กำลังส่งรายการให้แอดมินตรวจสอบ...');
 
     const res = await fetch(`${API_URL}/member/topups`, {
       method: 'POST',
@@ -106,40 +139,36 @@ export default function DepositPage() {
     setIsSubmitting(false);
 
     if (!res.ok) {
-      setMessage(data?.message ?? 'ส่งคำขอไม่สำเร็จ');
+      setMessage(data?.message ?? 'ส่งรายการไม่สำเร็จ');
       return;
     }
 
     setReferenceCode('');
     setNote('');
-    setMessage('ส่งคำขอสำเร็จ รอแอดมินตรวจสอบและอนุมัติ');
+    setPendingRequest(data);
     setItems((current) => [data, ...current]);
-    setStep('done');
+    setMessage('ส่งรายการแล้ว รอแอดมินตรวจสอบและอนุมัติ');
+    setStep('waiting');
   }
 
   return (
     <main style={{ maxWidth: 980, margin: '32px auto', padding: 24 }}>
       <a href="/">← หน้าแรก</a>
       <h1>ฝากเงิน / เติมเงิน</h1>
-      <p>เลือกยอด เลือกวิธีทำรายการ แล้วกดเสร็จสิ้นหลังทำรายการเรียบร้อย</p>
+      <p>เลือกยอด เลือกช่องทาง โอนเงิน แล้วรอแอดมินอนุมัติ</p>
 
       <section style={stepWrapStyle}>
         <div style={stepItemStyle(step === 'select')}>1 เลือกยอด</div>
-        <div style={stepItemStyle(step === 'pay')}>2 ทำรายการ</div>
-        <div style={stepItemStyle(step === 'done')}>3 รอตรวจสอบ</div>
+        <div style={stepItemStyle(step === 'transfer')}>2 โอนเงิน</div>
+        <div style={stepItemStyle(step === 'waiting' || step === 'approved' || step === 'rejected')}>3 ผลรายการ</div>
       </section>
 
       {step === 'select' && (
-        <form onSubmit={goToPay} style={panelStyle}>
+        <form onSubmit={goToTransfer} style={panelStyle}>
           <h2>เลือกจำนวนเงิน</h2>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(110px, 1fr))', gap: 10 }}>
             {AMOUNTS.map((value) => (
-              <button
-                key={value}
-                type="button"
-                onClick={() => setAmount(String(value))}
-                style={amountButtonStyle(amount === String(value))}
-              >
+              <button key={value} type="button" onClick={() => setAmount(String(value))} style={amountButtonStyle(amount === String(value))}>
                 ฿{value.toLocaleString('th-TH')}
               </button>
             ))}
@@ -150,46 +179,47 @@ export default function DepositPage() {
             <input value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="เช่น 500" inputMode="decimal" style={inputStyle} />
           </label>
 
-          <h2>เลือกวิธีการทำรายการ</h2>
+          <h2>เลือกวิธีการเติม</h2>
           <div style={{ display: 'grid', gap: 10 }}>
             {METHODS.map((item) => (
-              <button
-                key={item.code}
-                type="button"
-                onClick={() => setMethod(item.code)}
-                style={methodButtonStyle(method === item.code)}
-              >
+              <button key={item.code} type="button" onClick={() => setMethod(item.code)} style={methodButtonStyle(method === item.code)}>
                 <strong>{item.label}</strong>
                 <span>{item.detail}</span>
               </button>
             ))}
           </div>
 
-          <button type="submit" style={primaryButtonStyle}>เติมเงิน</button>
+          <button type="submit" style={primaryButtonStyle}>เสร็จสิ้น</button>
           {message && <p>{message}</p>}
         </form>
       )}
 
-      {step === 'pay' && (
+      {step === 'transfer' && (
         <section style={panelStyle}>
-          <h2>ทำรายการตามข้อมูลนี้</h2>
+          <h2>{selectedMethod.title}</h2>
           <div style={summaryStyle}>
-            <p>ยอดที่ต้องทำรายการ</p>
+            <p>ยอดที่ต้องโอน</p>
             <h1>฿{parsedAmount.toLocaleString('th-TH', { minimumFractionDigits: 2 })}</h1>
-            <p>วิธี: {selectedMethod.label}</p>
+            <p>ช่องทาง: {selectedMethod.label}</p>
           </div>
 
-          <section style={{ border: '1px solid #ddd', borderRadius: 14, padding: 16 }}>
-            <strong>{selectedMethod.title}</strong>
-            <p>{selectedMethod.detail}</p>
-            {method === 'bank_transfer' && (
-              <div>
-                <p>ชื่อบัญชี: Platform Demo</p>
-                <p>เลขบัญชี: 000-000-0000</p>
-                <p>ธนาคาร: Demo Bank</p>
-              </div>
-            )}
-          </section>
+          {method === 'bank_transfer' && (
+            <section style={paymentBoxStyle}>
+              <strong>ข้อมูลบัญชี</strong>
+              <p>ชื่อบัญชี: Platform Demo</p>
+              <p>เลขบัญชี: 000-000-0000</p>
+              <p>ธนาคาร: Demo Bank</p>
+              <p>โอนเสร็จแล้วให้กรอกเลขอ้างอิง แล้วกด “โอนเรียบร้อย”</p>
+            </section>
+          )}
+
+          {method === 'qr_promptpay' && (
+            <section style={paymentBoxStyle}>
+              <strong>QR Code</strong>
+              <div style={qrBoxStyle}>QR</div>
+              <p>สแกน QR แล้วโอนตามยอด ฿{parsedAmount.toLocaleString('th-TH', { minimumFractionDigits: 2 })}</p>
+            </section>
+          )}
 
           <label>
             Reference / เลขอ้างอิง
@@ -202,20 +232,41 @@ export default function DepositPage() {
 
           <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
             <button type="button" onClick={() => setStep('select')} style={secondaryButtonStyle}>ย้อนกลับ</button>
-            <button type="button" onClick={finishTopUp} disabled={isSubmitting} style={primaryButtonStyle}>
-              {isSubmitting ? 'กำลังส่ง...' : 'เสร็จสิ้น'}
+            <button type="button" onClick={submitAfterTransfer} disabled={isSubmitting} style={primaryButtonStyle}>
+              {isSubmitting ? 'กำลังส่ง...' : 'โอนเรียบร้อย / เสร็จ'}
             </button>
           </div>
           {message && <p>{message}</p>}
         </section>
       )}
 
-      {step === 'done' && (
+      {step === 'waiting' && (
         <section style={panelStyle}>
-          <h2>ส่งคำขอแล้ว</h2>
-          <p>รายการของคุณอยู่ในสถานะ PENDING รอแอดมินตรวจสอบและอนุมัติ</p>
-          <button type="button" onClick={() => setStep('select')} style={primaryButtonStyle}>เติมเงินอีกครั้ง</button>
+          <h2>รอแอดมินอนุมัติ</h2>
+          <p>รายการของคุณถูกส่งแล้ว สถานะตอนนี้: {pendingRequest?.status ?? 'PENDING'}</p>
+          <p>หน้านี้จะเช็กสถานะให้อัตโนมัติทุก 5 วินาที หลังแอดมินอนุมัติจะขึ้นแจ้งเตือนว่าทำรายการสำเร็จ</p>
+          <div style={summaryStyle}>
+            <p>ยอดรายการ</p>
+            <h1>฿{Number(pendingRequest?.amount ?? parsedAmount).toLocaleString('th-TH', { minimumFractionDigits: 2 })}</h1>
+          </div>
           {message && <p>{message}</p>}
+        </section>
+      )}
+
+      {step === 'approved' && (
+        <section style={panelStyle}>
+          <h2>ทำรายการเสร็จสิ้น ✅</h2>
+          <p>แอดมินอนุมัติแล้ว ยอดจะถูกเพิ่มเข้ากระเป๋าเงิน</p>
+          <a href="/" style={primaryLinkStyle}>กลับหน้าหลัก</a>
+          {message && <p>{message}</p>}
+        </section>
+      )}
+
+      {step === 'rejected' && (
+        <section style={panelStyle}>
+          <h2>รายการไม่ผ่าน</h2>
+          <p>{message || 'กรุณาตรวจสอบข้อมูลแล้วทำรายการใหม่'}</p>
+          <button type="button" onClick={() => setStep('select')} style={primaryButtonStyle}>ทำรายการใหม่</button>
         </section>
       )}
 
@@ -263,6 +314,18 @@ const primaryButtonStyle = {
   background: '#0a84ff',
   color: '#fff',
   border: 0,
+} as const;
+
+const primaryLinkStyle = {
+  display: 'inline-block',
+  textAlign: 'center' as const,
+  padding: 12,
+  borderRadius: 10,
+  cursor: 'pointer',
+  background: '#0a84ff',
+  color: '#fff',
+  border: 0,
+  textDecoration: 'none',
 } as const;
 
 const secondaryButtonStyle = {
@@ -316,4 +379,21 @@ const summaryStyle = {
   border: '1px solid #ddd',
   borderRadius: 14,
   padding: 16,
+} as const;
+
+const paymentBoxStyle = {
+  border: '1px solid #ddd',
+  borderRadius: 14,
+  padding: 16,
+} as const;
+
+const qrBoxStyle = {
+  width: 180,
+  height: 180,
+  border: '1px dashed #999',
+  borderRadius: 16,
+  display: 'grid',
+  placeItems: 'center',
+  fontSize: 36,
+  margin: '12px 0',
 } as const;
