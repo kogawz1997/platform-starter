@@ -1,3 +1,4 @@
+import 'reflect-metadata';
 import { ValidationPipe } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { NestFactory } from '@nestjs/core';
@@ -22,8 +23,8 @@ async function bootstrap() {
     }),
   );
 
-  const port = Number(config.get<string>('API_PORT') ?? 4000);
-  await app.listen(port);
+  const port = Number(process.env.PORT ?? config.get<string>('API_PORT') ?? 4000);
+  await app.listen(port, '0.0.0.0');
 }
 
 bootstrap();
