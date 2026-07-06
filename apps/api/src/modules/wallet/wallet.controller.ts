@@ -1,7 +1,8 @@
-import { Controller, Get, Param, Query, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Post, Query, Req, UseGuards } from '@nestjs/common';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { AdminAuthGuard } from '../../common/guards/admin-auth.guard';
 import { MemberAuthGuard } from '../../common/guards/member-auth.guard';
+import { AdjustWalletDto } from './dto/adjust-wallet.dto';
 import { WalletService } from './wallet.service';
 
 @Controller()
@@ -24,11 +25,12 @@ export class WalletController {
   @Get('admin/ledgers')
   getAdminLedgers(
     @Query('userId') userId?: string,
+    @Query('identifier') identifier?: string,
     @Query('type') type?: string,
     @Query('direction') direction?: string,
     @Query('limit') limit?: string,
   ) {
-    return this.walletService.getAdminLedgers({ userId, type, direction, limit });
+    return this.walletService.getAdminLedgers({ userId, identifier, type, direction, limit });
   }
 
   @UseGuards(AdminAuthGuard)
@@ -41,5 +43,11 @@ export class WalletController {
   @Get('admin/wallets/:userId')
   getAdminWalletDetail(@Param('userId') userId: string) {
     return this.walletService.getAdminWalletDetail(userId);
+  }
+
+  @UseGuards(AdminAuthGuard)
+  @Post('admin/wallets/:userId/adjust')
+  adjustWallet(@Param('userId') userId: string, @CurrentUser() user: any, @Body() body: AdjustWalletDto, @Req() req: any) {
+    return this.walletService.adjustWallet(userId, user, body, { ipAddress: req.ip, userAgent: req.headers?.['user-agent'] });
   }
 }
