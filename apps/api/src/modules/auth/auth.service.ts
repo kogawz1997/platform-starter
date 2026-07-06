@@ -38,18 +38,29 @@ export class AuthService {
 
     const hash = await argon2.hash(rawSecret);
 
-    const user = await this.prisma.user.create({
-      data: {
-        username: dto.username,
-        phone: dto.phone,
-        email: dto.email,
-        passwordHash: hash,
-        profile: {
-          create: {
-            displayName: dto.username,
+    const user = await this.prisma.$transaction(async (tx) => {
+      const createdUser = await tx.user.create({
+        data: {
+          username: dto.username,
+          phone: dto.phone,
+          email: dto.email,
+          passwordHash: hash,
+          profile: {
+            create: {
+              displayName: dto.username,
+            },
           },
         },
-      },
+      });
+
+      await tx.wallet.create({
+        data: {
+          userId: createdUser.id,
+          currency: 'THB',
+        },
+      });
+
+      return createdUser;
     });
 
     await this.writeLoginHistory('MEMBER', user.id, true, meta);
