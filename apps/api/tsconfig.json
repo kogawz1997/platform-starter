@@ -3,10 +3,12 @@
   "compilerOptions": {
     "module": "CommonJS",
     "moduleResolution": "Node",
+    "ignoreDeprecations": "6.0",
     "outDir": "dist",
     "rootDir": "src",
     "emitDecoratorMetadata": true,
     "experimentalDecorators": true
   },
-  "include": ["src/**/*.ts", "test/**/*.ts"]
+  "include": ["src/**/*.ts"],
+  "exclude": ["src/**/*.spec.ts", "test/**/*.ts", "node_modules", "dist"]
 }
