@@ -32,6 +32,28 @@ enum VerificationType {
   TWO_FACTOR
 }
 
+enum SiteSettingGroup {
+  WEBSITE
+  BRANDING
+  THEME
+  SEO
+  CONTACT
+  MAINTENANCE
+  SCRIPTS
+  FEATURES
+  LEGAL
+}
+
+enum SiteSettingType {
+  STRING
+  NUMBER
+  BOOLEAN
+  JSON
+  URL
+  COLOR
+  RICH_TEXT
+}
+
 model User {
   id              String          @id @default(uuid()) @db.Uuid
   username        String          @unique @db.VarChar(50)
@@ -210,4 +232,36 @@ model AdminAuditLog {
   @@index([adminUserId])
   @@index([module, action])
   @@map("admin_audit_logs")
+}
+
+model SiteSetting {
+  id          String           @id @default(uuid()) @db.Uuid
+  key         String           @unique @db.VarChar(160)
+  valueJson   Json             @map("value_json")
+  group       SiteSettingGroup
+  type        SiteSettingType  @default(JSON)
+  isPublic    Boolean          @default(false) @map("is_public")
+  isSensitive Boolean          @default(false) @map("is_sensitive")
+  updatedBy   String?          @map("updated_by") @db.Uuid
+  createdAt   DateTime         @default(now()) @map("created_at")
+  updatedAt   DateTime         @updatedAt @map("updated_at")
+
+  @@index([group])
+  @@index([isPublic])
+  @@map("site_settings")
+}
+
+model SiteSettingHistory {
+  id           String   @id @default(uuid()) @db.Uuid
+  settingKey   String   @map("setting_key") @db.VarChar(160)
+  oldValueJson Json?    @map("old_value_json")
+  newValueJson Json?    @map("new_value_json")
+  changedBy    String?  @map("changed_by") @db.Uuid
+  ipAddress    String?  @map("ip_address") @db.VarChar(64)
+  userAgent    String?  @map("user_agent")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  @@index([settingKey])
+  @@index([changedBy])
+  @@map("site_setting_histories")
 }
