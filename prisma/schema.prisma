@@ -7,8 +7,207 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// TODO models:
-// User, AdminUser, Role, Permission
-// Wallet, WalletLedger, Transaction
-// Deposit, Withdrawal, Provider, Game
-// Promotion, Coupon, MediaAsset, AuditLog, RiskAlert
+enum UserStatus {
+  ACTIVE
+  SUSPENDED
+  LOCKED
+  CLOSED
+}
+
+enum AdminStatus {
+  ACTIVE
+  SUSPENDED
+  LOCKED
+}
+
+enum SessionType {
+  MEMBER
+  ADMIN
+}
+
+enum VerificationType {
+  EMAIL
+  PHONE
+  PASSWORD_RESET
+  TWO_FACTOR
+}
+
+model User {
+  id              String          @id @default(uuid()) @db.Uuid
+  username        String          @unique @db.VarChar(50)
+  phone           String?         @unique @db.VarChar(30)
+  email           String?         @unique @db.VarChar(255)
+  passwordHash    String          @map("password_hash")
+  status          UserStatus      @default(ACTIVE)
+  phoneVerifiedAt DateTime?       @map("phone_verified_at")
+  emailVerifiedAt DateTime?       @map("email_verified_at")
+  lastLoginAt     DateTime?       @map("last_login_at")
+  createdAt       DateTime        @default(now()) @map("created_at")
+  updatedAt       DateTime        @updatedAt @map("updated_at")
+
+  profile       UserProfile?
+  sessions      AuthSession[]
+  loginHistory  LoginHistory[]
+
+  @@map("users")
+}
+
+model UserProfile {
+  id          String    @id @default(uuid()) @db.Uuid
+  userId      String    @unique @map("user_id") @db.Uuid
+  displayName String?   @map("display_name") @db.VarChar(100)
+  avatarUrl   String?   @map("avatar_url")
+  birthday    DateTime?
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("user_profiles")
+}
+
+model AdminUser {
+  id                String       @id @default(uuid()) @db.Uuid
+  username          String       @unique @db.VarChar(50)
+  email             String       @unique @db.VarChar(255)
+  passwordHash      String       @map("password_hash")
+  status            AdminStatus  @default(ACTIVE)
+  twoFactorEnabled  Boolean      @default(false) @map("two_factor_enabled")
+  twoFactorSecret   String?      @map("two_factor_secret")
+  lastLoginAt       DateTime?    @map("last_login_at")
+  createdAt         DateTime     @default(now()) @map("created_at")
+  updatedAt         DateTime     @updatedAt @map("updated_at")
+
+  roles         AdminUserRole[]
+  sessions      AuthSession[]
+  loginHistory  LoginHistory[]
+  auditLogs     AdminAuditLog[]
+
+  @@map("admin_users")
+}
+
+model Role {
+  id          String   @id @default(uuid()) @db.Uuid
+  code        String   @unique @db.VarChar(80)
+  name        String   @db.VarChar(100)
+  description String?
+  level       Int      @default(100)
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  adminUsers  AdminUserRole[]
+  permissions RolePermission[]
+
+  @@map("roles")
+}
+
+model Permission {
+  id          String   @id @default(uuid()) @db.Uuid
+  code        String   @unique @db.VarChar(120)
+  name        String   @db.VarChar(120)
+  module      String   @db.VarChar(80)
+  description String?
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  roles RolePermission[]
+
+  @@map("permissions")
+}
+
+model AdminUserRole {
+  adminUserId String @map("admin_user_id") @db.Uuid
+  roleId      String @map("role_id") @db.Uuid
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  adminUser AdminUser @relation(fields: [adminUserId], references: [id], onDelete: Cascade)
+  role      Role      @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@id([adminUserId, roleId])
+  @@map("admin_user_roles")
+}
+
+model RolePermission {
+  roleId       String   @map("role_id") @db.Uuid
+  permissionId String   @map("permission_id") @db.Uuid
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  role       Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@id([roleId, permissionId])
+  @@map("role_permissions")
+}
+
+model AuthSession {
+  id               String      @id @default(uuid()) @db.Uuid
+  type             SessionType
+  userId           String?     @map("user_id") @db.Uuid
+  adminUserId      String?     @map("admin_user_id") @db.Uuid
+  refreshTokenHash String      @map("refresh_token_hash")
+  ipAddress        String?     @map("ip_address") @db.VarChar(64)
+  userAgent        String?     @map("user_agent")
+  deviceId         String?     @map("device_id") @db.VarChar(120)
+  expiresAt        DateTime    @map("expires_at")
+  revokedAt        DateTime?   @map("revoked_at")
+  createdAt        DateTime    @default(now()) @map("created_at")
+  updatedAt        DateTime    @updatedAt @map("updated_at")
+
+  user      User?      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  adminUser AdminUser? @relation(fields: [adminUserId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([adminUserId])
+  @@map("auth_sessions")
+}
+
+model LoginHistory {
+  id          String      @id @default(uuid()) @db.Uuid
+  type        SessionType
+  userId      String?     @map("user_id") @db.Uuid
+  adminUserId String?     @map("admin_user_id") @db.Uuid
+  success     Boolean
+  ipAddress   String?     @map("ip_address") @db.VarChar(64)
+  userAgent   String?     @map("user_agent")
+  reason      String?
+  createdAt   DateTime    @default(now()) @map("created_at")
+
+  user      User?      @relation(fields: [userId], references: [id], onDelete: SetNull)
+  adminUser AdminUser? @relation(fields: [adminUserId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([adminUserId])
+  @@map("login_history")
+}
+
+model VerificationToken {
+  id        String           @id @default(uuid()) @db.Uuid
+  type      VerificationType
+  target    String           @db.VarChar(255)
+  tokenHash String           @map("token_hash")
+  expiresAt DateTime         @map("expires_at")
+  usedAt    DateTime?        @map("used_at")
+  createdAt DateTime         @default(now()) @map("created_at")
+
+  @@index([target, type])
+  @@map("verification_tokens")
+}
+
+model AdminAuditLog {
+  id          String   @id @default(uuid()) @db.Uuid
+  adminUserId String?  @map("admin_user_id") @db.Uuid
+  action      String   @db.VarChar(120)
+  module      String   @db.VarChar(80)
+  targetId    String?  @map("target_id") @db.VarChar(120)
+  oldData     Json?    @map("old_data")
+  newData     Json?    @map("new_data")
+  ipAddress   String?  @map("ip_address") @db.VarChar(64)
+  userAgent   String?  @map("user_agent")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  adminUser AdminUser? @relation(fields: [adminUserId], references: [id], onDelete: SetNull)
+
+  @@index([adminUserId])
+  @@index([module, action])
+  @@map("admin_audit_logs")
+}
