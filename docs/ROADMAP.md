@@ -2,7 +2,7 @@
 
 ## Phase 0: Project Foundation
 
-Status: started
+Status: completed
 
 - Monorepo structure
 - Member App
@@ -14,7 +14,7 @@ Status: started
 
 ## Phase 1: Auth, User, Admin
 
-Status: completed
+Status: completed core flow, UI polish scheduled in Phase 3.5
 
 ### Member Auth
 
@@ -37,6 +37,24 @@ Status: completed
 - IP whitelist
 - Session timeout
 - Admin audit log
+
+### Auth UX/UI follow-up
+
+These items must be completed before the authentication experience is considered production-ready for real users.
+
+- Member login page UI polish
+- Member register page UI polish
+- Admin login page UI polish
+- Auth form validation states
+- Loading states during login/register
+- Error states with clear Thai messages
+- Success states after register/login
+- Remember session behavior check
+- Redirect after member login
+- Redirect after admin login
+- Mobile responsive auth pages
+- Password visibility toggle
+- Consistent branding from Website Settings
 
 ### Core Tables
 
@@ -99,7 +117,7 @@ Backend requirements:
 
 ## Phase 3: Wallet Hardening and Operation Center
 
-Status: next
+Status: in progress
 
 - Finance dashboard summary
 - Private media storage for slips
@@ -108,6 +126,65 @@ Status: next
 - Export finance records
 - Job lock for high-risk operations
 
+## Phase 3.5: UX/UI Polish
+
+Status: planned after Finance Summary baseline
+
+### Auth Pages
+
+- Member login page final design
+- Member register page final design
+- Admin login page final design
+- Admin OTP/2FA page final design
+- Real login/register usable flow verification
+- Mobile-first form layout
+- Clear Thai labels and helper text
+- Loading spinner / disabled submit button
+- Error alert for wrong credentials
+- Error alert for validation failure
+- Success feedback after register
+- Redirect UX after login
+- Brand logo, site name, and colors from settings
+
+### Member UX/UI
+
+- Member home layout polish
+- Wallet card polish
+- Deposit page polish
+- Withdraw page polish
+- Transactions page polish
+- Mobile responsive layout
+- Empty states
+- Error states
+- Toast notifications
+- Confirmation modals
+
+### Admin UX/UI
+
+- Admin layout/sidebar
+- Finance dashboard polish
+- Top-up review page polish
+- Withdrawal review page polish
+- Wallets page polish
+- Ledgers page polish
+- Settings hub polish
+- Tables, filters, badges, and action buttons
+- Confirmation modal for approve/reject/adjust actions
+- Better spacing, cards, and typography
+
+### Design System
+
+- Button component
+- Input component
+- Card component
+- Table component
+- Badge component
+- Alert component
+- Modal component
+- Loading component
+- Empty state component
+- Shared colors, radius, spacing, and typography
+
 ## Phase 4: Admin Operation Center
 
 - Dashboard
@@ -115,6 +192,8 @@ Status: next
 - Member detail
 - Risk alert
 - Reports
+- Audit log viewer
+- Admin activity history
 
 ## Phase 5: Provider and Callback
 
@@ -148,3 +227,6 @@ Status: next
 - Backup
 - Alerts
 - Deployment
+- Security review
+- Rate limit
+- Production runbook
