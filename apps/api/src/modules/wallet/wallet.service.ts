@@ -1,5 +1,7 @@
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { Decimal } from '@prisma/client/runtime/library';
 import { PrismaService } from '../../database/prisma.service';
+import { AdjustWalletDto } from './dto/adjust-wallet.dto';
 
 @Injectable()
 export class WalletService {
@@ -20,17 +22,14 @@ export class WalletService {
       take: safeLimit,
     });
 
-    return {
-      walletId: wallet.id,
-      items: ledgers.map((ledger) => this.formatLedger(ledger)),
-    };
+    return { walletId: wallet.id, items: ledgers.map((ledger) => this.formatLedger(ledger)) };
   }
 
   async getAdminLedgers(query: AdminLedgerQuery) {
     const safeLimit = Math.min(Math.max(Number(query.limit) || 100, 1), 200);
+    const identifier = (query.identifier || query.userId || '').trim();
     const where: any = {};
 
-    if (query.userId) where.userId = query.userId;
     if (query.type) where.type = query.type;
     if (query.direction) where.direction = query.direction;
 
@@ -38,17 +37,20 @@ export class WalletService {
       where,
       include: {
         user: { select: { id: true, username: true, phone: true, email: true } },
-        wallet: { select: { id: true, currency: true, balance: true, lockedBalance: true, status: true } },
+        wallet: { select: { id: true, userId: true, currency: true, balance: true, lockedBalance: true, status: true, updatedAt: true } },
         createdByAdmin: { select: { id: true, username: true, email: true } },
       },
       orderBy: { createdAt: 'desc' },
-      take: safeLimit,
+      take: identifier ? 500 : safeLimit,
     });
 
+    const filtered = identifier ? items.filter((item) => this.matchesIdentifier(identifier, item.user, item.userId)) : items;
+
     return {
-      items: items.map((item) => ({
+      items: filtered.slice(0, safeLimit).map((item) => ({
         ...this.formatLedger(item),
-        user: item.user,
+        shortUserId: this.shortId(item.userId),
+        user: item.user ? { ...item.user, shortId: this.shortId(item.user.id) } : null,
         wallet: item.wallet ? this.formatWallet(item.wallet) : null,
         createdByAdmin: item.createdByAdmin,
       })),
@@ -60,24 +62,18 @@ export class WalletService {
     const search = query.search?.trim();
 
     const wallets = await this.prisma.wallet.findMany({
-      where: search
-        ? {
-            user: {
-              OR: [
-                { username: { contains: search, mode: 'insensitive' } },
-                { phone: { contains: search, mode: 'insensitive' } },
-                { email: { contains: search, mode: 'insensitive' } },
-              ],
-            },
-          }
-        : {},
       include: { user: { select: { id: true, username: true, phone: true, email: true, status: true } } },
       orderBy: { updatedAt: 'desc' },
-      take: safeLimit,
+      take: search ? 500 : safeLimit,
     });
 
+    const filtered = search ? wallets.filter((wallet) => this.matchesIdentifier(search, wallet.user, wallet.userId)) : wallets;
+
     return {
-      items: wallets.map((wallet) => ({ ...this.formatWallet(wallet), user: wallet.user })),
+      items: filtered.slice(0, safeLimit).map((wallet) => ({
+        ...this.formatWallet(wallet),
+        user: wallet.user ? { ...wallet.user, shortId: this.shortId(wallet.user.id) } : null,
+      })),
     };
   }
 
@@ -87,35 +83,100 @@ export class WalletService {
       where: { id: userId },
       select: { id: true, username: true, phone: true, email: true, status: true, createdAt: true },
     });
-    const ledgers = await this.prisma.walletLedger.findMany({
-      where: { userId },
-      orderBy: { createdAt: 'desc' },
-      take: 100,
-    });
+    const ledgers = await this.prisma.walletLedger.findMany({ where: { userId }, orderBy: { createdAt: 'desc' }, take: 100 });
 
-    return {
-      wallet: this.formatWallet(wallet),
-      user,
-      ledgers: ledgers.map((ledger) => this.formatLedger(ledger)),
-    };
+    return { wallet: this.formatWallet(wallet), user: user ? { ...user, shortId: this.shortId(user.id) } : null, ledgers: ledgers.map((ledger) => this.formatLedger(ledger)) };
+  }
+
+  async adjustWallet(userId: string, adminUser: any, dto: AdjustWalletDto, meta: RequestMeta = {}) {
+    const amount = new Decimal(dto.amount ?? 0);
+    const reason = dto.reason?.trim();
+
+    if (amount.lte(0)) throw new BadRequestException('Amount must be greater than zero');
+    if (!reason) throw new BadRequestException('Reason is required');
+
+    return this.prisma.$transaction(async (tx) => {
+      const user = await tx.user.findUnique({ where: { id: userId } });
+      if (!user) throw new NotFoundException('User not found');
+
+      const wallet = await tx.wallet.upsert({
+        where: { userId },
+        update: {},
+        create: { userId, currency: 'THB' },
+      });
+
+      if (wallet.status !== 'ACTIVE') throw new BadRequestException('Wallet is not active');
+
+      const balanceBefore = wallet.balance;
+      const balanceAfter = dto.direction === 'CREDIT' ? balanceBefore.plus(amount) : balanceBefore.minus(amount);
+
+      if (balanceAfter.lt(0)) throw new BadRequestException('Balance cannot be negative');
+      if (dto.direction === 'DEBIT' && balanceAfter.lt(wallet.lockedBalance)) {
+        throw new BadRequestException('Balance cannot be lower than locked balance');
+      }
+
+      const updatedWallet = await tx.wallet.update({ where: { id: wallet.id }, data: { balance: balanceAfter } });
+
+      const ledger = await tx.walletLedger.create({
+        data: {
+          walletId: wallet.id,
+          userId,
+          type: 'ADJUSTMENT',
+          direction: dto.direction,
+          amount,
+          balanceBefore,
+          balanceAfter,
+          referenceType: 'manual_adjustment',
+          referenceId: wallet.id,
+          idempotencyKey: `adjust:${wallet.id}:${Date.now()}:${Math.random().toString(36).slice(2)}`,
+          metadata: { reason },
+          createdByAdminId: adminUser.id,
+        },
+      });
+
+      await tx.adminAuditLog.create({
+        data: {
+          adminUserId: adminUser.id,
+          action: 'ADJUST_WALLET',
+          module: 'wallets',
+          targetId: wallet.id,
+          oldData: { balance: balanceBefore.toString(), lockedBalance: wallet.lockedBalance.toString() } as any,
+          newData: { direction: dto.direction, amount: amount.toString(), balanceAfter: balanceAfter.toString(), reason } as any,
+          ipAddress: meta.ipAddress,
+          userAgent: meta.userAgent,
+        },
+      });
+
+      return { wallet: this.formatWallet(updatedWallet), ledger: this.formatLedger(ledger) };
+    });
   }
 
   async ensureWallet(userId: string) {
     const existing = await this.prisma.wallet.findUnique({ where: { userId } });
     if (existing) return existing;
+    return this.prisma.wallet.create({ data: { userId, currency: 'THB' } });
+  }
 
-    return this.prisma.wallet.create({
-      data: {
-        userId,
-        currency: 'THB',
-      },
-    });
+  private matchesIdentifier(identifier: string, user: any, userId: string) {
+    const q = identifier.toLowerCase();
+    return (
+      userId.toLowerCase() === q ||
+      userId.toLowerCase().startsWith(q) ||
+      user?.username?.toLowerCase().includes(q) ||
+      user?.phone?.toLowerCase().includes(q) ||
+      user?.email?.toLowerCase().includes(q)
+    );
+  }
+
+  private shortId(id?: string | null) {
+    return id ? id.slice(0, 8) : null;
   }
 
   private formatWallet(wallet: any) {
     return {
       id: wallet.id,
       userId: wallet.userId,
+      shortUserId: this.shortId(wallet.userId),
       currency: wallet.currency,
       balance: wallet.balance.toString(),
       lockedBalance: wallet.lockedBalance.toString(),
@@ -130,6 +191,7 @@ export class WalletService {
       id: ledger.id,
       walletId: ledger.walletId,
       userId: ledger.userId,
+      shortUserId: this.shortId(ledger.userId),
       type: ledger.type,
       direction: ledger.direction,
       amount: ledger.amount.toString(),
@@ -144,14 +206,6 @@ export class WalletService {
   }
 }
 
-type AdminLedgerQuery = {
-  userId?: string;
-  type?: string;
-  direction?: string;
-  limit?: string;
-};
-
-type AdminWalletQuery = {
-  search?: string;
-  limit?: string;
-};
+type AdminLedgerQuery = { userId?: string; identifier?: string; type?: string; direction?: string; limit?: string };
+type AdminWalletQuery = { search?: string; limit?: string };
+type RequestMeta = { ipAddress?: string; userAgent?: string };
