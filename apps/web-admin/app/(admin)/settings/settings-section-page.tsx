@@ -27,14 +27,21 @@ export default function SettingsSectionPage({ group, title, description, fields,
 
   useEffect(() => {
     const token = window.localStorage.getItem('admin_access_token');
-    if (!token) return;
+    if (!token) {
+      setMessage('กรุณา login admin ใหม่ก่อนแก้ settings');
+      return;
+    }
 
     fetch(`${API_URL}/admin/settings/${group}`, {
       headers: { Authorization: `Bearer ${token}` },
     })
-      .then((res) => res.json())
+      .then(async (res) => {
+        const data = await res.json().catch(() => null);
+        if (!res.ok) throw new Error(data?.message ?? 'โหลด settings ไม่สำเร็จ');
+        return data;
+      })
       .then((data) => setForm(data.settings ?? {}))
-      .catch(() => setMessage('โหลด settings ไม่สำเร็จ'));
+      .catch((error) => setMessage(error.message));
   }, [group]);
 
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
@@ -42,6 +49,11 @@ export default function SettingsSectionPage({ group, title, description, fields,
     setMessage('กำลังบันทึก...');
 
     const token = window.localStorage.getItem('admin_access_token');
+    if (!token) {
+      setMessage('กรุณา login admin ใหม่ก่อนบันทึก settings');
+      return;
+    }
+
     const res = await fetch(`${API_URL}/admin/settings/${group}`, {
       method: 'PUT',
       headers: {
@@ -65,20 +77,20 @@ export default function SettingsSectionPage({ group, title, description, fields,
   }
 
   return (
-    <main style={{ maxWidth: 1180, margin: '32px auto', padding: 24 }}>
+    <main style={pageStyle}>
       <a href="/settings">← Settings</a>
-      <h1>{title}</h1>
+      <h1 style={headingStyle}>{title}</h1>
       <p>{description}</p>
 
-      <section style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 360px', gap: 24, alignItems: 'start' }}>
-        <form onSubmit={onSubmit} style={{ display: 'grid', gap: 14, border: '1px solid #ddd', borderRadius: 16, padding: 20 }}>
+      <section style={layoutStyle}>
+        <form onSubmit={onSubmit} style={panelStyle}>
           {fields.map((field) => {
             const type = field.type ?? 'text';
             const value = form[field.key];
 
             if (type === 'checkbox') {
               return (
-                <label key={field.key}>
+                <label key={field.key} style={checkboxStyle}>
                   <input type="checkbox" checked={Boolean(value)} onChange={(e) => update(field.key, e.target.checked)} /> {field.label}
                 </label>
               );
@@ -101,11 +113,11 @@ export default function SettingsSectionPage({ group, title, description, fields,
             );
           })}
 
-          <button type="submit" style={{ padding: 12, borderRadius: 10, cursor: 'pointer' }}>Save Changes</button>
+          <button type="submit" style={buttonStyle}>Save Changes</button>
           {message && <p>{message}</p>}
         </form>
 
-        <aside style={{ border: '1px solid #ddd', borderRadius: 16, padding: 20, position: 'sticky', top: 24 }}>
+        <aside style={previewStyle}>
           <h2>Preview</h2>
           <Preview type={preview} form={form} title={title} />
         </aside>
@@ -122,7 +134,7 @@ function Preview({ type, form, title }: { type: string; form: Record<string, any
     const text = form.text_color ?? '#ffffff';
 
     return (
-      <div style={{ background: bg, color: text, borderRadius: 16, padding: 16 }}>
+      <div style={{ background: bg, color: text, borderRadius: 16, padding: 16, overflowWrap: 'anywhere' }}>
         <strong>{form.logo_url ? 'Logo loaded' : 'Logo'}</strong>
         <div style={{ background: card, borderRadius: 14, padding: 14, marginTop: 12 }}>
           <p>Balance Card</p>
@@ -135,7 +147,7 @@ function Preview({ type, form, title }: { type: string; form: Record<string, any
 
   if (type === 'maintenance') {
     return (
-      <div style={{ border: '1px solid #eee', borderRadius: 14, padding: 16 }}>
+      <div style={{ border: '1px solid #eee', borderRadius: 14, padding: 16, overflowWrap: 'anywhere' }}>
         <p>Maintenance: {form.enabled ? 'ON' : 'OFF'}</p>
         <p>Message: {form.message ?? 'ระบบกำลังปรับปรุง'}</p>
         <p>Deposit: {form.deposit_enabled ? 'ปิดปรับปรุง' : 'เปิดใช้งาน'}</p>
@@ -145,7 +157,7 @@ function Preview({ type, form, title }: { type: string; form: Record<string, any
   }
 
   return (
-    <div style={{ border: '1px solid #eee', borderRadius: 14, padding: 16 }}>
+    <div style={{ border: '1px solid #eee', borderRadius: 14, padding: 16, overflowWrap: 'anywhere' }}>
       <strong>{title}</strong>
       {Object.entries(form).slice(0, 8).map(([key, value]) => (
         <p key={key}>{key}: {String(value)}</p>
@@ -154,11 +166,66 @@ function Preview({ type, form, title }: { type: string; form: Record<string, any
   );
 }
 
+const pageStyle = {
+  maxWidth: 1180,
+  margin: '32px auto',
+  padding: 24,
+  boxSizing: 'border-box',
+} as const;
+
+const headingStyle = {
+  fontSize: 'clamp(36px, 8vw, 64px)',
+  lineHeight: 1.05,
+} as const;
+
+const layoutStyle = {
+  display: 'flex',
+  flexWrap: 'wrap',
+  gap: 24,
+  alignItems: 'flex-start',
+} as const;
+
+const panelStyle = {
+  display: 'grid',
+  gap: 14,
+  border: '1px solid #ddd',
+  borderRadius: 16,
+  padding: 20,
+  flex: '1 1 420px',
+  minWidth: 0,
+  boxSizing: 'border-box',
+} as const;
+
+const previewStyle = {
+  border: '1px solid #ddd',
+  borderRadius: 16,
+  padding: 20,
+  flex: '1 1 320px',
+  minWidth: 0,
+  boxSizing: 'border-box',
+} as const;
+
 const inputStyle = {
   display: 'block',
   width: '100%',
+  maxWidth: '100%',
   padding: 10,
   marginTop: 6,
   borderRadius: 10,
   border: '1px solid #ccc',
+  boxSizing: 'border-box',
+  fontSize: 16,
+} as const;
+
+const checkboxStyle = {
+  display: 'flex',
+  alignItems: 'center',
+  gap: 8,
+} as const;
+
+const buttonStyle = {
+  padding: 12,
+  borderRadius: 10,
+  cursor: 'pointer',
+  maxWidth: 220,
 } as const;
