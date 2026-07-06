@@ -1,0 +1,19 @@
+{
+  "name": "platform-starter",
+  "private": true,
+  "packageManager": "pnpm@9.0.0",
+  "scripts": {
+    "dev": "turbo dev",
+    "build": "turbo build",
+    "lint": "turbo lint",
+    "test": "turbo test",
+    "db:generate": "prisma generate",
+    "db:migrate": "prisma migrate dev",
+    "db:studio": "prisma studio"
+  },
+  "devDependencies": {
+    "turbo": "latest",
+    "typescript": "latest",
+    "prisma": "latest"
+  }
+}
