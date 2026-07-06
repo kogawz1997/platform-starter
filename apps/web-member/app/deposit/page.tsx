@@ -43,6 +43,15 @@ export default function DepositPage() {
 
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+
+    const cleanAmountText = amount.trim().replace(/,/g, '');
+    const parsedAmount = Number(cleanAmountText);
+
+    if (!Number.isFinite(parsedAmount) || parsedAmount <= 0) {
+      setMessage('กรุณาใส่จำนวนเงินมากกว่า 0');
+      return;
+    }
+
     setMessage('กำลังส่งคำขอ...');
 
     const token = window.localStorage.getItem('member_access_token');
@@ -57,7 +66,7 @@ export default function DepositPage() {
         'Content-Type': 'application/json',
         Authorization: `Bearer ${token}`,
       },
-      body: JSON.stringify({ amount: Number(amount), method, referenceCode, note }),
+      body: JSON.stringify({ amount: parsedAmount, method, referenceCode, note }),
     });
 
     const data = await res.json().catch(() => null);
@@ -82,7 +91,7 @@ export default function DepositPage() {
       <form onSubmit={onSubmit} style={{ display: 'grid', gap: 12, border: '1px solid #ddd', borderRadius: 16, padding: 20, marginBottom: 24 }}>
         <label>
           จำนวนเงิน
-          <input value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="เช่น 500" type="number" min="1" style={inputStyle} />
+          <input value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="เช่น 500" inputMode="decimal" style={inputStyle} />
         </label>
         <label>
           วิธีทำรายการ
