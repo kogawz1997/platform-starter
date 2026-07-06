@@ -11,6 +11,7 @@ const settingsItems = [
 ];
 
 const moneyItems = [
+  ['Finance Summary', '/finance', 'ภาพรวมยอดเงินรวม คิว pending และรายการล่าสุด'],
   ['Top Up Review', '/topups', 'ตรวจสลิปและอนุมัติรายการฝากเงิน'],
   ['Withdrawal Review', '/withdrawals', 'ตรวจและปิดรายการถอนเงิน'],
   ['Wallet Ledgers', '/ledgers', 'ดูประวัติเงินทั้งหมด ฝาก ถอน และยอดก่อน/หลัง'],
