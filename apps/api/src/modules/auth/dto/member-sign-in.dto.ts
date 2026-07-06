@@ -4,12 +4,14 @@ export class MemberSignInDto {
   @IsString()
   identifier!: string;
 
+  @IsOptional()
   @IsString()
   @MinLength(6)
-  secret!: string;
+  secret?: string;
 
   @IsOptional()
   @IsString()
+  @MinLength(6)
   password?: string;
 
   @IsOptional()
