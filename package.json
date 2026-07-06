@@ -8,9 +8,16 @@
     "lint": "turbo lint",
     "test": "turbo test",
     "db:generate": "prisma generate",
-    "db:migrate": "prisma migrate dev",
+    "db:migrate": "prisma migrate deploy",
+    "db:migrate:dev": "prisma migrate dev",
     "db:seed": "tsx prisma/seed.ts",
-    "db:studio": "prisma studio"
+    "db:studio": "prisma studio",
+    "build:api": "prisma generate && pnpm --filter @platform/api build",
+    "start:api": "pnpm --filter @platform/api start:prod",
+    "build:web-member": "pnpm --filter @platform/web-member build",
+    "start:web-member": "pnpm --filter @platform/web-member start",
+    "build:web-admin": "pnpm --filter @platform/web-admin build",
+    "start:web-admin": "pnpm --filter @platform/web-admin start"
   },
   "devDependencies": {
     "turbo": "latest",
