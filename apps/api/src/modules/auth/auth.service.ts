@@ -49,7 +49,6 @@ export class AuthService {
     });
 
     await this.writeLoginHistory('MEMBER', user.id, true, meta);
-
     return this.createMemberSession(user.id, meta);
   }
 
@@ -76,7 +75,7 @@ export class AuthService {
   }
 
   async refreshSession(dto: RefreshSessionDto, meta: RequestMeta = {}) {
-    const sessionId = await this.readRefreshSessionId(dto.refreshToken);
+    const { sessionId, rawToken } = this.readRefreshTokenParts(dto.refreshToken);
     const session = await this.prisma.authSession.findFirst({
       where: {
         id: sessionId,
@@ -90,7 +89,7 @@ export class AuthService {
       throw new UnauthorizedException('Invalid refresh session');
     }
 
-    const valid = await argon2.verify(session.refreshTokenHash, dto.refreshToken);
+    const valid = await argon2.verify(session.refreshTokenHash, rawToken);
     if (!valid) {
       throw new UnauthorizedException('Invalid refresh session');
     }
@@ -113,8 +112,8 @@ export class AuthService {
   }
 
   private async createMemberSession(userId: string, meta: RequestMeta = {}) {
-    const refreshToken = this.createRefreshToken();
-    const refreshTokenHash = await argon2.hash(refreshToken);
+    const rawToken = this.createRefreshToken();
+    const refreshTokenHash = await argon2.hash(rawToken);
     const expiresAt = new Date(Date.now() + this.getRefreshTokenTtlMs());
 
     const session = await this.prisma.authSession.create({
@@ -139,7 +138,7 @@ export class AuthService {
 
     return {
       accessToken,
-      refreshToken: `${session.id}.${refreshToken}`,
+      refreshToken: `${session.id}.${rawToken}`,
       expiresAt,
     };
   }
@@ -148,10 +147,10 @@ export class AuthService {
     return randomBytes(48).toString('base64url');
   }
 
-  private async readRefreshSessionId(value: string) {
-    const [sessionId] = value.split('.');
-    if (!sessionId) throw new UnauthorizedException('Invalid refresh token');
-    return sessionId;
+  private readRefreshTokenParts(value: string) {
+    const [sessionId, rawToken] = value.split('.');
+    if (!sessionId || !rawToken) throw new UnauthorizedException('Invalid refresh token');
+    return { sessionId, rawToken };
   }
 
   private getRefreshTokenTtlMs() {
