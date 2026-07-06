@@ -38,14 +38,21 @@ export default function WebsiteSettingsPage() {
 
   useEffect(() => {
     const token = window.localStorage.getItem('admin_access_token');
-    if (!token) return;
+    if (!token) {
+      setMessage('กรุณา login admin ใหม่ก่อนแก้ settings');
+      return;
+    }
 
     fetch(`${API_URL}/admin/settings/website`, {
       headers: { Authorization: `Bearer ${token}` },
     })
-      .then((res) => res.json())
+      .then(async (res) => {
+        const data = await res.json().catch(() => null);
+        if (!res.ok) throw new Error(data?.message ?? 'โหลด settings ไม่สำเร็จ');
+        return data;
+      })
       .then((data) => setForm({ ...defaults, ...(data.settings ?? {}) }))
-      .catch(() => setMessage('โหลด settings ไม่สำเร็จ'));
+      .catch((error) => setMessage(error.message));
   }, []);
 
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
@@ -53,6 +60,11 @@ export default function WebsiteSettingsPage() {
     setMessage('กำลังบันทึก...');
 
     const token = window.localStorage.getItem('admin_access_token');
+    if (!token) {
+      setMessage('กรุณา login admin ใหม่ก่อนบันทึก settings');
+      return;
+    }
+
     const res = await fetch(`${API_URL}/admin/settings/website`, {
       method: 'PUT',
       headers: {
@@ -76,13 +88,13 @@ export default function WebsiteSettingsPage() {
   }
 
   return (
-    <main style={{ maxWidth: 1180, margin: '32px auto', padding: 24 }}>
+    <main style={pageStyle}>
       <a href="/settings">← Settings</a>
-      <h1>Website Settings</h1>
+      <h1 style={headingStyle}>Website Settings</h1>
       <p>ตั้งค่าข้อมูลเว็บไซต์หลัก แยกจากระบบเงินและ Provider balance</p>
 
-      <section style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 360px', gap: 24, alignItems: 'start' }}>
-        <form onSubmit={onSubmit} style={{ display: 'grid', gap: 14, border: '1px solid #ddd', borderRadius: 16, padding: 20 }}>
+      <section style={layoutStyle}>
+        <form onSubmit={onSubmit} style={panelStyle}>
           <label>
             Site Name
             <input value={form.site_name} onChange={(e) => update('site_name', e.target.value)} style={inputStyle} />
@@ -119,23 +131,23 @@ export default function WebsiteSettingsPage() {
             <input value={form.date_format} onChange={(e) => update('date_format', e.target.value)} style={inputStyle} />
           </label>
 
-          <label>
+          <label style={checkboxStyle}>
             <input type="checkbox" checked={form.maintenance_mode} onChange={(e) => update('maintenance_mode', e.target.checked)} /> Maintenance Mode
           </label>
-          <label>
+          <label style={checkboxStyle}>
             <input type="checkbox" checked={form.registration_enabled} onChange={(e) => update('registration_enabled', e.target.checked)} /> Registration Enabled
           </label>
-          <label>
+          <label style={checkboxStyle}>
             <input type="checkbox" checked={form.login_enabled} onChange={(e) => update('login_enabled', e.target.checked)} /> Login Enabled
           </label>
 
-          <button type="submit" style={{ padding: 12, borderRadius: 10, cursor: 'pointer' }}>Save Changes</button>
+          <button type="submit" style={buttonStyle}>Save Changes</button>
           {message && <p>{message}</p>}
         </form>
 
-        <aside style={{ border: '1px solid #ddd', borderRadius: 16, padding: 20, position: 'sticky', top: 24 }}>
+        <aside style={previewStyle}>
           <h2>Preview</h2>
-          <div style={{ border: '1px solid #eee', borderRadius: 14, padding: 16 }}>
+          <div style={{ border: '1px solid #eee', borderRadius: 14, padding: 16, overflowWrap: 'anywhere' }}>
             <strong>{form.site_name || 'Website Name'}</strong>
             <p>{form.site_description || 'Website description preview'}</p>
             <p>URL: {form.site_url || '-'}</p>
@@ -153,11 +165,66 @@ export default function WebsiteSettingsPage() {
   );
 }
 
+const pageStyle = {
+  maxWidth: 1180,
+  margin: '32px auto',
+  padding: 24,
+  boxSizing: 'border-box',
+} as const;
+
+const headingStyle = {
+  fontSize: 'clamp(36px, 8vw, 64px)',
+  lineHeight: 1.05,
+} as const;
+
+const layoutStyle = {
+  display: 'flex',
+  flexWrap: 'wrap',
+  gap: 24,
+  alignItems: 'flex-start',
+} as const;
+
+const panelStyle = {
+  display: 'grid',
+  gap: 14,
+  border: '1px solid #ddd',
+  borderRadius: 16,
+  padding: 20,
+  flex: '1 1 420px',
+  minWidth: 0,
+  boxSizing: 'border-box',
+} as const;
+
+const previewStyle = {
+  border: '1px solid #ddd',
+  borderRadius: 16,
+  padding: 20,
+  flex: '1 1 320px',
+  minWidth: 0,
+  boxSizing: 'border-box',
+} as const;
+
 const inputStyle = {
   display: 'block',
   width: '100%',
+  maxWidth: '100%',
   padding: 10,
   marginTop: 6,
   borderRadius: 10,
   border: '1px solid #ccc',
+  boxSizing: 'border-box',
+  fontSize: 16,
+} as const;
+
+const checkboxStyle = {
+  display: 'flex',
+  alignItems: 'center',
+  gap: 8,
+} as const;
+
+const buttonStyle = {
+  padding: 12,
+  borderRadius: 10,
+  cursor: 'pointer',
+  maxWidth: 220,
 } as const;
