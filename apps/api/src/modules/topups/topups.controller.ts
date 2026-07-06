@@ -1,7 +1,9 @@
-import { Body, Controller, Get, Param, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Post, Query, Req, UseGuards } from '@nestjs/common';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import { AdminAuthGuard } from '../../common/guards/admin-auth.guard';
 import { MemberAuthGuard } from '../../common/guards/member-auth.guard';
 import { CreateTopUpRequestDto } from './dto/create-top-up-request.dto';
+import { ReviewTopUpRequestDto } from './dto/review-top-up-request.dto';
 import { TopUpsService } from './topups.service';
 
 @Controller()
@@ -24,5 +26,46 @@ export class TopUpsController {
   @Get('member/topups/:id')
   getMemberRequest(@CurrentUser() user: any, @Param('id') id: string) {
     return this.topUpsService.getMemberRequest(user.id, id);
+  }
+
+  @UseGuards(AdminAuthGuard)
+  @Get('admin/topups')
+  getAdminRequests(@Query('status') status?: string) {
+    return this.topUpsService.getAdminRequests(status);
+  }
+
+  @UseGuards(AdminAuthGuard)
+  @Get('admin/topups/:id')
+  getAdminRequest(@Param('id') id: string) {
+    return this.topUpsService.getAdminRequest(id);
+  }
+
+  @UseGuards(AdminAuthGuard)
+  @Post('admin/topups/:id/confirm')
+  confirmRequest(
+    @Param('id') id: string,
+    @CurrentUser() user: any,
+    @Body() body: ReviewTopUpRequestDto,
+    @Req() req: any,
+  ) {
+    return this.topUpsService.approveRequest(id, user, body, this.meta(req));
+  }
+
+  @UseGuards(AdminAuthGuard)
+  @Post('admin/topups/:id/decline')
+  declineRequest(
+    @Param('id') id: string,
+    @CurrentUser() user: any,
+    @Body() body: ReviewTopUpRequestDto,
+    @Req() req: any,
+  ) {
+    return this.topUpsService.rejectRequest(id, user, body, this.meta(req));
+  }
+
+  private meta(req: any) {
+    return {
+      ipAddress: req.ip,
+      userAgent: req.headers?.['user-agent'],
+    };
   }
 }
