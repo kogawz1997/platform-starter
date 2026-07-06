@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import * as argon2 from 'argon2';
 import { randomBytes } from 'crypto';
+import { authenticator } from 'otplib';
 import { PrismaService } from '../../database/prisma.service';
 import { AdminSignInDto } from './dto/admin-sign-in.dto';
 import { VerifyAdminTwoFactorDto } from './dto/verify-admin-2fa.dto';
@@ -34,12 +35,46 @@ export class AdminAuthService {
     }
 
     if (admin.twoFactorEnabled) {
-      this.assertOtp(dto.twoFactorCode ?? '');
+      this.assertOtp(admin.twoFactorSecret, dto.twoFactorCode ?? '');
     }
 
     await this.writeLoginHistory(admin.id, true, meta);
     await this.writeAudit(admin.id, 'admin.login', 'auth', admin.id, meta);
     return this.createAdminSession(admin.id, meta);
+  }
+
+  async setupTwoFactor(adminUserId: string, meta: RequestMeta = {}) {
+    const admin = await this.prisma.adminUser.findUnique({ where: { id: adminUserId } });
+    if (!admin || admin.status !== 'ACTIVE') throw new UnauthorizedException('Admin is not active');
+
+    const secret = authenticator.generateSecret();
+    const issuer = this.configService.get<string>('ADMIN_OTP_ISSUER') ?? 'Platform Admin';
+    const otpAuthUrl = authenticator.keyuri(admin.username, issuer, secret);
+
+    await this.prisma.adminUser.update({
+      where: { id: admin.id },
+      data: { twoFactorSecret: secret, twoFactorEnabled: false },
+    });
+
+    await this.writeAudit(admin.id, 'admin.otp.setup', 'auth', admin.id, meta);
+    return { secret, otpAuthUrl };
+  }
+
+  async enableTwoFactor(adminUserId: string, code: string, meta: RequestMeta = {}) {
+    const admin = await this.prisma.adminUser.findUnique({ where: { id: adminUserId } });
+    if (!admin || admin.status !== 'ACTIVE' || !admin.twoFactorSecret) {
+      throw new UnauthorizedException('Two factor setup is not ready');
+    }
+
+    this.assertOtp(admin.twoFactorSecret, code);
+
+    await this.prisma.adminUser.update({
+      where: { id: admin.id },
+      data: { twoFactorEnabled: true },
+    });
+
+    await this.writeAudit(admin.id, 'admin.otp.enable', 'auth', admin.id, meta);
+    return { success: true };
   }
 
   async verifyTwoFactor(dto: VerifyAdminTwoFactorDto, meta: RequestMeta = {}) {
@@ -48,7 +83,7 @@ export class AdminAuthService {
       throw new UnauthorizedException('Invalid challenge');
     }
 
-    this.assertOtp(dto.code);
+    this.assertOtp(admin.twoFactorSecret, dto.code);
     await this.writeLoginHistory(admin.id, true, meta);
     await this.writeAudit(admin.id, 'admin.otp.verify', 'auth', admin.id, meta);
     return this.createAdminSession(admin.id, meta);
@@ -105,7 +140,9 @@ export class AdminAuthService {
     return { accessToken, refreshToken: `${session.id}.${rawToken}`, expiresAt };
   }
 
-  private assertOtp(code: string) {
+  private assertOtp(storedSecret: string | null, code: string) {
+    if (storedSecret && authenticator.verify({ token: code, secret: storedSecret })) return;
+
     const configuredCode = this.configService.get<string>('ADMIN_OTP_FOR_DEV');
     if (!configuredCode || code !== configuredCode) throw new UnauthorizedException('Invalid code');
   }
