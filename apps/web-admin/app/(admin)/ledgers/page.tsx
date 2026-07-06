@@ -7,6 +7,7 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000';
 type LedgerItem = {
   id: string;
   userId: string;
+  shortUserId?: string | null;
   type: string;
   direction: string;
   amount: string;
@@ -15,7 +16,7 @@ type LedgerItem = {
   referenceType?: string | null;
   referenceId?: string | null;
   createdAt: string;
-  user?: { id: string; username: string; phone?: string | null; email?: string | null };
+  user?: { id: string; username: string; shortId?: string | null; phone?: string | null; email?: string | null };
   createdByAdmin?: { id: string; username: string; email?: string | null } | null;
 };
 
@@ -23,24 +24,24 @@ export default function AdminLedgersPage() {
   const [items, setItems] = useState<LedgerItem[]>([]);
   const [type, setType] = useState('');
   const [direction, setDirection] = useState('');
-  const [userId, setUserId] = useState('');
+  const [identifier, setIdentifier] = useState('');
   const [message, setMessage] = useState('');
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    const nextUserId = params.get('userId') ?? '';
-    setUserId(nextUserId);
-    loadItems(nextUserId);
+    const nextIdentifier = params.get('identifier') ?? params.get('userId') ?? '';
+    setIdentifier(nextIdentifier);
+    loadItems(nextIdentifier);
   }, []);
 
-  async function loadItems(nextUserId = userId) {
+  async function loadItems(nextIdentifier = identifier) {
     const token = window.localStorage.getItem('admin_access_token');
     if (!token) { setMessage('กรุณา login admin ก่อน'); return; }
 
     const params = new URLSearchParams();
     if (type) params.set('type', type);
     if (direction) params.set('direction', direction);
-    if (nextUserId) params.set('userId', nextUserId);
+    if (nextIdentifier) params.set('identifier', nextIdentifier);
     params.set('limit', '200');
 
     setMessage('กำลังโหลด ledger...');
@@ -55,10 +56,10 @@ export default function AdminLedgersPage() {
     <main style={{ maxWidth: 1180, margin: '32px auto', padding: 24 }}>
       <a href="/settings">← Settings</a>
       <h1>Wallet Ledgers</h1>
-      <p>ประวัติเงินทั้งหมด ฝาก ถอน ปรับยอด พร้อมยอดก่อนและหลัง</p>
+      <p>ค้นหาด้วย username หรือ Short ID ได้ เช่น Th11 หรือ 62a76bbe</p>
 
       <section style={toolbarStyle}>
-        <input value={userId} onChange={(event) => setUserId(event.target.value)} placeholder="userId optional" style={inputStyle} />
+        <input value={identifier} onChange={(event) => setIdentifier(event.target.value)} placeholder="username / short ID / user ID" style={inputStyle} />
         <select value={type} onChange={(event) => setType(event.target.value)} style={inputStyle}>
           <option value="">ทุกประเภท</option>
           <option value="DEPOSIT">DEPOSIT</option>
@@ -83,6 +84,7 @@ export default function AdminLedgersPage() {
               <div>
                 <h2>{item.type} / {item.direction}</h2>
                 <p>Member: {item.user?.username ?? item.userId}</p>
+                <p>Short ID: {item.user?.shortId ?? item.shortUserId ?? '-'}</p>
                 <p>Ref: {item.referenceType || '-'} {item.referenceId ? `#${item.referenceId.slice(0, 8)}` : ''}</p>
                 <p>Admin: {item.createdByAdmin?.username ?? '-'}</p>
                 <p>{new Date(item.createdAt).toLocaleString('th-TH')}</p>
