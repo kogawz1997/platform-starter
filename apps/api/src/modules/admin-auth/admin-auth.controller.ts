@@ -19,6 +19,18 @@ export class AdminAuthController {
     return this.adminAuthService.verifyTwoFactor(dto, this.meta(req));
   }
 
+  @UseGuards(AdminAuthGuard)
+  @Post('2fa/setup')
+  setupTwoFactor(@CurrentUser() user: any, @Req() req: any) {
+    return this.adminAuthService.setupTwoFactor(user.id, this.meta(req));
+  }
+
+  @UseGuards(AdminAuthGuard)
+  @Post('2fa/enable')
+  enableTwoFactor(@CurrentUser() user: any, @Body('code') code: string, @Req() req: any) {
+    return this.adminAuthService.enableTwoFactor(user.id, code, this.meta(req));
+  }
+
   @Post('refresh')
   refresh(@Body('refreshToken') refreshToken: string, @Req() req: any) {
     return this.adminAuthService.refreshSession(refreshToken, this.meta(req));
