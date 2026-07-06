@@ -74,6 +74,13 @@ enum WalletLedgerDirection {
   DEBIT
 }
 
+enum TopUpRequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  CANCELLED
+}
+
 model User {
   id              String          @id @default(uuid()) @db.Uuid
   username        String          @unique @db.VarChar(50)
@@ -92,6 +99,7 @@ model User {
   loginHistory  LoginHistory[]
   wallet        Wallet?
   walletLedgers WalletLedger[]
+  topUpRequests TopUpRequest[]
 
   @@map("users")
 }
@@ -127,6 +135,7 @@ model AdminUser {
   loginHistory        LoginHistory[]
   auditLogs           AdminAuditLog[]
   walletLedgerEntries WalletLedger[]
+  reviewedTopUps      TopUpRequest[]
 
   @@map("admin_users")
 }
@@ -299,6 +308,30 @@ model WalletLedger {
   @@index([type])
   @@index([referenceType, referenceId])
   @@map("wallet_ledgers")
+}
+
+model TopUpRequest {
+  id            String             @id @default(uuid()) @db.Uuid
+  userId        String             @map("user_id") @db.Uuid
+  amount        Decimal            @db.Decimal(18, 2)
+  currency      String             @default("THB") @db.VarChar(10)
+  status        TopUpRequestStatus @default(PENDING)
+  method        String?            @db.VarChar(80)
+  referenceCode String?            @map("reference_code") @db.VarChar(120)
+  note          String?
+  adminNote     String?            @map("admin_note")
+  reviewedBy    String?            @map("reviewed_by") @db.Uuid
+  reviewedAt    DateTime?          @map("reviewed_at")
+  createdAt     DateTime           @default(now()) @map("created_at")
+  updatedAt     DateTime           @updatedAt @map("updated_at")
+
+  user     User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  reviewer AdminUser? @relation(fields: [reviewedBy], references: [id], onDelete: SetNull)
+
+  @@index([userId, createdAt])
+  @@index([status])
+  @@index([reviewedBy])
+  @@map("top_up_requests")
 }
 
 model SiteSetting {
