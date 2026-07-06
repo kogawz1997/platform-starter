@@ -8,6 +8,7 @@ import { UsersModule } from './modules/users/users.module';
 import { WalletModule } from './modules/wallet/wallet.module';
 import { TopUpsModule } from './modules/topups/topups.module';
 import { WithdrawalsModule } from './modules/withdrawals/withdrawals.module';
+import { FinanceModule } from './modules/finance/finance.module';
 
 @Module({
   imports: [
@@ -20,6 +21,7 @@ import { WithdrawalsModule } from './modules/withdrawals/withdrawals.module';
     WalletModule,
     TopUpsModule,
     WithdrawalsModule,
+    FinanceModule,
   ],
 })
 export class AppModule {}
