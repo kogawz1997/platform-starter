@@ -31,7 +31,7 @@ export class AuthService {
       throw new ConflictException('Member already exists');
     }
 
-    const rawSecret = (dto as any).secret ?? (dto as any).password;
+    const rawSecret = dto.secret;
     const hash = await argon2.hash(rawSecret);
 
     const user = await this.prisma.user.create({
@@ -132,7 +132,7 @@ export class AuthService {
       { sub: userId, type: 'MEMBER', sessionId: session.id },
       {
         secret: this.configService.get<string>('JWT_ACCESS_KEY') ?? 'local_access_key',
-        expiresIn: this.configService.get<string>('JWT_ACCESS_TTL') ?? '15m',
+        expiresIn: (this.configService.get<string>('JWT_ACCESS_TTL') ?? '15m') as any,
       },
     );
 
