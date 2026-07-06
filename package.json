@@ -23,7 +23,7 @@
   "devDependencies": {
     "turbo": "latest",
     "typescript": "latest",
-    "prisma": "latest",
+    "prisma": "6.14.0",
     "tsx": "latest"
   }
 }
