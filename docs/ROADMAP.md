@@ -128,23 +128,23 @@ Status: in progress
 
 ## Phase 3.5: UX/UI Polish
 
-Status: planned after Finance Summary baseline
+Status: in progress
 
 ### Auth Pages
 
-- Member login page final design
-- Member register page final design
-- Admin login page final design
-- Admin OTP/2FA page final design
-- Real login/register usable flow verification
-- Mobile-first form layout
-- Clear Thai labels and helper text
-- Loading spinner / disabled submit button
-- Error alert for wrong credentials
-- Error alert for validation failure
-- Success feedback after register
-- Redirect UX after login
-- Brand logo, site name, and colors from settings
+- Member login page final design: completed
+- Member register page final design: completed
+- Admin login page final design: completed
+- Admin OTP/2FA page final design: first pass completed
+- Real login/register usable flow verification: pending production test
+- Mobile-first form layout: completed
+- Clear Thai labels and helper text: completed
+- Loading spinner / disabled submit button: completed
+- Error alert for wrong credentials: completed
+- Error alert for validation failure: completed
+- Success feedback after register/login: completed
+- Redirect UX after login: completed
+- Brand logo, site name, and colors from settings: completed for member, pending for admin settings integration
 
 ### Member UX/UI
 
