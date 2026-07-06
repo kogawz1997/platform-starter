@@ -23,17 +23,24 @@ export default function AdminLedgersPage() {
   const [items, setItems] = useState<LedgerItem[]>([]);
   const [type, setType] = useState('');
   const [direction, setDirection] = useState('');
+  const [userId, setUserId] = useState('');
   const [message, setMessage] = useState('');
 
-  useEffect(() => { loadItems(); }, []);
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const nextUserId = params.get('userId') ?? '';
+    setUserId(nextUserId);
+    loadItems(nextUserId);
+  }, []);
 
-  async function loadItems() {
+  async function loadItems(nextUserId = userId) {
     const token = window.localStorage.getItem('admin_access_token');
     if (!token) { setMessage('กรุณา login admin ก่อน'); return; }
 
     const params = new URLSearchParams();
     if (type) params.set('type', type);
     if (direction) params.set('direction', direction);
+    if (nextUserId) params.set('userId', nextUserId);
     params.set('limit', '200');
 
     setMessage('กำลังโหลด ledger...');
@@ -51,6 +58,7 @@ export default function AdminLedgersPage() {
       <p>ประวัติเงินทั้งหมด ฝาก ถอน ปรับยอด พร้อมยอดก่อนและหลัง</p>
 
       <section style={toolbarStyle}>
+        <input value={userId} onChange={(event) => setUserId(event.target.value)} placeholder="userId optional" style={inputStyle} />
         <select value={type} onChange={(event) => setType(event.target.value)} style={inputStyle}>
           <option value="">ทุกประเภท</option>
           <option value="DEPOSIT">DEPOSIT</option>
@@ -64,7 +72,7 @@ export default function AdminLedgersPage() {
           <option value="CREDIT">CREDIT</option>
           <option value="DEBIT">DEBIT</option>
         </select>
-        <button type="button" onClick={loadItems} style={buttonStyle}>Apply</button>
+        <button type="button" onClick={() => loadItems()} style={buttonStyle}>Apply</button>
       </section>
 
       {message && <p>{message}</p>}
