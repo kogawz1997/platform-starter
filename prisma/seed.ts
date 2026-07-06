@@ -28,8 +28,63 @@ const permissions = [
   ['admin.create', 'Admin Create', 'admin'],
   ['roles.update', 'Roles Update', 'admin'],
   ['settings.update', 'Settings Update', 'settings'],
+  ['settings.website.view', 'Website Settings View', 'settings'],
+  ['settings.website.update', 'Website Settings Update', 'settings'],
+  ['settings.branding.view', 'Branding Settings View', 'settings'],
+  ['settings.branding.update', 'Branding Settings Update', 'settings'],
+  ['settings.theme.view', 'Theme Settings View', 'settings'],
+  ['settings.theme.update', 'Theme Settings Update', 'settings'],
+  ['settings.seo.view', 'SEO Settings View', 'settings'],
+  ['settings.seo.update', 'SEO Settings Update', 'settings'],
+  ['settings.contact.view', 'Contact Settings View', 'settings'],
+  ['settings.contact.update', 'Contact Settings Update', 'settings'],
+  ['settings.maintenance.view', 'Maintenance Settings View', 'settings'],
+  ['settings.maintenance.update', 'Maintenance Settings Update', 'settings'],
+  ['settings.scripts.view', 'Script Settings View', 'settings'],
+  ['settings.scripts.update', 'Script Settings Update', 'settings'],
+  ['settings.features.view', 'Feature Settings View', 'settings'],
+  ['settings.features.update', 'Feature Settings Update', 'settings'],
+  ['settings.legal.view', 'Legal Settings View', 'settings'],
+  ['settings.legal.update', 'Legal Settings Update', 'settings'],
   ['reports.view', 'Reports View', 'reports'],
   ['reports.export', 'Reports Export', 'reports'],
+] as const;
+
+const defaultSettings = [
+  ['website.site_name', 'Platform Starter', 'WEBSITE', 'STRING', true, false],
+  ['website.site_description', 'Member platform starter', 'WEBSITE', 'STRING', true, false],
+  ['website.site_url', 'https://platformweb-member-production.up.railway.app', 'WEBSITE', 'URL', true, false],
+  ['website.admin_url', 'https://platformweb-admin-production.up.railway.app', 'WEBSITE', 'URL', false, false],
+  ['website.default_language', 'th', 'WEBSITE', 'STRING', true, false],
+  ['website.timezone', 'Asia/Bangkok', 'WEBSITE', 'STRING', true, false],
+  ['website.currency', 'THB', 'WEBSITE', 'STRING', true, false],
+  ['website.date_format', 'DD/MM/YYYY', 'WEBSITE', 'STRING', true, false],
+  ['website.maintenance_mode', false, 'WEBSITE', 'BOOLEAN', true, false],
+  ['website.registration_enabled', true, 'WEBSITE', 'BOOLEAN', true, false],
+  ['website.login_enabled', true, 'WEBSITE', 'BOOLEAN', true, false],
+  ['branding.primary_color', '#f5c542', 'BRANDING', 'COLOR', true, false],
+  ['branding.background_color', '#080808', 'BRANDING', 'COLOR', true, false],
+  ['branding.card_color', '#181818', 'BRANDING', 'COLOR', true, false],
+  ['branding.text_color', '#ffffff', 'BRANDING', 'COLOR', true, false],
+  ['branding.success_color', '#22c55e', 'BRANDING', 'COLOR', true, false],
+  ['branding.danger_color', '#ef4444', 'BRANDING', 'COLOR', true, false],
+  ['theme.show_balance_header', true, 'THEME', 'BOOLEAN', true, false],
+  ['theme.show_deposit_withdraw_buttons', true, 'THEME', 'BOOLEAN', true, false],
+  ['theme.show_promotion_banner', true, 'THEME', 'BOOLEAN', true, false],
+  ['seo.default_title', 'Platform Starter', 'SEO', 'STRING', true, false],
+  ['seo.default_description', 'Platform starter website', 'SEO', 'STRING', true, false],
+  ['contact.support_hours', '24/7', 'CONTACT', 'STRING', true, false],
+  ['maintenance.enabled', false, 'MAINTENANCE', 'BOOLEAN', true, false],
+  ['maintenance.member_enabled', false, 'MAINTENANCE', 'BOOLEAN', true, false],
+  ['maintenance.deposit_enabled', false, 'MAINTENANCE', 'BOOLEAN', true, false],
+  ['maintenance.withdraw_enabled', false, 'MAINTENANCE', 'BOOLEAN', true, false],
+  ['features.registration_enabled', true, 'FEATURES', 'BOOLEAN', true, false],
+  ['features.login_enabled', true, 'FEATURES', 'BOOLEAN', true, false],
+  ['features.deposit_enabled', true, 'FEATURES', 'BOOLEAN', true, false],
+  ['features.withdraw_enabled', true, 'FEATURES', 'BOOLEAN', true, false],
+  ['features.promotion_enabled', true, 'FEATURES', 'BOOLEAN', true, false],
+  ['legal.terms', '', 'LEGAL', 'RICH_TEXT', true, false],
+  ['legal.privacy', '', 'LEGAL', 'RICH_TEXT', true, false],
 ] as const;
 
 async function main() {
@@ -89,6 +144,22 @@ async function main() {
       roleId: superAdminRole.id,
     },
   });
+
+  for (const [key, valueJson, group, type, isPublic, isSensitive] of defaultSettings) {
+    await prisma.siteSetting.upsert({
+      where: { key },
+      update: {},
+      create: {
+        key,
+        valueJson,
+        group: group as any,
+        type: type as any,
+        isPublic,
+        isSensitive,
+        updatedBy: firstAdmin.id,
+      },
+    });
+  }
 
   console.log('Seed completed');
 }
