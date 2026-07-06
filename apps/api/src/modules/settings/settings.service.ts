@@ -35,7 +35,7 @@ export class SettingsService {
   async getAdminGroup(group: string) {
     const normalized = this.assertGroup(group);
     const settings = await this.prisma.siteSetting.findMany({
-      where: { group: GROUP_TO_PRISMA[normalized] },
+      where: { group: GROUP_TO_PRISMA[normalized] as any },
       orderBy: { key: 'asc' },
     });
 
@@ -58,18 +58,20 @@ export class SettingsService {
     const entries = Object.entries(body).filter(([, value]) => value !== undefined);
     const requiresDualApproval = entries.some(([key]) => HIGH_RISK_KEYS.has(this.makeKey(normalized, key)));
 
-    const updated = [];
+    const updated: string[] = [];
     for (const [fieldKey, rawValue] of entries) {
       const settingKey = this.makeKey(normalized, fieldKey);
       const oldSetting = await this.prisma.siteSetting.findUnique({ where: { key: settingKey } });
       const newValue = rawValue as Prisma.InputJsonValue;
+      const groupValue = GROUP_TO_PRISMA[normalized] as any;
+      const typeValue = this.detectType(rawValue) as any;
 
       const setting = await this.prisma.siteSetting.upsert({
         where: { key: settingKey },
         update: {
           valueJson: newValue,
-          group: GROUP_TO_PRISMA[normalized],
-          type: this.detectType(rawValue),
+          group: groupValue,
+          type: typeValue,
           isPublic: this.isPublic(normalized, fieldKey),
           isSensitive: this.isSensitive(normalized, fieldKey),
           updatedBy: actor.id,
@@ -77,8 +79,8 @@ export class SettingsService {
         create: {
           key: settingKey,
           valueJson: newValue,
-          group: GROUP_TO_PRISMA[normalized],
-          type: this.detectType(rawValue),
+          group: groupValue,
+          type: typeValue,
           isPublic: this.isPublic(normalized, fieldKey),
           isSensitive: this.isSensitive(normalized, fieldKey),
           updatedBy: actor.id,
@@ -123,7 +125,7 @@ export class SettingsService {
 
   private async getPublicGroup(group: SettingGroupSlug) {
     const settings = await this.prisma.siteSetting.findMany({
-      where: { group: GROUP_TO_PRISMA[group], isPublic: true, isSensitive: false },
+      where: { group: GROUP_TO_PRISMA[group] as any, isPublic: true, isSensitive: false },
       orderBy: { key: 'asc' },
     });
     return { group, settings: this.toKeyValueObject(settings) };
@@ -147,14 +149,14 @@ export class SettingsService {
   }
 
   private detectType(value: unknown) {
-    if (typeof value === 'boolean') return 'BOOLEAN' as const;
-    if (typeof value === 'number') return 'NUMBER' as const;
+    if (typeof value === 'boolean') return 'BOOLEAN';
+    if (typeof value === 'number') return 'NUMBER';
     if (typeof value === 'string') {
-      if (/^#[0-9a-f]{6}$/i.test(value)) return 'COLOR' as const;
-      if (/^https?:\/\//i.test(value)) return 'URL' as const;
-      return 'STRING' as const;
+      if (/^#[0-9a-f]{6}$/i.test(value)) return 'COLOR';
+      if (/^https?:\/\//i.test(value)) return 'URL';
+      return 'STRING';
     }
-    return 'JSON' as const;
+    return 'JSON';
   }
 
   private isPublic(group: SettingGroupSlug, key: string) {
