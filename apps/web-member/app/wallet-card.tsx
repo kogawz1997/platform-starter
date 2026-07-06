@@ -44,8 +44,8 @@ export default function WalletCard({ primaryColor, cardColor, showButtons }: { p
       {!wallet && message && <p>{message}</p>}
       {showButtons && (
         <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-          <button style={{ background: primaryColor, border: 0, borderRadius: 12, padding: '10px 18px' }}>ฝากเงิน</button>
-          <button style={{ borderRadius: 12, padding: '10px 18px' }}>ถอนเงิน</button>
+          <a href="/deposit" style={{ background: primaryColor, color: '#111', borderRadius: 12, padding: '10px 18px', textDecoration: 'none' }}>ฝากเงิน</a>
+          <a href="/withdraw" style={{ borderRadius: 12, padding: '10px 18px', textDecoration: 'none', background: '#eee' }}>ถอนเงิน</a>
         </div>
       )}
     </section>
