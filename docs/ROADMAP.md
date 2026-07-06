@@ -14,7 +14,7 @@ Status: started
 
 ## Phase 1: Auth, User, Admin
 
-Status: in progress
+Status: completed
 
 ### Member Auth
 
@@ -52,7 +52,23 @@ Status: in progress
 - verification_tokens
 - admin_audit_logs
 
-## Phase 2: Wallet, Ledger, Transaction
+## Phase 2: Website Settings, Wallet, Ledger, Transaction
+
+### Website Settings
+
+- Site identity: website name, logo, favicon
+- Public contact settings: support phone, email, social links
+- Member web settings: maintenance mode, registration toggle, login toggle
+- Admin web settings: dashboard display settings, security notice text
+- Theme settings: primary color, secondary color, default language
+- SEO defaults: title, description, keywords, Open Graph image
+- Legal pages config: terms URL, privacy URL, responsible-use notice
+- Announcement banner: message, active window, target page
+- Feature flags: enable or disable features per environment
+- Admin settings page with RBAC permission
+- Audit log for every website setting change
+
+### Wallet Foundation
 
 - WalletService
 - Ledger
