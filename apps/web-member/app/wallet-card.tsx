@@ -46,6 +46,7 @@ export default function WalletCard({ primaryColor, cardColor, showButtons }: { p
         <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
           <a href="/deposit" style={{ background: primaryColor, color: '#111', borderRadius: 12, padding: '10px 18px', textDecoration: 'none' }}>ฝากเงิน</a>
           <a href="/withdraw" style={{ borderRadius: 12, padding: '10px 18px', textDecoration: 'none', background: '#eee' }}>ถอนเงิน</a>
+          <a href="/transactions" style={{ borderRadius: 12, padding: '10px 18px', textDecoration: 'none', background: '#eee' }}>ประวัติ</a>
         </div>
       )}
     </section>
