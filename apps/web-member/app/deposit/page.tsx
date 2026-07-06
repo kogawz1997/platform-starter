@@ -1,6 +1,6 @@
 'use client';
 
-import { FormEvent, useEffect, useMemo, useState } from 'react';
+import { ChangeEvent, FormEvent, useEffect, useMemo, useState } from 'react';
 import { API_URL } from '../site-settings';
 
 type TopUpItem = {
@@ -24,13 +24,13 @@ const METHODS = [
     code: 'bank_transfer',
     label: 'โอนธนาคาร',
     title: 'บัญชีรับเงิน',
-    detail: 'โอนตามยอดที่เลือก แล้วกลับมากดปุ่มโอนเรียบร้อย',
+    detail: 'โอนตามยอดที่เลือก แล้วกลับมาแนบสลิป',
   },
   {
     code: 'qr_promptpay',
     label: 'QR PromptPay',
     title: 'สแกน QR เพื่อโอนเงิน',
-    detail: 'สแกน QR ตามยอดที่เลือก แล้วกลับมากดปุ่มโอนเรียบร้อย',
+    detail: 'สแกน QR ตามยอดที่เลือก แล้วกลับมาแนบสลิป',
   },
 ];
 
@@ -38,8 +38,9 @@ export default function DepositPage() {
   const [step, setStep] = useState<Step>('select');
   const [amount, setAmount] = useState('500');
   const [method, setMethod] = useState('bank_transfer');
-  const [referenceCode, setReferenceCode] = useState('');
   const [note, setNote] = useState('');
+  const [slipImageData, setSlipImageData] = useState('');
+  const [slipImageName, setSlipImageName] = useState('');
   const [items, setItems] = useState<TopUpItem[]>([]);
   const [message, setMessage] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -110,10 +111,30 @@ export default function DepositPage() {
     setStep('transfer');
   }
 
+  async function handleSlipChange(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      setMessage('กรุณาเลือกไฟล์รูปภาพสลิป');
+      return;
+    }
+
+    const imageData = await resizeImage(file, 900, 0.7);
+    setSlipImageName(file.name);
+    setSlipImageData(imageData);
+    setMessage('แนบสลิปแล้ว');
+  }
+
   async function submitAfterTransfer() {
     if (!Number.isFinite(parsedAmount) || parsedAmount <= 0) {
       setMessage('กรุณาเลือกหรือใส่จำนวนเงินมากกว่า 0');
       setStep('select');
+      return;
+    }
+
+    if (!slipImageData) {
+      setMessage('กรุณาแนบรูปสลิปก่อนกดเสร็จ');
       return;
     }
 
@@ -126,13 +147,19 @@ export default function DepositPage() {
     setIsSubmitting(true);
     setMessage('กำลังส่งรายการให้แอดมินตรวจสอบ...');
 
+    const proofNote = JSON.stringify({
+      userNote: note,
+      slipImageName,
+      slipImageData,
+    });
+
     const res = await fetch(`${API_URL}/member/topups`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         Authorization: `Bearer ${token}`,
       },
-      body: JSON.stringify({ amount: parsedAmount, method, referenceCode, note }),
+      body: JSON.stringify({ amount: parsedAmount, method, note: proofNote }),
     });
 
     const data = await res.json().catch(() => null);
@@ -143,8 +170,9 @@ export default function DepositPage() {
       return;
     }
 
-    setReferenceCode('');
     setNote('');
+    setSlipImageName('');
+    setSlipImageData('');
     setPendingRequest(data);
     setItems((current) => [data, ...current]);
     setMessage('ส่งรายการแล้ว รอแอดมินตรวจสอบและอนุมัติ');
@@ -155,7 +183,7 @@ export default function DepositPage() {
     <main style={{ maxWidth: 980, margin: '32px auto', padding: 24 }}>
       <a href="/">← หน้าแรก</a>
       <h1>ฝากเงิน / เติมเงิน</h1>
-      <p>เลือกยอด เลือกช่องทาง โอนเงิน แล้วรอแอดมินอนุมัติ</p>
+      <p>เลือกยอด เลือกช่องทาง โอนเงิน แนบสลิป แล้วรอแอดมินอนุมัติ</p>
 
       <section style={stepWrapStyle}>
         <div style={stepItemStyle(step === 'select')}>1 เลือกยอด</div>
@@ -209,7 +237,7 @@ export default function DepositPage() {
               <p>ชื่อบัญชี: Platform Demo</p>
               <p>เลขบัญชี: 000-000-0000</p>
               <p>ธนาคาร: Demo Bank</p>
-              <p>โอนเสร็จแล้วให้กรอกเลขอ้างอิง แล้วกด “โอนเรียบร้อย”</p>
+              <p>โอนเสร็จแล้วให้แนบรูปสลิป แล้วกด “เสร็จ”</p>
             </section>
           )}
 
@@ -222,18 +250,27 @@ export default function DepositPage() {
           )}
 
           <label>
-            Reference / เลขอ้างอิง
-            <input value={referenceCode} onChange={(e) => setReferenceCode(e.target.value)} placeholder="เช่น เลขสลิป" style={inputStyle} />
+            แนบสลิปโอนเงิน
+            <input type="file" accept="image/*" onChange={handleSlipChange} style={inputStyle} />
           </label>
+
+          {slipImageData && (
+            <section style={previewBoxStyle}>
+              <strong>ตัวอย่างสลิป</strong>
+              <img src={slipImageData} alt="slip preview" style={{ width: '100%', maxWidth: 320, borderRadius: 12, marginTop: 10 }} />
+              <p>{slipImageName}</p>
+            </section>
+          )}
+
           <label>
             หมายเหตุ
-            <textarea value={note} onChange={(e) => setNote(e.target.value)} placeholder="รายละเอียดเพิ่มเติม" style={inputStyle} />
+            <textarea value={note} onChange={(e) => setNote(e.target.value)} placeholder="รายละเอียดเพิ่มเติม ถ้ามี" style={inputStyle} />
           </label>
 
           <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
             <button type="button" onClick={() => setStep('select')} style={secondaryButtonStyle}>ย้อนกลับ</button>
             <button type="button" onClick={submitAfterTransfer} disabled={isSubmitting} style={primaryButtonStyle}>
-              {isSubmitting ? 'กำลังส่ง...' : 'โอนเรียบร้อย / เสร็จ'}
+              {isSubmitting ? 'กำลังส่ง...' : 'เสร็จ'}
             </button>
           </div>
           {message && <p>{message}</p>}
@@ -272,19 +309,62 @@ export default function DepositPage() {
 
       <h2>ประวัติคำขอ</h2>
       <div style={{ display: 'grid', gap: 12 }}>
-        {items.map((item) => (
-          <section key={item.id} style={{ border: '1px solid #ddd', borderRadius: 14, padding: 16 }}>
-            <strong>{item.currency} {Number(item.amount).toLocaleString('th-TH', { minimumFractionDigits: 2 })}</strong>
-            <p>Status: {item.status}</p>
-            <p>Ref: {item.referenceCode || '-'}</p>
-            <p>Note: {item.note || '-'}</p>
-            {item.adminNote && <p>Admin note: {item.adminNote}</p>}
-          </section>
-        ))}
+        {items.map((item) => {
+          const proof = parseProofNote(item.note);
+          return (
+            <section key={item.id} style={{ border: '1px solid #ddd', borderRadius: 14, padding: 16 }}>
+              <strong>{item.currency} {Number(item.amount).toLocaleString('th-TH', { minimumFractionDigits: 2 })}</strong>
+              <p>Status: {item.status}</p>
+              <p>สลิป: {proof.slipImageData ? 'แนบแล้ว' : '-'}</p>
+              <p>หมายเหตุ: {proof.userNote || '-'}</p>
+              {item.adminNote && <p>Admin note: {item.adminNote}</p>}
+            </section>
+          );
+        })}
         {items.length === 0 && <p>ยังไม่มีรายการ</p>}
       </div>
     </main>
   );
+}
+
+function parseProofNote(value?: string | null) {
+  if (!value) return { userNote: '', slipImageData: '', slipImageName: '' };
+  try {
+    const data = JSON.parse(value);
+    return {
+      userNote: typeof data.userNote === 'string' ? data.userNote : '',
+      slipImageData: typeof data.slipImageData === 'string' ? data.slipImageData : '',
+      slipImageName: typeof data.slipImageName === 'string' ? data.slipImageName : '',
+    };
+  } catch {
+    return { userNote: value, slipImageData: '', slipImageName: '' };
+  }
+}
+
+function resizeImage(file: File, maxSize: number, quality: number) {
+  return new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const img = new Image();
+      img.onload = () => {
+        const scale = Math.min(1, maxSize / Math.max(img.width, img.height));
+        const canvas = document.createElement('canvas');
+        canvas.width = Math.round(img.width * scale);
+        canvas.height = Math.round(img.height * scale);
+        const ctx = canvas.getContext('2d');
+        if (!ctx) {
+          reject(new Error('ไม่สามารถอ่านรูปสลิปได้'));
+          return;
+        }
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        resolve(canvas.toDataURL('image/jpeg', quality));
+      };
+      img.onerror = () => reject(new Error('ไม่สามารถอ่านรูปสลิปได้'));
+      img.src = String(reader.result);
+    };
+    reader.onerror = () => reject(new Error('ไม่สามารถอ่านรูปสลิปได้'));
+    reader.readAsDataURL(file);
+  });
 }
 
 const panelStyle = {
@@ -382,6 +462,12 @@ const summaryStyle = {
 } as const;
 
 const paymentBoxStyle = {
+  border: '1px solid #ddd',
+  borderRadius: 14,
+  padding: 16,
+} as const;
+
+const previewBoxStyle = {
   border: '1px solid #ddd',
   borderRadius: 14,
   padding: 16,
