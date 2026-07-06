@@ -54,6 +54,26 @@ enum SiteSettingType {
   RICH_TEXT
 }
 
+enum WalletStatus {
+  ACTIVE
+  LOCKED
+  CLOSED
+}
+
+enum WalletLedgerType {
+  ADJUSTMENT
+  DEPOSIT
+  WITHDRAWAL
+  TRANSFER
+  BONUS
+  REVERSAL
+}
+
+enum WalletLedgerDirection {
+  CREDIT
+  DEBIT
+}
+
 model User {
   id              String          @id @default(uuid()) @db.Uuid
   username        String          @unique @db.VarChar(50)
@@ -70,6 +90,8 @@ model User {
   profile       UserProfile?
   sessions      AuthSession[]
   loginHistory  LoginHistory[]
+  wallet        Wallet?
+  walletLedgers WalletLedger[]
 
   @@map("users")
 }
@@ -100,10 +122,11 @@ model AdminUser {
   createdAt         DateTime     @default(now()) @map("created_at")
   updatedAt         DateTime     @updatedAt @map("updated_at")
 
-  roles         AdminUserRole[]
-  sessions      AuthSession[]
-  loginHistory  LoginHistory[]
-  auditLogs     AdminAuditLog[]
+  roles               AdminUserRole[]
+  sessions            AuthSession[]
+  loginHistory        LoginHistory[]
+  auditLogs           AdminAuditLog[]
+  walletLedgerEntries WalletLedger[]
 
   @@map("admin_users")
 }
@@ -232,6 +255,50 @@ model AdminAuditLog {
   @@index([adminUserId])
   @@index([module, action])
   @@map("admin_audit_logs")
+}
+
+model Wallet {
+  id            String       @id @default(uuid()) @db.Uuid
+  userId        String       @unique @map("user_id") @db.Uuid
+  currency      String       @default("THB") @db.VarChar(10)
+  balance       Decimal      @default(0) @db.Decimal(18, 2)
+  lockedBalance Decimal      @default(0) @map("locked_balance") @db.Decimal(18, 2)
+  status        WalletStatus @default(ACTIVE)
+  createdAt     DateTime     @default(now()) @map("created_at")
+  updatedAt     DateTime     @updatedAt @map("updated_at")
+
+  user    User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  ledgers WalletLedger[]
+
+  @@index([status])
+  @@map("wallets")
+}
+
+model WalletLedger {
+  id               String                @id @default(uuid()) @db.Uuid
+  walletId         String                @map("wallet_id") @db.Uuid
+  userId           String                @map("user_id") @db.Uuid
+  type             WalletLedgerType
+  direction        WalletLedgerDirection
+  amount           Decimal               @db.Decimal(18, 2)
+  balanceBefore    Decimal               @map("balance_before") @db.Decimal(18, 2)
+  balanceAfter     Decimal               @map("balance_after") @db.Decimal(18, 2)
+  referenceType    String?               @map("reference_type") @db.VarChar(80)
+  referenceId      String?               @map("reference_id") @db.VarChar(120)
+  idempotencyKey   String?               @unique @map("idempotency_key") @db.VarChar(160)
+  metadata         Json?
+  createdByAdminId String?               @map("created_by_admin_id") @db.Uuid
+  createdAt        DateTime              @default(now()) @map("created_at")
+
+  wallet         Wallet     @relation(fields: [walletId], references: [id], onDelete: Cascade)
+  user           User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdByAdmin AdminUser? @relation(fields: [createdByAdminId], references: [id], onDelete: SetNull)
+
+  @@index([walletId, createdAt])
+  @@index([userId, createdAt])
+  @@index([type])
+  @@index([referenceType, referenceId])
+  @@map("wallet_ledgers")
 }
 
 model SiteSetting {
