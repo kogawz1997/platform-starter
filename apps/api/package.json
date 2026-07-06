@@ -5,5 +5,26 @@
     "dev": "nest start --watch",
     "build": "nest build",
     "test": "jest"
+  },
+  "dependencies": {
+    "@nestjs/common": "latest",
+    "@nestjs/core": "latest",
+    "@nestjs/config": "latest",
+    "@nestjs/jwt": "latest",
+    "@nestjs/passport": "latest",
+    "@prisma/client": "latest",
+    "argon2": "latest",
+    "class-transformer": "latest",
+    "class-validator": "latest",
+    "passport": "latest",
+    "passport-jwt": "latest"
+  },
+  "devDependencies": {
+    "@nestjs/cli": "latest",
+    "@nestjs/testing": "latest",
+    "@types/passport-jwt": "latest",
+    "jest": "latest",
+    "ts-jest": "latest",
+    "typescript": "latest"
   }
 }
