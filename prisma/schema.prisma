@@ -81,25 +81,33 @@ enum TopUpRequestStatus {
   CANCELLED
 }
 
-model User {
-  id              String          @id @default(uuid()) @db.Uuid
-  username        String          @unique @db.VarChar(50)
-  phone           String?         @unique @db.VarChar(30)
-  email           String?         @unique @db.VarChar(255)
-  passwordHash    String          @map("password_hash")
-  status          UserStatus      @default(ACTIVE)
-  phoneVerifiedAt DateTime?       @map("phone_verified_at")
-  emailVerifiedAt DateTime?       @map("email_verified_at")
-  lastLoginAt     DateTime?       @map("last_login_at")
-  createdAt       DateTime        @default(now()) @map("created_at")
-  updatedAt       DateTime        @updatedAt @map("updated_at")
+enum WithdrawalRequestStatus {
+  PENDING
+  COMPLETED
+  REJECTED
+  CANCELLED
+}
 
-  profile       UserProfile?
-  sessions      AuthSession[]
-  loginHistory  LoginHistory[]
-  wallet        Wallet?
-  walletLedgers WalletLedger[]
-  topUpRequests TopUpRequest[]
+model User {
+  id              String     @id @default(uuid()) @db.Uuid
+  username        String     @unique @db.VarChar(50)
+  phone           String?    @unique @db.VarChar(30)
+  email           String?    @unique @db.VarChar(255)
+  passwordHash    String     @map("password_hash")
+  status          UserStatus @default(ACTIVE)
+  phoneVerifiedAt DateTime?  @map("phone_verified_at")
+  emailVerifiedAt DateTime?  @map("email_verified_at")
+  lastLoginAt     DateTime?  @map("last_login_at")
+  createdAt       DateTime   @default(now()) @map("created_at")
+  updatedAt       DateTime   @updatedAt @map("updated_at")
+
+  profile            UserProfile?
+  sessions           AuthSession[]
+  loginHistory       LoginHistory[]
+  wallet             Wallet?
+  walletLedgers      WalletLedger[]
+  topUpRequests      TopUpRequest[]
+  withdrawalRequests WithdrawalRequest[]
 
   @@map("users")
 }
@@ -119,16 +127,16 @@ model UserProfile {
 }
 
 model AdminUser {
-  id                String       @id @default(uuid()) @db.Uuid
-  username          String       @unique @db.VarChar(50)
-  email             String       @unique @db.VarChar(255)
-  passwordHash      String       @map("password_hash")
-  status            AdminStatus  @default(ACTIVE)
-  twoFactorEnabled  Boolean      @default(false) @map("two_factor_enabled")
-  twoFactorSecret   String?      @map("two_factor_secret")
-  lastLoginAt       DateTime?    @map("last_login_at")
-  createdAt         DateTime     @default(now()) @map("created_at")
-  updatedAt         DateTime     @updatedAt @map("updated_at")
+  id               String      @id @default(uuid()) @db.Uuid
+  username         String      @unique @db.VarChar(50)
+  email            String      @unique @db.VarChar(255)
+  passwordHash     String      @map("password_hash")
+  status           AdminStatus @default(ACTIVE)
+  twoFactorEnabled Boolean     @default(false) @map("two_factor_enabled")
+  twoFactorSecret  String?     @map("two_factor_secret")
+  lastLoginAt      DateTime?   @map("last_login_at")
+  createdAt        DateTime    @default(now()) @map("created_at")
+  updatedAt        DateTime    @updatedAt @map("updated_at")
 
   roles               AdminUserRole[]
   sessions            AuthSession[]
@@ -136,6 +144,7 @@ model AdminUser {
   auditLogs           AdminAuditLog[]
   walletLedgerEntries WalletLedger[]
   reviewedTopUps      TopUpRequest[]
+  reviewedWithdrawals WithdrawalRequest[]
 
   @@map("admin_users")
 }
@@ -170,8 +179,8 @@ model Permission {
 }
 
 model AdminUserRole {
-  adminUserId String @map("admin_user_id") @db.Uuid
-  roleId      String @map("role_id") @db.Uuid
+  adminUserId String   @map("admin_user_id") @db.Uuid
+  roleId      String   @map("role_id") @db.Uuid
   createdAt   DateTime @default(now()) @map("created_at")
 
   adminUser AdminUser @relation(fields: [adminUserId], references: [id], onDelete: Cascade)
@@ -332,6 +341,32 @@ model TopUpRequest {
   @@index([status])
   @@index([reviewedBy])
   @@map("top_up_requests")
+}
+
+model WithdrawalRequest {
+  id            String                  @id @default(uuid()) @db.Uuid
+  userId        String                  @map("user_id") @db.Uuid
+  amount        Decimal                 @db.Decimal(18, 2)
+  currency      String                  @default("THB") @db.VarChar(10)
+  status        WithdrawalRequestStatus @default(PENDING)
+  method        String?                 @db.VarChar(80)
+  accountName   String?                 @map("account_name") @db.VarChar(160)
+  accountNumber String?                 @map("account_number") @db.VarChar(160)
+  bankName      String?                 @map("bank_name") @db.VarChar(160)
+  note          String?
+  adminNote     String?                 @map("admin_note")
+  reviewedBy    String?                 @map("reviewed_by") @db.Uuid
+  reviewedAt    DateTime?               @map("reviewed_at")
+  createdAt     DateTime                @default(now()) @map("created_at")
+  updatedAt     DateTime                @updatedAt @map("updated_at")
+
+  user     User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  reviewer AdminUser? @relation(fields: [reviewedBy], references: [id], onDelete: SetNull)
+
+  @@index([userId, createdAt])
+  @@index([status])
+  @@index([reviewedBy])
+  @@map("withdrawal_requests")
 }
 
 model SiteSetting {
