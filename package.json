@@ -14,7 +14,7 @@
     "db:seed": "tsx prisma/seed.ts",
     "db:studio": "prisma studio --schema prisma/schema.prisma",
     "build:api": "pnpm db:generate && pnpm --filter @platform/api build",
-    "start:api": "pnpm --filter @platform/api start:prod",
+    "start:api": "pnpm db:generate && pnpm --filter @platform/api start:prod",
     "build:web-member": "pnpm --filter @platform/web-member build",
     "start:web-member": "pnpm --filter @platform/web-member start",
     "build:web-admin": "pnpm --filter @platform/web-admin build",
