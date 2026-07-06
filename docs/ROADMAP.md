@@ -54,9 +54,10 @@ Status: completed
 
 ## Phase 2: Website Settings, Wallet, Ledger, Transaction
 
-Website settings must be implemented before or alongside the Admin Panel foundation and must be clearly separated from money, wallet, deposit, withdraw, and provider balance settings.
+Status: completed
 
 Full specification: `docs/WEBSITE_SETTINGS.md`
+Wallet flow checklist: `docs/P2_WALLET_FLOW.md`
 
 ### Website Settings
 
@@ -77,50 +78,35 @@ Backend requirements:
 - site_settings key-value table
 - site_setting_histories table
 - Public settings APIs for safe frontend values
-- Admin settings APIs with RBAC permissions
-- Audit log for every change
-- Dual approval for high-risk changes
-- Redis cache for public/theme/seo/maintenance/features settings
-
-Required permission groups:
-
-- settings.website.view / settings.website.update
-- settings.branding.view / settings.branding.update
-- settings.theme.view / settings.theme.update
-- settings.seo.view / settings.seo.update
-- settings.contact.view / settings.contact.update
-- settings.maintenance.view / settings.maintenance.update
-- settings.scripts.view / settings.scripts.update
-- settings.features.view / settings.features.update
-- settings.legal.view / settings.legal.update
-
-Dual approval required for:
-
-- Enable/disable deposit
-- Enable/disable withdraw
-- Enable full-site maintenance
-- Update custom scripts
-- Update domain settings
-- Update provider feature flags
-- Enable/disable registration
+- Admin settings APIs
+- Audit log for admin changes
 
 ### Wallet Foundation
 
 - WalletService
-- Ledger
-- Transaction log
-- Lock balance
-- Rollback
-- Reconciliation
+- Wallet ledger
+- Balance and locked balance
+- Member top-up request
+- Admin top-up review
+- Member withdrawal request
+- Admin withdrawal review
+- Member transaction history
+- Admin ledger explorer
+- Admin wallet view
+- Short member ID search
+- Manual wallet adjustment
+- Admin audit log for wallet actions
 
-## Phase 3: Deposit and Withdraw
+## Phase 3: Wallet Hardening and Operation Center
 
-- Manual deposit
-- Manual withdraw
-- Admin queue
-- Job lock
-- Slip private media
-- Notification
+Status: next
+
+- Finance dashboard summary
+- Private media storage for slips
+- Notification for review queues
+- Reconciliation reports
+- Export finance records
+- Job lock for high-risk operations
 
 ## Phase 4: Admin Operation Center
 
@@ -134,7 +120,7 @@ Dual approval required for:
 
 - Provider adapter
 - Game launch
-- Bet / win / refund callback
+- Callback handling
 - HMAC signature
 - Idempotency
 - Redis lock
