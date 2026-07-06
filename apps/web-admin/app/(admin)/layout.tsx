@@ -20,7 +20,7 @@ export default function AdminProtectedLayout({ children }: { children: ReactNode
   return (
     <main style={shellStyle}>
       <aside style={sideStyle}>
-        <div style={brandStyle}>A</div>
+        <a href="/finance" style={brandStyle}>A</a>
         <nav style={navStyle}>
           {navItems.map(([title, href]) => <a key={href} href={href} style={linkStyle}>{title}</a>)}
         </nav>
@@ -31,8 +31,8 @@ export default function AdminProtectedLayout({ children }: { children: ReactNode
 }
 
 const shellStyle = { minHeight: '100vh', background: '#080808', color: '#fff', display: 'grid', gridTemplateColumns: '220px 1fr' } as const;
-const sideStyle = { position: 'sticky', top: 0, height: '100vh', padding: 18, borderRight: '1px solid rgba(255,255,255,0.10)', background: '#111', display: 'grid', alignContent: 'start', gap: 18 } as const;
-const brandStyle = { width: 48, height: 48, borderRadius: 16, display: 'grid', placeItems: 'center', fontWeight: 900, background: '#f5c542', color: '#111' } as const;
+const sideStyle = { position: 'sticky', top: 0, height: '100vh', padding: 16, borderRight: '1px solid rgba(255,255,255,0.10)', background: '#101010', display: 'grid', alignContent: 'start', gap: 14 } as const;
+const brandStyle = { width: 48, height: 48, borderRadius: 16, display: 'grid', placeItems: 'center', fontWeight: 900, background: '#f5c542', color: '#111', textDecoration: 'none' } as const;
 const navStyle = { display: 'grid', gap: 10 } as const;
-const linkStyle = { color: 'inherit', textDecoration: 'none', border: '1px solid rgba(255,255,255,0.10)', borderRadius: 14, padding: '12px 14px', fontWeight: 800, background: 'rgba(255,255,255,0.04)' } as const;
+const linkStyle = { color: 'inherit', textDecoration: 'none', border: '1px solid rgba(255,255,255,0.10)', borderRadius: 999, padding: '12px 14px', fontWeight: 900, background: 'rgba(255,255,255,0.04)' } as const;
 const contentStyle = { minWidth: 0 } as const;
