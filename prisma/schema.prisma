@@ -1,0 +1,14 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// TODO models:
+// User, AdminUser, Role, Permission
+// Wallet, WalletLedger, Transaction
+// Deposit, Withdrawal, Provider, Game
+// Promotion, Coupon, MediaAsset, AuditLog, RiskAlert
