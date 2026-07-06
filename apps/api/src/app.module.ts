@@ -5,6 +5,7 @@ import { AdminAuthModule } from './modules/admin-auth/admin-auth.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { SettingsModule } from './modules/settings/settings.module';
 import { UsersModule } from './modules/users/users.module';
+import { WalletModule } from './modules/wallet/wallet.module';
 
 @Module({
   imports: [
@@ -14,6 +15,7 @@ import { UsersModule } from './modules/users/users.module';
     AdminAuthModule,
     UsersModule,
     SettingsModule,
+    WalletModule,
   ],
 })
 export class AppModule {}
