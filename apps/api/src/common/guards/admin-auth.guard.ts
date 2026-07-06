@@ -59,8 +59,8 @@ export class AdminAuthGuard implements CanActivate {
         throw new UnauthorizedException('Admin session is not active');
       }
 
-      const permissions = session.adminUser.roles.flatMap((userRole) =>
-        userRole.role.permissions.map((rolePermission) => rolePermission.permission.code),
+      const permissions = session.adminUser.roles.flatMap((userRole: any) =>
+        userRole.role.permissions.map((rolePermission: any) => rolePermission.permission.code),
       );
 
       request.user = {
