@@ -70,7 +70,7 @@ async function verifyMemberSession() {
   if (token) {
     const res = await fetch(`${API_URL}/member/wallet`, { headers: { Authorization: `Bearer ${token}` } });
     if (res.ok) return true;
-    if (res.status !== 401) return true;
+    if (res.status !== 401) return false;
   }
 
   const refreshed = await refreshMemberToken();
@@ -81,6 +81,6 @@ async function verifyMemberSession() {
 
   const retry = await fetch(`${API_URL}/member/wallet`, { headers: { Authorization: `Bearer ${refreshed}` } });
   if (retry.ok) return true;
-  if (retry.status === 401) clearMemberSession();
+  clearMemberSession();
   return false;
 }
