@@ -1,5 +1,5 @@
 import { Type } from 'class-transformer';
-import { IsIn, IsNumber, IsString, Min } from 'class-validator';
+import { IsIn, IsNumber, IsOptional, IsString, MaxLength, Min } from 'class-validator';
 
 export class AdjustWalletDto {
   @IsIn(['CREDIT', 'DEBIT'])
@@ -12,4 +12,9 @@ export class AdjustWalletDto {
 
   @IsString()
   reason!: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  idempotencyKey?: string;
 }
