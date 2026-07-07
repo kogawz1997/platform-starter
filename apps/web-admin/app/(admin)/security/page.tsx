@@ -1,5 +1,6 @@
 'use client';
 
+import QRCode from 'qrcode';
 import { useEffect, useState } from 'react';
 import { adminApiFetch, clearAdminSession } from '../../admin-api';
 import { AdminBadge, AdminButton, AdminCard, AdminMetric, AdminMetricGrid, AdminNotice, AdminPage, AdminStack } from '../_components/admin-ui';
@@ -11,12 +12,17 @@ type SessionItem = { id: string; deviceId?: string | null; ipAddress?: string | 
 export default function AdminSecurityPage() {
   const [me, setMe] = useState<AdminMe | null>(null);
   const [setup, setSetup] = useState<SetupResponse | null>(null);
+  const [qrDataUrl, setQrDataUrl] = useState('');
   const [sessions, setSessions] = useState<SessionItem[]>([]);
   const [code, setCode] = useState('');
   const [message, setMessage] = useState('');
   const [loading, setLoading] = useState(false);
 
   useEffect(() => { loadAll(); }, []);
+  useEffect(() => {
+    if (!setup?.otpAuthUrl) { setQrDataUrl(''); return; }
+    QRCode.toDataURL(setup.otpAuthUrl, { margin: 1, width: 220 }).then(setQrDataUrl).catch(() => setMessage('สร้าง QR code ไม่สำเร็จ'));
+  }, [setup?.otpAuthUrl]);
 
   async function loadAll() {
     await Promise.all([loadMe(), loadSessions()]);
@@ -102,12 +108,13 @@ export default function AdminSecurityPage() {
       <AdminStack>
         <div style={infoStyle}>
           <AdminBadge tone="success">TOTP READY</AdminBadge>
-          <p>Backend ตรวจรหัส TOTP จาก secret จริงแล้ว สแกนหรือคัดลอก OTP Auth URL เข้าแอป Authenticator แล้วใส่รหัส 6 หลักเพื่อเปิดใช้งาน</p>
+          <p>Backend ตรวจรหัส TOTP จาก secret จริงแล้ว สแกน QR หรือคัดลอก OTP Auth URL เข้าแอป Authenticator แล้วใส่รหัส 6 หลักเพื่อเปิดใช้งาน</p>
         </div>
 
         {!setup && <AdminButton disabled={loading} onClick={startSetup}>Generate 2FA Secret</AdminButton>}
 
         {setup && <section style={setupBoxStyle}>
+          {qrDataUrl && <div style={qrBoxStyle}><img src={qrDataUrl} alt="2FA QR code" style={qrImageStyle} /><span>สแกนด้วยแอป Authenticator</span></div>}
           <label style={labelStyle}>Manual secret
             <div style={copyRowStyle}><input value={setup.secret} readOnly style={inputStyle} /><button type="button" onClick={() => copy(setup.secret, ' secret')} style={copyButtonStyle}>Copy</button></div>
           </label>
@@ -135,6 +142,8 @@ const labelStyle = { display: 'grid', gap: 7, fontWeight: 850, minWidth: 0 } as 
 const copyRowStyle = { display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) auto', gap: 8, minWidth: 0 } as const;
 const inputStyle = { minHeight: 44, borderRadius: 12, border: '1px solid rgba(148,163,184,.22)', background: '#0b1220', color: '#f8fafc', padding: '0 12px', minWidth: 0, width: '100%', boxSizing: 'border-box' as const };
 const copyButtonStyle = { border: '1px solid rgba(245,197,66,.35)', borderRadius: 12, padding: '0 12px', background: 'rgba(245,197,66,.14)', color: '#f5c542', fontWeight: 900, cursor: 'pointer' } as const;
+const qrBoxStyle = { border: '1px solid rgba(148,163,184,.18)', borderRadius: 16, padding: 14, display: 'grid', justifyItems: 'center', gap: 10, background: '#0b1220' } as const;
+const qrImageStyle = { width: 220, height: 220, maxWidth: '100%', borderRadius: 12, background: '#fff', padding: 8 } as const;
 const sessionBoxStyle = { border: '1px solid rgba(148,163,184,.18)', borderRadius: 16, padding: 12, display: 'grid', gap: 6, minWidth: 0 } as const;
 const sessionTopStyle = { display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'center', flexWrap: 'wrap' as const };
 const sessionToolbarStyle = { display: 'flex', gap: 10, flexWrap: 'wrap' as const, marginBottom: 12 };
