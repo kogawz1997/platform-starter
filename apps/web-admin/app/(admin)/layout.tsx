@@ -5,18 +5,11 @@ import { usePathname } from 'next/navigation';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000';
 
-const navItems = [
-  ['Dashboard', '/dashboard'],
-  ['Finance', '/finance'],
-  ['Reports', '/reports'],
-  ['Exports', '/exports'],
-  ['Activity', '/activity'],
-  ['Member Detail', '/member-detail'],
-  ['Settings', '/settings'],
-  ['Topups', '/topups'],
-  ['Withdrawals', '/withdrawals'],
-  ['Wallets', '/wallets'],
-  ['Ledgers', '/ledgers'],
+const navGroups = [
+  { title: 'Overview', items: [['Dashboard', '/dashboard'], ['Finance', '/finance']] },
+  { title: 'Queues', items: [['Top-ups', '/topups'], ['Withdrawals', '/withdrawals']] },
+  { title: 'Money', items: [['Wallets', '/wallets'], ['Ledgers', '/ledgers'], ['Reports', '/reports'], ['Exports', '/exports']] },
+  { title: 'Admin', items: [['Activity', '/activity'], ['Member Detail', '/member-detail'], ['Settings', '/settings']] },
 ];
 
 export default function AdminProtectedLayout({ children }: { children: ReactNode }) {
@@ -53,23 +46,11 @@ export default function AdminProtectedLayout({ children }: { children: ReactNode
 
   return (
     <main className="admin-shell admin-shell-drawer-mode">
-      <header className="admin-topbar">
-        <a href="/dashboard" className="admin-brand-row admin-brand-link">
-          <span className="admin-brand-mark">A</span>
-          <span className="admin-brand-text"><strong>Admin Console</strong><small>{queueCount.topups + queueCount.withdrawals > 0 ? `${queueCount.topups + queueCount.withdrawals} pending reviews` : 'Operation Center'}</small></span>
-        </a>
-        <button type="button" className="admin-menu-button" onClick={() => setMenuOpen(true)} aria-label="เปิดเมนูแอดมิน">☰</button>
-      </header>
+      <header className="admin-topbar"><a href="/dashboard" className="admin-brand-row admin-brand-link"><span className="admin-brand-mark">A</span><span className="admin-brand-text"><strong>Admin Console</strong><small>{queueCount.topups + queueCount.withdrawals > 0 ? `${queueCount.topups + queueCount.withdrawals} pending reviews` : 'Operation Center'}</small></span></a><button type="button" className="admin-menu-button" onClick={() => setMenuOpen(true)} aria-label="เปิดเมนูแอดมิน">☰</button></header>
       {menuOpen && <button type="button" className="admin-drawer-backdrop" onClick={() => setMenuOpen(false)} aria-label="ปิดเมนู" />}
       <aside className={menuOpen ? 'admin-drawer open' : 'admin-drawer'}>
-        <div className="admin-drawer-head"><div><strong>Admin Console</strong><p>Topups {queueCount.topups} · Withdrawals {queueCount.withdrawals}</p></div><button type="button" onClick={() => setMenuOpen(false)} aria-label="ปิดเมนู">×</button></div>
-        <nav className="admin-drawer-nav" aria-label="Admin navigation">
-          {navItems.map(([title, href]) => {
-            const active = pathname === href || pathname.startsWith(`${href}/`);
-            const badge = badgeFor(href);
-            return <a key={href} href={href} onClick={() => setMenuOpen(false)} className={active ? 'active' : ''}><span>{title}</span>{badge > 0 && <em>{badge}</em>}</a>;
-          })}
-        </nav>
+        <div className="admin-drawer-head"><div><strong>Admin Console</strong><p>Top-ups {queueCount.topups} · Withdrawals {queueCount.withdrawals}</p></div><button type="button" onClick={() => setMenuOpen(false)} aria-label="ปิดเมนู">×</button></div>
+        <nav className="admin-drawer-nav" aria-label="Admin navigation">{navGroups.map((group) => <section key={group.title} style={{ display: 'grid', gap: 8, background: 'transparent', border: 0, padding: 0 }}><p style={{ margin: '8px 4px 2px', fontSize: 11, fontWeight: 950, textTransform: 'uppercase', letterSpacing: '.12em', color: 'rgba(255,255,255,.46)' }}>{group.title}</p>{group.items.map(([title, href]) => { const active = pathname === href || pathname.startsWith(`${href}/`); const badge = badgeFor(href); return <a key={href} href={href} onClick={() => setMenuOpen(false)} className={active ? 'active' : ''}><span>{title}</span>{badge > 0 && <em>{badge}</em>}</a>; })}</section>)}</nav>
         <button type="button" className="admin-logout-button" onClick={logout}>ออกจากระบบ</button>
       </aside>
       <section className="admin-content-shell">{children}</section>
