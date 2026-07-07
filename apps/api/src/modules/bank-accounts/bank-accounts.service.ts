@@ -13,17 +13,25 @@ type BankBody = {
   sortOrder?: number;
   adminNote?: string;
 };
+type PaymentType = 'bank_transfer' | 'promptpay' | 'wallet' | 'other';
 
 @Injectable()
 export class BankAccountsService {
   constructor(private readonly prisma: PrismaService) {}
 
   async getActiveReceivingAccounts() {
-    const items = await this.prisma.receivingBankAccount.findMany({
-      where: { status: 'ACTIVE' },
-      orderBy: [{ sortOrder: 'asc' }, { createdAt: 'desc' }],
-    });
+    const items = await this.prisma.receivingBankAccount.findMany({ where: { status: 'ACTIVE' }, orderBy: [{ sortOrder: 'asc' }, { createdAt: 'desc' }] });
     return { items: items.map(this.mapReceiving) };
+  }
+
+  async assignReceivingAccount(paymentType = 'bank_transfer', amount?: string | number) {
+    const parsedAmount = amount === undefined || amount === '' ? null : Number(amount);
+    if (parsedAmount !== null && (!Number.isFinite(parsedAmount) || parsedAmount <= 0)) throw new BadRequestException('Invalid amount');
+    const all = await this.prisma.receivingBankAccount.findMany({ where: { status: 'ACTIVE' }, orderBy: [{ sortOrder: 'asc' }, { createdAt: 'asc' }] });
+    const items = all.filter((item) => this.paymentType(item.bankName) === paymentType && this.matchAmount(item, parsedAmount));
+    if (items.length === 0) throw new NotFoundException('No active receiving account for this payment method');
+    const index = Math.floor(Date.now() / 60000) % items.length;
+    return { item: this.mapReceiving(items[index]) };
   }
 
   async listReceivingAccounts() {
@@ -34,17 +42,7 @@ export class BankAccountsService {
   async createReceivingAccount(body: BankBody, admin: any, meta: any) {
     this.requireBankFields(body);
     const item = await this.prisma.receivingBankAccount.create({
-      data: {
-        bankName: body.bankName!.trim(),
-        accountName: body.accountName!.trim(),
-        accountNumber: body.accountNumber!.trim(),
-        promptPay: body.promptPay?.trim() || null,
-        qrImageUrl: body.qrImageUrl?.trim() || null,
-        minAmount: this.decimalOrNull(body.minAmount),
-        maxAmount: this.decimalOrNull(body.maxAmount),
-        status: body.status ?? 'ACTIVE',
-        sortOrder: Number(body.sortOrder ?? 100),
-      },
+      data: { bankName: body.bankName!.trim(), accountName: body.accountName!.trim(), accountNumber: body.accountNumber!.trim(), promptPay: body.promptPay?.trim() || null, qrImageUrl: body.qrImageUrl?.trim() || null, minAmount: this.decimalOrNull(body.minAmount), maxAmount: this.decimalOrNull(body.maxAmount), status: body.status ?? 'ACTIVE', sortOrder: Number(body.sortOrder ?? 100) },
     });
     await this.audit(admin?.id, 'CREATE_RECEIVING_BANK_ACCOUNT', item.id, null, this.mapReceiving(item), meta);
     return { item: this.mapReceiving(item) };
@@ -53,20 +51,7 @@ export class BankAccountsService {
   async updateReceivingAccount(id: string, body: BankBody, admin: any, meta: any) {
     const existing = await this.prisma.receivingBankAccount.findUnique({ where: { id } });
     if (!existing) throw new NotFoundException('Receiving bank account not found');
-    const item = await this.prisma.receivingBankAccount.update({
-      where: { id },
-      data: {
-        bankName: body.bankName?.trim() ?? undefined,
-        accountName: body.accountName?.trim() ?? undefined,
-        accountNumber: body.accountNumber?.trim() ?? undefined,
-        promptPay: body.promptPay === undefined ? undefined : body.promptPay?.trim() || null,
-        qrImageUrl: body.qrImageUrl === undefined ? undefined : body.qrImageUrl?.trim() || null,
-        minAmount: body.minAmount === undefined ? undefined : this.decimalOrNull(body.minAmount),
-        maxAmount: body.maxAmount === undefined ? undefined : this.decimalOrNull(body.maxAmount),
-        status: body.status ?? undefined,
-        sortOrder: body.sortOrder === undefined ? undefined : Number(body.sortOrder),
-      },
-    });
+    const item = await this.prisma.receivingBankAccount.update({ where: { id }, data: { bankName: body.bankName?.trim() ?? undefined, accountName: body.accountName?.trim() ?? undefined, accountNumber: body.accountNumber?.trim() ?? undefined, promptPay: body.promptPay === undefined ? undefined : body.promptPay?.trim() || null, qrImageUrl: body.qrImageUrl === undefined ? undefined : body.qrImageUrl?.trim() || null, minAmount: body.minAmount === undefined ? undefined : this.decimalOrNull(body.minAmount), maxAmount: body.maxAmount === undefined ? undefined : this.decimalOrNull(body.maxAmount), status: body.status ?? undefined, sortOrder: body.sortOrder === undefined ? undefined : Number(body.sortOrder) } });
     await this.audit(admin?.id, 'UPDATE_RECEIVING_BANK_ACCOUNT', id, this.mapReceiving(existing), this.mapReceiving(item), meta);
     return { item: this.mapReceiving(item) };
   }
@@ -78,29 +63,21 @@ export class BankAccountsService {
 
   async createMemberBankAccount(userId: string, body: BankBody) {
     this.requireBankFields(body);
-
     const existing = await this.prisma.memberBankAccount.findFirst({ where: { userId } });
     if (existing) throw new BadRequestException('สมาชิก 1 คนเพิ่มบัญชีถอนได้ 1 บัญชีเท่านั้น');
-
     const user = await this.prisma.user.findUnique({ where: { id: userId }, include: { profile: true } });
     if (!user) throw new NotFoundException('Member not found');
     const allowedNames = [user.profile?.displayName, user.username].filter(Boolean).map((value) => this.normalizeName(String(value)));
     const submittedName = this.normalizeName(body.accountName!);
     if (!allowedNames.includes(submittedName)) throw new BadRequestException('ชื่อบัญชีต้องตรงกับชื่อบัญชีสมาชิก');
-
-    const item = await this.prisma.memberBankAccount.create({
-      data: { userId, bankName: body.bankName!.trim(), accountName: body.accountName!.trim(), accountNumber: body.accountNumber!.trim(), isPrimary: true, status: 'PENDING_REVIEW' },
-    });
+    const item = await this.prisma.memberBankAccount.create({ data: { userId, bankName: body.bankName!.trim(), accountName: body.accountName!.trim(), accountNumber: body.accountNumber!.trim(), isPrimary: true, status: 'PENDING_REVIEW' } });
     return { item: this.mapMemberBank(item) };
   }
 
   async setPrimaryMemberBankAccount(userId: string, id: string) {
     const existing = await this.prisma.memberBankAccount.findFirst({ where: { id, userId } });
     if (!existing) throw new NotFoundException('Member bank account not found');
-    await this.prisma.$transaction([
-      this.prisma.memberBankAccount.updateMany({ where: { userId }, data: { isPrimary: false } }),
-      this.prisma.memberBankAccount.update({ where: { id }, data: { isPrimary: true } }),
-    ]);
+    await this.prisma.$transaction([this.prisma.memberBankAccount.updateMany({ where: { userId }, data: { isPrimary: false } }), this.prisma.memberBankAccount.update({ where: { id }, data: { isPrimary: true } })]);
     const item = await this.prisma.memberBankAccount.findUniqueOrThrow({ where: { id } });
     return { item: this.mapMemberBank(item) };
   }
@@ -119,30 +96,12 @@ export class BankAccountsService {
     return { item: this.mapMemberBank(item) };
   }
 
-  private requireBankFields(body: BankBody) {
-    if (!body.bankName?.trim() || !body.accountName?.trim() || !body.accountNumber?.trim()) throw new BadRequestException('bankName, accountName and accountNumber are required');
-  }
-
-  private decimalOrNull(value: unknown) {
-    if (value === null || value === undefined || value === '') return null;
-    const next = Number(value);
-    if (!Number.isFinite(next) || next < 0) throw new BadRequestException('Invalid amount limit');
-    return next;
-  }
-
-  private normalizeName(value: string) {
-    return value.replace(/\s+/g, '').trim().toLowerCase();
-  }
-
-  private mapReceiving(item: any) {
-    return { id: item.id, bankName: item.bankName, accountName: item.accountName, accountNumber: item.accountNumber, promptPay: item.promptPay, qrImageUrl: item.qrImageUrl, minAmount: item.minAmount?.toString?.() ?? null, maxAmount: item.maxAmount?.toString?.() ?? null, status: item.status, sortOrder: item.sortOrder, createdAt: item.createdAt, updatedAt: item.updatedAt };
-  }
-
-  private mapMemberBank(item: any) {
-    return { id: item.id, userId: item.userId, bankName: item.bankName, accountName: item.accountName, accountNumber: item.accountNumber, isPrimary: item.isPrimary, status: item.status, adminNote: item.adminNote, createdAt: item.createdAt, updatedAt: item.updatedAt };
-  }
-
-  private audit(adminUserId: string | undefined, action: string, targetId: string, oldData: any, newData: any, meta: any) {
-    return this.prisma.adminAuditLog.create({ data: { adminUserId, module: 'bank_accounts', action, targetId, oldData, newData, ipAddress: meta?.ipAddress, userAgent: meta?.userAgent } });
-  }
+  private requireBankFields(body: BankBody) { if (!body.bankName?.trim() || !body.accountName?.trim() || !body.accountNumber?.trim()) throw new BadRequestException('bankName, accountName and accountNumber are required'); }
+  private decimalOrNull(value: unknown) { if (value === null || value === undefined || value === '') return null; const next = Number(value); if (!Number.isFinite(next) || next < 0) throw new BadRequestException('Invalid amount limit'); return next; }
+  private normalizeName(value: string) { return value.replace(/\s+/g, '').trim().toLowerCase(); }
+  private paymentType(bankName: string): PaymentType { if (bankName === 'พร้อมเพย์') return 'promptpay'; if (bankName === 'วอเลต') return 'wallet'; if (bankName === 'อื่น ๆ') return 'other'; return 'bank_transfer'; }
+  private matchAmount(item: any, amount: number | null) { if (amount === null) return true; const min = item.minAmount ? Number(item.minAmount) : 0; const max = item.maxAmount ? Number(item.maxAmount) : Infinity; return amount >= min && amount <= max; }
+  private mapReceiving(item: any) { return { id: item.id, bankName: item.bankName, accountName: item.accountName, accountNumber: item.accountNumber, promptPay: item.promptPay, qrImageUrl: item.qrImageUrl, minAmount: item.minAmount?.toString?.() ?? null, maxAmount: item.maxAmount?.toString?.() ?? null, status: item.status, sortOrder: item.sortOrder, createdAt: item.createdAt, updatedAt: item.updatedAt }; }
+  private mapMemberBank(item: any) { return { id: item.id, userId: item.userId, bankName: item.bankName, accountName: item.accountName, accountNumber: item.accountNumber, isPrimary: item.isPrimary, status: item.status, adminNote: item.adminNote, createdAt: item.createdAt, updatedAt: item.updatedAt }; }
+  private audit(adminUserId: string | undefined, action: string, targetId: string, oldData: any, newData: any, meta: any) { return this.prisma.adminAuditLog.create({ data: { adminUserId, module: 'bank_accounts', action, targetId, oldData, newData, ipAddress: meta?.ipAddress, userAgent: meta?.userAgent } }); }
 }
