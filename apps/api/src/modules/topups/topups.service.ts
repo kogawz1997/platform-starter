@@ -65,10 +65,16 @@ export class TopUpsService {
     return this.formatRequest(request);
   }
 
-  async getAdminRequests(status?: string) {
+  async getAdminRequests(status?: string, paging: { page?: string; take?: string } = {}) {
     await this.releaseExpiredClaims();
-    const items = await this.prisma.topUpRequest.findMany({ where: status ? { status: status as any } : {}, include: { user: { select: { id: true, username: true, phone: true, email: true } } }, orderBy: { createdAt: 'desc' }, take: 100 });
-    return { items: items.map((item) => ({ ...this.formatRequest(item), user: item.user })) };
+    const page = Math.max(Number(paging.page ?? 1) || 1, 1);
+    const take = Math.min(Math.max(Number(paging.take ?? 100) || 100, 1), 100);
+    const where = status ? { status: status as any } : {};
+    const [items, total] = await this.prisma.$transaction([
+      this.prisma.topUpRequest.findMany({ where, include: { user: { select: { id: true, username: true, phone: true, email: true } } }, orderBy: { createdAt: 'desc' }, skip: (page - 1) * take, take }),
+      this.prisma.topUpRequest.count({ where }),
+    ]);
+    return { items: items.map((item) => ({ ...this.formatRequest(item), user: item.user })), page, take, total, pageCount: Math.max(Math.ceil(total / take), 1) };
   }
 
   async getAdminRequest(id: string) {
