@@ -21,13 +21,6 @@ type MemberHomeProps = {
 type MoneyRequest = { id: string; amount: string; currency: string; status: string; method?: string | null; createdAt: string };
 type LedgerItem = { id: string; type: string; direction: string; amount: string; balanceAfter: string; createdAt: string };
 
-const quickActions = [
-  ['ฝากเงิน', '/deposit', 'เติมยอดเข้ากระเป๋า'],
-  ['ถอนเงิน', '/withdraw', 'ส่งคำขอถอน'],
-  ['ประวัติ', '/transactions', 'ดูรายการล่าสุด'],
-  ['บัญชีถอน', '/bank-accounts', 'จัดการบัญชี'],
-];
-
 export default function MemberHome(props: MemberHomeProps) {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [ready, setReady] = useState(false);
@@ -86,13 +79,6 @@ export default function MemberHome(props: MemberHomeProps) {
           {pendingWithdrawals.map((item) => <ActivityRow key={item.id} title="ถอนเงินรอดำเนินการ" href="/withdraw" item={item} />)}
         </div>
       </section>}
-
-      <section className="member-info-card">
-        <p>Quick actions</p>
-        <div className="member-quick-grid">
-          {quickActions.map(([title, href, text]) => <a key={href} href={href} className="member-quick-card"><strong>{title}</strong><span>{text}</span></a>)}
-        </div>
-      </section>
 
       {isLoggedIn && <section className="member-info-card">
         <div style={sectionHeadStyle}><div><p>Recent activity</p><h2>รายการล่าสุด</h2></div><a href="/transactions" style={{ color: props.primaryColor, fontWeight: 900, textDecoration: 'none' }}>ดูทั้งหมด</a></div>
