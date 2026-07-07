@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../database/prisma.service';
 
 @Injectable()
@@ -69,5 +69,54 @@ export class AdminAccessService {
         roles: user.roles.map((item) => ({ id: item.role.id, code: item.role.code, name: item.role.name, level: item.role.level })),
       })),
     };
+  }
+
+  async assignRole(actorAdminId: string, targetAdminId: string, roleId: string) {
+    const [target, role] = await Promise.all([
+      this.prisma.adminUser.findUnique({ where: { id: targetAdminId }, include: { roles: { include: { role: true } } } }),
+      this.prisma.role.findUnique({ where: { id: roleId }, include: { permissions: { include: { permission: true } } } }),
+    ]);
+    if (!target) throw new NotFoundException('Admin user not found');
+    if (!role) throw new NotFoundException('Role not found');
+
+    await this.prisma.adminUserRole.upsert({
+      where: { adminUserId_roleId: { adminUserId: targetAdminId, roleId } },
+      update: {},
+      create: { adminUserId: targetAdminId, roleId },
+    });
+
+    await this.audit(actorAdminId, 'ASSIGN_ROLE', targetAdminId, { roleId, roleCode: role.code, target: target.username });
+    return this.overview();
+  }
+
+  async removeRole(actorAdminId: string, targetAdminId: string, roleId: string) {
+    const target = await this.prisma.adminUser.findUnique({ where: { id: targetAdminId }, include: { roles: { include: { role: { include: { permissions: { include: { permission: true } } } } } } } });
+    if (!target) throw new NotFoundException('Admin user not found');
+    const assignment = target.roles.find((item) => item.roleId === roleId);
+    if (!assignment) throw new BadRequestException('Role is not assigned to this admin user');
+
+    const isSelf = actorAdminId === targetAdminId;
+    const isLastRole = target.roles.length <= 1;
+    const roleHasWildcard = assignment.role.permissions.some((item) => item.permission.code === '*');
+    const roleHasAccessManage = assignment.role.permissions.some((item) => item.permission.code === 'admin.access.manage');
+    if (isSelf && (isLastRole || roleHasWildcard || roleHasAccessManage)) {
+      throw new ForbiddenException('Cannot remove your own critical access role');
+    }
+
+    await this.prisma.adminUserRole.delete({ where: { adminUserId_roleId: { adminUserId: targetAdminId, roleId } } });
+    await this.audit(actorAdminId, 'REMOVE_ROLE', targetAdminId, { roleId, roleCode: assignment.role.code, target: target.username });
+    return this.overview();
+  }
+
+  private async audit(actorAdminId: string, action: string, targetId: string, newData: Record<string, unknown>) {
+    await this.prisma.adminAuditLog.create({
+      data: {
+        adminUserId: actorAdminId,
+        action,
+        module: 'admin-access',
+        targetId,
+        newData,
+      },
+    });
   }
 }
