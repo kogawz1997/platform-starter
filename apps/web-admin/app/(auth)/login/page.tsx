@@ -14,7 +14,7 @@ export default function AdminLoginPage() {
   const [showSecret, setShowSecret] = useState(false);
 
   useEffect(() => {
-    if (window.localStorage.getItem('admin_access_token')) window.location.replace('/dashboard');
+    if (window.localStorage.getItem('admin_access_token') || window.localStorage.getItem('admin_refresh_token')) window.location.replace('/dashboard');
   }, []);
 
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
@@ -31,16 +31,34 @@ export default function AdminLoginPage() {
     window.location.replace('/dashboard');
   }
 
-  return <main style={pageStyle}><form onSubmit={onSubmit} style={cardStyle}><div><p style={eyebrowStyle}>Admin Console</p><h1 style={titleStyle}>เข้าสู่ระบบ</h1></div><label style={labelStyle}>Username<input value={username} onChange={(e) => setUsername(e.target.value)} autoComplete="username" disabled={loading} style={inputStyle} /></label><label style={labelStyle}>Password<div style={passwordWrapStyle}><input value={secret} onChange={(e) => setSecret(e.target.value)} type={showSecret ? 'text' : 'password'} autoComplete="current-password" disabled={loading} style={{ ...inputStyle, paddingRight: 78 }} /><button type="button" onClick={() => setShowSecret((v) => !v)} style={ghostButtonStyle} disabled={loading}>{showSecret ? 'ซ่อน' : 'แสดง'}</button></div></label><label style={labelStyle}>2FA<input value={twoFactorCode} onChange={(e) => setTwoFactorCode(e.target.value)} inputMode="numeric" autoComplete="one-time-code" disabled={loading} style={inputStyle} /></label><button type="submit" disabled={loading} style={submitStyle}>{loading ? 'กำลังเข้าสู่ระบบ...' : 'Login'}</button>{message && <div style={alertStyle(status)}>{message}</div>}</form></main>;
+  return <main style={pageStyle}>
+    <section style={shellStyle}>
+      <form onSubmit={onSubmit} style={cardStyle}>
+        <div style={brandRowStyle}><div style={logoStyle}>A</div><div><p style={eyebrowStyle}>Admin Console</p><h1 style={titleStyle}>Platform Admin</h1></div></div>
+        <div style={headlineStyle}><h2 style={formTitleStyle}>เข้าสู่ระบบ</h2><p style={mutedStyle}>เข้าสู่ระบบเพื่อจัดการสมาชิก การเงิน คิว และความเสี่ยง</p></div>
+        <label style={labelStyle}>Username<input value={username} onChange={(e) => setUsername(e.target.value)} autoComplete="username" disabled={loading} placeholder="admin username" style={inputStyle} /></label>
+        <label style={labelStyle}>Password<div style={passwordWrapStyle}><input value={secret} onChange={(e) => setSecret(e.target.value)} type={showSecret ? 'text' : 'password'} autoComplete="current-password" disabled={loading} placeholder="admin password" style={{ ...inputStyle, paddingRight: 58 }} /><button type="button" onClick={() => setShowSecret((v) => !v)} style={eyeButtonStyle} disabled={loading} aria-label={showSecret ? 'Hide password' : 'Show password'} title={showSecret ? 'Hide password' : 'Show password'}>{showSecret ? '🙈' : '👁️'}</button></div></label>
+        <label style={labelStyle}>2FA <span style={{ opacity: 0.6, fontWeight: 500 }}>(ถ้ามี)</span><input value={twoFactorCode} onChange={(e) => setTwoFactorCode(e.target.value)} inputMode="numeric" autoComplete="one-time-code" disabled={loading} placeholder="รหัส 2FA" style={inputStyle} /></label>
+        <button type="submit" disabled={loading} style={submitStyle}>{loading ? 'กำลังเข้าสู่ระบบ...' : 'Login'}</button>
+        {message && <div style={alertStyle(status)}>{message}</div>}
+      </form>
+    </section>
+  </main>;
 }
 
-const pageStyle = { minHeight: '100vh', padding: 24, display: 'grid', placeItems: 'center', background: '#080808', color: '#fff' } as const;
-const cardStyle = { width: '100%', maxWidth: 440, display: 'grid', gap: 16, border: '1px solid rgba(255,255,255,0.12)', borderRadius: 24, padding: 24, background: '#111a24', boxShadow: '0 20px 80px rgba(0,0,0,0.32)' } as const;
-const eyebrowStyle = { margin: 0, opacity: 0.68, fontSize: 13, fontWeight: 900 } as const;
-const titleStyle = { margin: '6px 0 0', fontSize: 34, lineHeight: 1.05 } as const;
+const pageStyle = { minHeight: '100dvh', padding: 16, display: 'grid', placeItems: 'center', background: '#080808', color: '#fff', boxSizing: 'border-box' } as const;
+const shellStyle = { width: '100%', maxWidth: 460, margin: '0 auto', display: 'grid', placeItems: 'center' } as const;
+const cardStyle = { width: '100%', display: 'grid', gap: 16, border: '1px solid rgba(255,255,255,0.12)', borderRadius: 28, padding: 24, background: '#111a24', boxShadow: '0 28px 90px rgba(0,0,0,0.34)', boxSizing: 'border-box' } as const;
+const brandRowStyle = { display: 'flex', alignItems: 'center', gap: 12 } as const;
+const logoStyle = { width: 52, height: 52, borderRadius: 18, display: 'grid', placeItems: 'center', fontWeight: 950, fontSize: 22, background: '#f5c542', color: '#111', flex: '0 0 52px' } as const;
+const eyebrowStyle = { margin: 0, opacity: 0.68, fontSize: 12, fontWeight: 900, letterSpacing: '.08em', textTransform: 'uppercase' as const };
+const titleStyle = { margin: '4px 0 0', fontSize: 28, lineHeight: 1.05 } as const;
+const headlineStyle = { display: 'grid', gap: 6 } as const;
+const formTitleStyle = { margin: 0, fontSize: 30, lineHeight: 1.05 } as const;
+const mutedStyle = { margin: 0, color: 'rgba(255,255,255,.68)', lineHeight: 1.5 } as const;
 const labelStyle = { display: 'grid', gap: 8, fontWeight: 800 } as const;
-const inputStyle = { width: '100%', padding: '13px 14px', borderRadius: 14, border: '1px solid rgba(255,255,255,0.14)', background: '#172231', color: '#fff', boxSizing: 'border-box' } as const;
+const inputStyle = { width: '100%', padding: '13px 14px', borderRadius: 14, border: '1px solid rgba(255,255,255,0.14)', background: '#172231', color: '#fff', boxSizing: 'border-box', outline: 'none' } as const;
 const passwordWrapStyle = { position: 'relative' } as const;
-const ghostButtonStyle = { position: 'absolute', right: 8, top: 7, border: 0, borderRadius: 10, padding: '7px 10px', background: 'rgba(255,255,255,0.08)', color: '#fff', cursor: 'pointer' } as const;
+const eyeButtonStyle = { position: 'absolute', right: 8, top: 7, width: 38, height: 34, borderRadius: 12, border: '1px solid rgba(255,255,255,.14)', background: 'rgba(255,255,255,.10)', color: '#fff', cursor: 'pointer', display: 'grid', placeItems: 'center', fontSize: 16 } as const;
 const submitStyle = { padding: 14, borderRadius: 14, border: 0, background: '#f5c542', color: '#111', fontWeight: 900, cursor: 'pointer' } as const;
 function alertStyle(type: 'idle' | 'success' | 'error' | 'info') { return { border: '1px solid rgba(255,255,255,0.12)', borderRadius: 14, padding: 12, background: type === 'error' ? 'rgba(255,70,70,0.12)' : type === 'success' ? 'rgba(80,255,140,0.12)' : 'rgba(255,255,255,0.06)', color: '#fff' } as const; }
