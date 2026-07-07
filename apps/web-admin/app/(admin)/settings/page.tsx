@@ -1,4 +1,4 @@
-import { AdminBadge, AdminCard, AdminGrid, AdminLinkButton, AdminPage } from './_components/admin-ui';
+import { AdminBadge, AdminCard, AdminGrid, AdminLinkButton, AdminPage } from '../_components/admin-ui';
 
 const settingsItems = [
   ['Website', '/settings/website', 'ข้อมูลเว็บหลัก ภาษา โดเมน และสถานะ login/register'],
