@@ -47,9 +47,14 @@ export class TopUpsService {
   }
 
   async approveRequest(id: string, adminUser: any, dto: ReviewTopUpRequestDto, meta: RequestMeta = {}) {
+    const idempotencyKey = `topup:${id}:approve`;
     return this.prisma.$transaction(async (tx) => {
       const request = await tx.topUpRequest.findUnique({ where: { id } });
       if (!request) throw new NotFoundException('Top up request not found');
+      if (request.status !== 'PENDING') throw new ConflictException(`Top up request already reviewed: ${request.status}`);
+
+      const existingLedger = await tx.walletLedger.findUnique({ where: { idempotencyKey } });
+      if (existingLedger) throw new ConflictException('Top up approval ledger already exists');
 
       const claim = await tx.topUpRequest.updateMany({
         where: { id, status: 'PENDING' },
@@ -76,7 +81,7 @@ export class TopUpsService {
           balanceAfter,
           referenceType: 'top_up_request',
           referenceId: request.id,
-          idempotencyKey: `topup:${request.id}:approve`,
+          idempotencyKey,
           metadata: { method: request.method, referenceCode: request.referenceCode },
           createdByAdminId: adminUser.id,
         },
@@ -89,7 +94,7 @@ export class TopUpsService {
           module: 'topups',
           targetId: request.id,
           oldData: { status: request.status, amount: request.amount.toString() } as any,
-          newData: { status: 'APPROVED', balanceBefore: balanceBefore.toString(), balanceAfter: balanceAfter.toString() } as any,
+          newData: { status: 'APPROVED', balanceBefore: balanceBefore.toString(), balanceAfter: balanceAfter.toString(), idempotencyKey } as any,
           ipAddress: meta.ipAddress,
           userAgent: meta.userAgent,
         },
@@ -104,6 +109,7 @@ export class TopUpsService {
     return this.prisma.$transaction(async (tx) => {
       const request = await tx.topUpRequest.findUnique({ where: { id } });
       if (!request) throw new NotFoundException('Top up request not found');
+      if (request.status !== 'PENDING') throw new ConflictException(`Top up request already reviewed: ${request.status}`);
 
       const claim = await tx.topUpRequest.updateMany({
         where: { id, status: 'PENDING' },
