@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { Decimal } from '@prisma/client/runtime/library';
 import { PrismaService } from '../../database/prisma.service';
 import { AdjustWalletDto } from './dto/adjust-wallet.dto';
@@ -15,13 +15,7 @@ export class WalletService {
   async getMemberLedger(userId: string, limit = 50) {
     const wallet = await this.ensureWallet(userId);
     const safeLimit = Math.min(Math.max(Number(limit) || 50, 1), 100);
-
-    const ledgers = await this.prisma.walletLedger.findMany({
-      where: { walletId: wallet.id, userId },
-      orderBy: { createdAt: 'desc' },
-      take: safeLimit,
-    });
-
+    const ledgers = await this.prisma.walletLedger.findMany({ where: { walletId: wallet.id, userId }, orderBy: { createdAt: 'desc' }, take: safeLimit });
     return { walletId: wallet.id, items: ledgers.map((ledger) => this.formatLedger(ledger)) };
   }
 
@@ -29,94 +23,59 @@ export class WalletService {
     const safeLimit = Math.min(Math.max(Number(query.limit) || 100, 1), 200);
     const identifier = (query.identifier || query.userId || '').trim();
     const where: any = {};
-
     if (query.type) where.type = query.type;
     if (query.direction) where.direction = query.direction;
 
     const items = await this.prisma.walletLedger.findMany({
       where,
-      include: {
-        user: { select: { id: true, username: true, phone: true, email: true } },
-        wallet: { select: { id: true, userId: true, currency: true, balance: true, lockedBalance: true, status: true, updatedAt: true } },
-        createdByAdmin: { select: { id: true, username: true, email: true } },
-      },
+      include: { user: { select: { id: true, username: true, phone: true, email: true } }, wallet: { select: { id: true, userId: true, currency: true, balance: true, lockedBalance: true, status: true, updatedAt: true } }, createdByAdmin: { select: { id: true, username: true, email: true } } },
       orderBy: { createdAt: 'desc' },
       take: identifier ? 500 : safeLimit,
     });
-
     const filtered = identifier ? items.filter((item) => this.matchesIdentifier(identifier, item.user, item.userId)) : items;
-
-    return {
-      items: filtered.slice(0, safeLimit).map((item) => ({
-        ...this.formatLedger(item),
-        shortUserId: this.shortId(item.userId),
-        user: item.user ? { ...item.user, shortId: this.shortId(item.user.id) } : null,
-        wallet: item.wallet ? this.formatWallet(item.wallet) : null,
-        createdByAdmin: item.createdByAdmin,
-      })),
-    };
+    return { items: filtered.slice(0, safeLimit).map((item) => ({ ...this.formatLedger(item), shortUserId: this.shortId(item.userId), user: item.user ? { ...item.user, shortId: this.shortId(item.user.id) } : null, wallet: item.wallet ? this.formatWallet(item.wallet) : null, createdByAdmin: item.createdByAdmin })) };
   }
 
   async getAdminWallets(query: AdminWalletQuery) {
     const safeLimit = Math.min(Math.max(Number(query.limit) || 100, 1), 200);
     const search = query.search?.trim();
-
-    const wallets = await this.prisma.wallet.findMany({
-      include: { user: { select: { id: true, username: true, phone: true, email: true, status: true } } },
-      orderBy: { updatedAt: 'desc' },
-      take: search ? 500 : safeLimit,
-    });
-
+    const wallets = await this.prisma.wallet.findMany({ include: { user: { select: { id: true, username: true, phone: true, email: true, status: true } } }, orderBy: { updatedAt: 'desc' }, take: search ? 500 : safeLimit });
     const filtered = search ? wallets.filter((wallet) => this.matchesIdentifier(search, wallet.user, wallet.userId)) : wallets;
-
-    return {
-      items: filtered.slice(0, safeLimit).map((wallet) => ({
-        ...this.formatWallet(wallet),
-        user: wallet.user ? { ...wallet.user, shortId: this.shortId(wallet.user.id) } : null,
-      })),
-    };
+    return { items: filtered.slice(0, safeLimit).map((wallet) => ({ ...this.formatWallet(wallet), user: wallet.user ? { ...wallet.user, shortId: this.shortId(wallet.user.id) } : null })) };
   }
 
   async getAdminWalletDetail(userId: string) {
     const wallet = await this.ensureWallet(userId);
-    const user = await this.prisma.user.findUnique({
-      where: { id: userId },
-      select: { id: true, username: true, phone: true, email: true, status: true, createdAt: true },
-    });
+    const user = await this.prisma.user.findUnique({ where: { id: userId }, select: { id: true, username: true, phone: true, email: true, status: true, createdAt: true } });
     const ledgers = await this.prisma.walletLedger.findMany({ where: { userId }, orderBy: { createdAt: 'desc' }, take: 100 });
-
     return { wallet: this.formatWallet(wallet), user: user ? { ...user, shortId: this.shortId(user.id) } : null, ledgers: ledgers.map((ledger) => this.formatLedger(ledger)) };
   }
 
   async adjustWallet(userId: string, adminUser: any, dto: AdjustWalletDto, meta: RequestMeta = {}) {
     const amount = new Decimal(dto.amount ?? 0);
     const reason = dto.reason?.trim();
-
     if (amount.lte(0)) throw new BadRequestException('Amount must be greater than zero');
     if (!reason) throw new BadRequestException('Reason is required');
 
+    const clientKey = dto.idempotencyKey?.trim();
+    const idempotencyKey = clientKey ? `adjust:${userId}:${clientKey}` : `adjust:${userId}:${Date.now()}:${Math.random().toString(36).slice(2)}`;
+
     return this.prisma.$transaction(async (tx) => {
+      const existingLedger = await tx.walletLedger.findUnique({ where: { idempotencyKey } });
+      if (existingLedger) throw new ConflictException('Manual adjustment already submitted');
+
       const user = await tx.user.findUnique({ where: { id: userId } });
       if (!user) throw new NotFoundException('User not found');
 
-      const wallet = await tx.wallet.upsert({
-        where: { userId },
-        update: {},
-        create: { userId, currency: 'THB' },
-      });
-
+      const wallet = await tx.wallet.upsert({ where: { userId }, update: {}, create: { userId, currency: 'THB' } });
       if (wallet.status !== 'ACTIVE') throw new BadRequestException('Wallet is not active');
 
       const balanceBefore = wallet.balance;
       const balanceAfter = dto.direction === 'CREDIT' ? balanceBefore.plus(amount) : balanceBefore.minus(amount);
-
       if (balanceAfter.lt(0)) throw new BadRequestException('Balance cannot be negative');
-      if (dto.direction === 'DEBIT' && balanceAfter.lt(wallet.lockedBalance)) {
-        throw new BadRequestException('Balance cannot be lower than locked balance');
-      }
+      if (dto.direction === 'DEBIT' && balanceAfter.lt(wallet.lockedBalance)) throw new BadRequestException('Balance cannot be lower than locked balance');
 
       const updatedWallet = await tx.wallet.update({ where: { id: wallet.id }, data: { balance: balanceAfter } });
-
       const ledger = await tx.walletLedger.create({
         data: {
           walletId: wallet.id,
@@ -128,23 +87,14 @@ export class WalletService {
           balanceAfter,
           referenceType: 'manual_adjustment',
           referenceId: wallet.id,
-          idempotencyKey: `adjust:${wallet.id}:${Date.now()}:${Math.random().toString(36).slice(2)}`,
+          idempotencyKey,
           metadata: { reason },
           createdByAdminId: adminUser.id,
         },
       });
 
       await tx.adminAuditLog.create({
-        data: {
-          adminUserId: adminUser.id,
-          action: 'ADJUST_WALLET',
-          module: 'wallets',
-          targetId: wallet.id,
-          oldData: { balance: balanceBefore.toString(), lockedBalance: wallet.lockedBalance.toString() } as any,
-          newData: { direction: dto.direction, amount: amount.toString(), balanceAfter: balanceAfter.toString(), reason } as any,
-          ipAddress: meta.ipAddress,
-          userAgent: meta.userAgent,
-        },
+        data: { adminUserId: adminUser.id, action: 'ADJUST_WALLET', module: 'wallets', targetId: wallet.id, oldData: { balance: balanceBefore.toString(), lockedBalance: wallet.lockedBalance.toString() } as any, newData: { direction: dto.direction, amount: amount.toString(), balanceAfter: balanceAfter.toString(), reason, idempotencyKey } as any, ipAddress: meta.ipAddress, userAgent: meta.userAgent },
       });
 
       return { wallet: this.formatWallet(updatedWallet), ledger: this.formatLedger(ledger) };
@@ -159,50 +109,17 @@ export class WalletService {
 
   private matchesIdentifier(identifier: string, user: any, userId: string) {
     const q = identifier.toLowerCase();
-    return (
-      userId.toLowerCase() === q ||
-      userId.toLowerCase().startsWith(q) ||
-      user?.username?.toLowerCase().includes(q) ||
-      user?.phone?.toLowerCase().includes(q) ||
-      user?.email?.toLowerCase().includes(q)
-    );
+    return userId.toLowerCase() === q || userId.toLowerCase().startsWith(q) || user?.username?.toLowerCase().includes(q) || user?.phone?.toLowerCase().includes(q) || user?.email?.toLowerCase().includes(q);
   }
 
-  private shortId(id?: string | null) {
-    return id ? id.slice(0, 8) : null;
-  }
+  private shortId(id?: string | null) { return id ? id.slice(0, 8) : null; }
 
   private formatWallet(wallet: any) {
-    return {
-      id: wallet.id,
-      userId: wallet.userId,
-      shortUserId: this.shortId(wallet.userId),
-      currency: wallet.currency,
-      balance: wallet.balance.toString(),
-      lockedBalance: wallet.lockedBalance.toString(),
-      availableBalance: wallet.balance.minus(wallet.lockedBalance).toString(),
-      status: wallet.status,
-      updatedAt: wallet.updatedAt,
-    };
+    return { id: wallet.id, userId: wallet.userId, shortUserId: this.shortId(wallet.userId), currency: wallet.currency, balance: wallet.balance.toString(), lockedBalance: wallet.lockedBalance.toString(), availableBalance: wallet.balance.minus(wallet.lockedBalance).toString(), status: wallet.status, updatedAt: wallet.updatedAt };
   }
 
   private formatLedger(ledger: any) {
-    return {
-      id: ledger.id,
-      walletId: ledger.walletId,
-      userId: ledger.userId,
-      shortUserId: this.shortId(ledger.userId),
-      type: ledger.type,
-      direction: ledger.direction,
-      amount: ledger.amount.toString(),
-      balanceBefore: ledger.balanceBefore.toString(),
-      balanceAfter: ledger.balanceAfter.toString(),
-      referenceType: ledger.referenceType,
-      referenceId: ledger.referenceId,
-      metadata: ledger.metadata,
-      createdByAdminId: ledger.createdByAdminId,
-      createdAt: ledger.createdAt,
-    };
+    return { id: ledger.id, walletId: ledger.walletId, userId: ledger.userId, shortUserId: this.shortId(ledger.userId), type: ledger.type, direction: ledger.direction, amount: ledger.amount.toString(), balanceBefore: ledger.balanceBefore.toString(), balanceAfter: ledger.balanceAfter.toString(), referenceType: ledger.referenceType, referenceId: ledger.referenceId, metadata: ledger.metadata, createdByAdminId: ledger.createdByAdminId, createdAt: ledger.createdAt };
   }
 }
 
