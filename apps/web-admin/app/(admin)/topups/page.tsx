@@ -5,7 +5,7 @@ import { useEffect, useMemo, useState } from 'react';
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000';
 
 type TopUpItem = { id: string; userId: string; amount: string; currency: string; status: string; method?: string | null; note?: string | null; adminNote?: string | null; reviewedAt?: string | null; createdAt: string; user?: { id: string; username: string; phone?: string | null; email?: string | null } };
-type Proof = { userNote: string; slipImageData: string; slipImageName: string };
+type Proof = { userNote: string; slipImageData: string; slipImageName: string; slipFileId: string };
 
 export default function AdminTopUpsPage() {
   const [items, setItems] = useState<TopUpItem[]>([]);
@@ -13,8 +13,10 @@ export default function AdminTopUpsPage() {
   const [message, setMessage] = useState('');
   const [reviewNote, setReviewNote] = useState('');
   const [busyId, setBusyId] = useState('');
+  const [slips, setSlips] = useState<Record<string, { dataUrl: string; name: string }>>({});
 
   useEffect(() => { loadItems(status); }, [status]);
+  useEffect(() => { loadPrivateSlips(items); }, [items]);
   const counts = useMemo(() => ({ pending: items.filter((item) => item.status === 'PENDING').length, total: items.length }), [items]);
 
   async function loadItems(nextStatus = status) {
@@ -28,6 +30,17 @@ export default function AdminTopUpsPage() {
     setItems(data.items ?? []); setMessage('');
   }
 
+  async function loadPrivateSlips(nextItems: TopUpItem[]) {
+    const token = window.localStorage.getItem('admin_access_token');
+    if (!token) return;
+    const targets = nextItems.filter((item) => parseProofNote(item.note).slipFileId && !slips[item.id]);
+    await Promise.all(targets.map(async (item) => {
+      const res = await fetch(`${API_URL}/admin/topups/${item.id}/slip`, { headers: { Authorization: `Bearer ${token}` } });
+      const data = await res.json().catch(() => null);
+      if (res.ok && data?.dataUrl) setSlips((current) => ({ ...current, [item.id]: { dataUrl: data.dataUrl, name: data.slipImageName ?? 'slip' } }));
+    }));
+  }
+
   async function reviewItem(id: string, action: 'confirm' | 'decline') {
     const token = window.localStorage.getItem('admin_access_token');
     if (!token) { setMessage('กรุณา login admin ก่อน'); return; }
@@ -37,10 +50,7 @@ export default function AdminTopUpsPage() {
     const data = await res.json().catch(() => null); setBusyId('');
     if (!res.ok) { setMessage(data?.message ?? 'ทำรายการไม่สำเร็จ'); return; }
     const updated = data?.item ?? data?.topup ?? data;
-    setItems((current) => {
-      const patched = current.map((item) => (item.id === id ? { ...item, ...updated, status: updated?.status ?? nextStatus, adminNote: updated?.adminNote ?? reviewNote } : item));
-      return status === 'PENDING' ? patched.filter((item) => item.id !== id) : patched;
-    });
+    setItems((current) => { const patched = current.map((item) => (item.id === id ? { ...item, ...updated, status: updated?.status ?? nextStatus, adminNote: updated?.adminNote ?? reviewNote } : item)); return status === 'PENDING' ? patched.filter((item) => item.id !== id) : patched; });
     setReviewNote('');
     setMessage(action === 'confirm' ? 'อนุมัติสำเร็จ ย้ายรายการออกจากคิว pending แล้ว' : 'ปฏิเสธรายการแล้ว ย้ายออกจากคิว pending แล้ว');
     window.setTimeout(() => loadItems(status), 400);
@@ -49,24 +59,18 @@ export default function AdminTopUpsPage() {
   return (
     <main style={pageStyle}>
       <a href="/settings" style={backStyle}>← Settings</a>
-      <p style={eyebrowStyle}>Finance Queue</p>
-      <h1 style={titleStyle}>Top Up Review</h1>
-      <p style={mutedStyle}>ตรวจสลิป เติมยอด และจัดการคำขอเติมเงินของสมาชิก</p>
-      <section style={toolbarStyle}>
-        <strong>Pending ในหน้านี้: {counts.pending}</strong>
-        <select value={status} onChange={(event) => setStatus(event.target.value)} style={inputStyle}><option value="PENDING">PENDING</option><option value="APPROVED">APPROVED</option><option value="REJECTED">REJECTED</option><option value="ALL">ALL</option></select>
-        <button type="button" onClick={() => loadItems()} style={buttonStyle}>Refresh</button>
-      </section>
+      <p style={eyebrowStyle}>Finance Queue</p><h1 style={titleStyle}>Top Up Review</h1><p style={mutedStyle}>ตรวจสลิป เติมยอด และจัดการคำขอเติมเงินของสมาชิก</p>
+      <section style={toolbarStyle}><strong>Pending ในหน้านี้: {counts.pending}</strong><select value={status} onChange={(event) => setStatus(event.target.value)} style={inputStyle}><option value="PENDING">PENDING</option><option value="APPROVED">APPROVED</option><option value="REJECTED">REJECTED</option><option value="ALL">ALL</option></select><button type="button" onClick={() => loadItems()} style={buttonStyle}>Refresh</button></section>
       {message && <div style={noticeStyle}>{message}</div>}
       <div style={{ display: 'grid', gap: 14 }}>
-        {items.map((item) => { const proof = parseProofNote(item.note); const isPending = item.status === 'PENDING'; return <section key={item.id} style={cardStyle}><div style={topRowStyle}><div><span style={badgeStyle}>{item.status}</span><h2 style={amountStyle}>{item.currency} {Number(item.amount).toLocaleString('th-TH', { minimumFractionDigits: 2 })}</h2><p style={mutedStyle}>Member: {item.user?.username ?? item.userId}</p><p style={mutedStyle}>Method: {item.method ?? '-'}</p><p style={mutedStyle}>Created: {new Date(item.createdAt).toLocaleString('th-TH')}</p></div><div style={reviewBoxStyle}>{isPending ? <><label style={labelStyle}>Admin note<textarea value={reviewNote} onChange={(event) => setReviewNote(event.target.value)} placeholder="หมายเหตุสำหรับรายการนี้" style={{ ...inputStyle, minHeight: 92 }} /></label><div style={actionRowStyle}><button type="button" disabled={busyId === item.id} onClick={() => reviewItem(item.id, 'confirm')} style={confirmButtonStyle}>{busyId === item.id ? 'กำลังทำ...' : 'อนุมัติ'}</button><button type="button" disabled={busyId === item.id} onClick={() => reviewItem(item.id, 'decline')} style={declineButtonStyle}>ไม่อนุมัติ</button></div></> : <div style={noticeStyle}>รายการนี้ตรวจแล้ว: {item.status}</div>}</div></div><div style={proofBoxStyle}><strong>สลิปที่แนบ</strong>{proof.slipImageData ? <div style={{ marginTop: 10 }}><img src={proof.slipImageData} alt="top up slip" style={slipStyle} /><p style={mutedStyle}>{proof.slipImageName || 'slip image'}</p></div> : <p style={mutedStyle}>ไม่มีสลิป</p>}<p style={mutedStyle}>Member note: {proof.userNote || '-'}</p>{item.adminNote && <p style={mutedStyle}>Previous admin note: {item.adminNote}</p>}</div></section>; })}
+        {items.map((item) => { const proof = parseProofNote(item.note); const slip = proof.slipImageData ? { dataUrl: proof.slipImageData, name: proof.slipImageName } : slips[item.id]; const isPending = item.status === 'PENDING'; return <section key={item.id} style={cardStyle}><div style={topRowStyle}><div><span style={badgeStyle}>{item.status}</span><h2 style={amountStyle}>{item.currency} {Number(item.amount).toLocaleString('th-TH', { minimumFractionDigits: 2 })}</h2><p style={mutedStyle}>Member: {item.user?.username ?? item.userId}</p><p style={mutedStyle}>Method: {item.method ?? '-'}</p><p style={mutedStyle}>Created: {new Date(item.createdAt).toLocaleString('th-TH')}</p></div><div style={reviewBoxStyle}>{isPending ? <><label style={labelStyle}>Admin note<textarea value={reviewNote} onChange={(event) => setReviewNote(event.target.value)} placeholder="หมายเหตุสำหรับรายการนี้" style={{ ...inputStyle, minHeight: 92 }} /></label><div style={actionRowStyle}><button type="button" disabled={busyId === item.id} onClick={() => reviewItem(item.id, 'confirm')} style={confirmButtonStyle}>{busyId === item.id ? 'กำลังทำ...' : 'อนุมัติ'}</button><button type="button" disabled={busyId === item.id} onClick={() => reviewItem(item.id, 'decline')} style={declineButtonStyle}>ไม่อนุมัติ</button></div></> : <div style={noticeStyle}>รายการนี้ตรวจแล้ว: {item.status}</div>}</div></div><div style={proofBoxStyle}><strong>สลิปที่แนบ</strong>{slip?.dataUrl ? <div style={{ marginTop: 10 }}><img src={slip.dataUrl} alt="top up slip" style={slipStyle} /><p style={mutedStyle}>{slip.name || 'slip image'} {proof.slipFileId ? '(private)' : ''}</p></div> : <p style={mutedStyle}>{proof.slipFileId ? 'กำลังโหลดสลิปส่วนตัว...' : 'ไม่มีสลิป'}</p>}<p style={mutedStyle}>Member note: {proof.userNote || '-'}</p>{item.adminNote && <p style={mutedStyle}>Previous admin note: {item.adminNote}</p>}</div></section>; })}
         {items.length === 0 && <div style={noticeStyle}>ยังไม่มีรายการ</div>}
       </div>
     </main>
   );
 }
 
-function parseProofNote(value?: string | null): Proof { if (!value) return { userNote: '', slipImageData: '', slipImageName: '' }; try { const data = JSON.parse(value); return { userNote: typeof data.userNote === 'string' ? data.userNote : '', slipImageData: typeof data.slipImageData === 'string' ? data.slipImageData : '', slipImageName: typeof data.slipImageName === 'string' ? data.slipImageName : '' }; } catch { return { userNote: value, slipImageData: '', slipImageName: '' }; } }
+function parseProofNote(value?: string | null): Proof { if (!value) return { userNote: '', slipImageData: '', slipImageName: '', slipFileId: '' }; try { const data = JSON.parse(value); return { userNote: typeof data.userNote === 'string' ? data.userNote : '', slipImageData: typeof data.slipImageData === 'string' ? data.slipImageData : '', slipImageName: typeof data.slipImageName === 'string' ? data.slipImageName : '', slipFileId: typeof data.slipFileId === 'string' ? data.slipFileId : '' }; } catch { return { userNote: value, slipImageData: '', slipImageName: '', slipFileId: '' }; } }
 const pageStyle = { maxWidth: 1160, margin: '0 auto', padding: '22px 16px 44px', color: '#fff' } as const;
 const backStyle = { color: '#f5c542', textDecoration: 'none', fontWeight: 900 } as const;
 const eyebrowStyle = { margin: '18px 0 0', opacity: 0.66, fontSize: 14 } as const;
