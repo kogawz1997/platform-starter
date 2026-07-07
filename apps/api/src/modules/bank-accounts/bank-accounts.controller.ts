@@ -15,6 +15,12 @@ export class BankAccountsController {
   }
 
   @UseGuards(MemberAuthGuard)
+  @Get('member/receiving-bank-account')
+  getAssignedReceivingAccount(@Query('paymentType') paymentType?: string, @Query('amount') amount?: string) {
+    return this.bankAccountsService.assignReceivingAccount(paymentType, amount);
+  }
+
+  @UseGuards(MemberAuthGuard)
   @Get('member/bank-accounts')
   getMemberBankAccounts(@CurrentUser() user: any) {
     return this.bankAccountsService.listMemberBankAccounts(user.id);
