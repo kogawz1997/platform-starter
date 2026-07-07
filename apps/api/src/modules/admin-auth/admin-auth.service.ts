@@ -17,97 +17,67 @@ export class AdminAuthService {
 
   async signIn(dto: AdminSignInDto, meta: RequestMeta = {}) {
     const admin = await this.prisma.adminUser.findUnique({ where: { username: dto.username } });
-
     if (!admin || admin.status !== 'ACTIVE') {
-      await this.writeLoginHistory(null, false, meta, 'ADMIN_NOT_ACTIVE');
+      await this.safeWriteLoginHistory(null, false, meta, 'ADMIN_NOT_ACTIVE');
       throw new UnauthorizedException('Invalid admin credentials');
     }
 
     const valid = await argon2.verify(admin.passwordHash, dto.secret);
     if (!valid) {
-      await this.writeLoginHistory(admin.id, false, meta, 'INVALID_SECRET');
+      await this.safeWriteLoginHistory(admin.id, false, meta, 'INVALID_SECRET');
       throw new UnauthorizedException('Invalid admin credentials');
     }
 
-    if (admin.twoFactorEnabled && !dto.twoFactorCode) {
-      return { requiresTwoFactor: true, challengeId: admin.id };
-    }
+    if (admin.twoFactorEnabled && !dto.twoFactorCode) return { requiresTwoFactor: true, challengeId: admin.id };
+    if (admin.twoFactorEnabled) this.assertOtp(dto.twoFactorCode ?? '');
 
-    if (admin.twoFactorEnabled) {
-      this.assertOtp(dto.twoFactorCode ?? '');
-    }
-
-    await this.writeLoginHistory(admin.id, true, meta);
-    await this.writeAudit(admin.id, 'admin.login', 'auth', admin.id, meta);
+    await this.safeWriteLoginHistory(admin.id, true, meta);
+    await this.safeWriteAudit(admin.id, 'admin.login', 'auth', admin.id, meta);
     return this.createAdminSession(admin.id, meta);
   }
 
   async setupTwoFactor(adminUserId: string, meta: RequestMeta = {}) {
     const admin = await this.prisma.adminUser.findUnique({ where: { id: adminUserId } });
     if (!admin || admin.status !== 'ACTIVE') throw new UnauthorizedException('Admin is not active');
-
     const secret = randomBytes(20).toString('base64url');
     const issuer = this.configService.get<string>('ADMIN_OTP_ISSUER') ?? 'Platform Admin';
     const otpAuthUrl = `otpauth://totp/${encodeURIComponent(issuer)}:${encodeURIComponent(admin.username)}?secret=${encodeURIComponent(secret)}&issuer=${encodeURIComponent(issuer)}`;
-
-    await this.prisma.adminUser.update({
-      where: { id: admin.id },
-      data: { twoFactorSecret: secret, twoFactorEnabled: false },
-    });
-
-    await this.writeAudit(admin.id, 'admin.otp.setup', 'auth', admin.id, meta);
+    await this.prisma.adminUser.update({ where: { id: admin.id }, data: { twoFactorSecret: secret, twoFactorEnabled: false } });
+    await this.safeWriteAudit(admin.id, 'admin.otp.setup', 'auth', admin.id, meta);
     return { secret, otpAuthUrl };
   }
 
   async enableTwoFactor(adminUserId: string, code: string, meta: RequestMeta = {}) {
     const admin = await this.prisma.adminUser.findUnique({ where: { id: adminUserId } });
-    if (!admin || admin.status !== 'ACTIVE' || !admin.twoFactorSecret) {
-      throw new UnauthorizedException('Two factor setup is not ready');
-    }
-
+    if (!admin || admin.status !== 'ACTIVE' || !admin.twoFactorSecret) throw new UnauthorizedException('Two factor setup is not ready');
     this.assertOtp(code);
-
-    await this.prisma.adminUser.update({
-      where: { id: admin.id },
-      data: { twoFactorEnabled: true },
-    });
-
-    await this.writeAudit(admin.id, 'admin.otp.enable', 'auth', admin.id, meta);
+    await this.prisma.adminUser.update({ where: { id: admin.id }, data: { twoFactorEnabled: true } });
+    await this.safeWriteAudit(admin.id, 'admin.otp.enable', 'auth', admin.id, meta);
     return { success: true };
   }
 
   async verifyTwoFactor(dto: VerifyAdminTwoFactorDto, meta: RequestMeta = {}) {
     const admin = await this.prisma.adminUser.findUnique({ where: { id: dto.challengeId } });
-    if (!admin || admin.status !== 'ACTIVE' || !admin.twoFactorEnabled) {
-      throw new UnauthorizedException('Invalid challenge');
-    }
-
+    if (!admin || admin.status !== 'ACTIVE' || !admin.twoFactorEnabled) throw new UnauthorizedException('Invalid challenge');
     this.assertOtp(dto.code);
-    await this.writeLoginHistory(admin.id, true, meta);
-    await this.writeAudit(admin.id, 'admin.otp.verify', 'auth', admin.id, meta);
+    await this.safeWriteLoginHistory(admin.id, true, meta);
+    await this.safeWriteAudit(admin.id, 'admin.otp.verify', 'auth', admin.id, meta);
     return this.createAdminSession(admin.id, meta);
   }
 
   async refreshSession(refreshToken: string, meta: RequestMeta = {}) {
     const { sessionId, rawToken } = this.readRefreshTokenParts(refreshToken);
-    const session = await this.prisma.authSession.findFirst({
-      where: { id: sessionId, type: 'ADMIN', revokedAt: null, expiresAt: { gt: new Date() } },
-    });
-
+    const session = await this.prisma.authSession.findFirst({ where: { id: sessionId, type: 'ADMIN', revokedAt: null, expiresAt: { gt: new Date() } } });
     if (!session?.adminUserId) throw new UnauthorizedException('Invalid admin refresh session');
     const valid = await argon2.verify(session.refreshTokenHash, rawToken);
     if (!valid) throw new UnauthorizedException('Invalid admin refresh session');
-
     await this.prisma.authSession.update({ where: { id: session.id }, data: { revokedAt: new Date() } });
     return this.createAdminSession(session.adminUserId, meta);
   }
 
   async signOut(sessionId: string, adminUserId: string, meta: RequestMeta = {}) {
-    await this.prisma.authSession.updateMany({
-      where: { id: sessionId, type: 'ADMIN', revokedAt: null },
-      data: { revokedAt: new Date() },
-    });
-    await this.writeAudit(adminUserId, 'admin.logout', 'auth', adminUserId, meta);
+    await this.prisma.authSession.updateMany({ where: { id: sessionId, type: 'ADMIN', revokedAt: null }, data: { revokedAt: new Date() } });
+    await this.safeWriteAudit(adminUserId, 'admin.logout', 'auth', adminUserId, meta);
     return { success: true };
   }
 
@@ -115,27 +85,8 @@ export class AdminAuthService {
     const rawToken = randomBytes(48).toString('base64url');
     const refreshTokenHash = await argon2.hash(rawToken);
     const expiresAt = new Date(Date.now() + this.getRefreshTokenTtlMs());
-
-    const session = await this.prisma.authSession.create({
-      data: {
-        type: 'ADMIN',
-        adminUserId,
-        refreshTokenHash,
-        ipAddress: meta.ipAddress,
-        userAgent: meta.userAgent,
-        deviceId: meta.deviceId,
-        expiresAt,
-      },
-    });
-
-    const accessToken = await this.jwtService.signAsync(
-      { sub: adminUserId, type: 'ADMIN', sessionId: session.id },
-      {
-        secret: this.configService.get<string>('JWT_ACCESS_KEY') ?? 'local_access_key',
-        expiresIn: (this.configService.get<string>('ADMIN_JWT_ACCESS_TTL') ?? '10m') as any,
-      },
-    );
-
+    const session = await this.prisma.authSession.create({ data: { type: 'ADMIN', adminUserId, refreshTokenHash, ipAddress: meta.ipAddress, userAgent: meta.userAgent, deviceId: meta.deviceId, expiresAt } });
+    const accessToken = await this.jwtService.signAsync({ sub: adminUserId, type: 'ADMIN', sessionId: session.id }, { secret: this.configService.get<string>('JWT_ACCESS_KEY') ?? 'local_access_key', expiresIn: (this.configService.get<string>('ADMIN_JWT_ACCESS_TTL') ?? '10m') as any });
     return { accessToken, refreshToken: `${session.id}.${rawToken}`, expiresAt };
   }
 
@@ -155,16 +106,20 @@ export class AdminAuthService {
     return hours * 60 * 60 * 1000;
   }
 
-  private async writeLoginHistory(adminUserId: string | null, success: boolean, meta: RequestMeta, reason?: string) {
-    await this.prisma.loginHistory.create({
-      data: { type: 'ADMIN', adminUserId, success, ipAddress: meta.ipAddress, userAgent: meta.userAgent, reason },
-    });
+  private async safeWriteLoginHistory(adminUserId: string | null, success: boolean, meta: RequestMeta, reason?: string) {
+    try {
+      await this.prisma.loginHistory.create({ data: { type: 'ADMIN', adminUserId, success, ipAddress: meta.ipAddress, userAgent: meta.userAgent, reason } });
+    } catch (error) {
+      console.error('admin login history write failed', error);
+    }
   }
 
-  private async writeAudit(adminUserId: string, action: string, module: string, targetId: string, meta: RequestMeta) {
-    await this.prisma.adminAuditLog.create({
-      data: { adminUserId, action, module, targetId, ipAddress: meta.ipAddress, userAgent: meta.userAgent },
-    });
+  private async safeWriteAudit(adminUserId: string, action: string, module: string, targetId: string, meta: RequestMeta) {
+    try {
+      await this.prisma.adminAuditLog.create({ data: { adminUserId, action, module, targetId, ipAddress: meta.ipAddress, userAgent: meta.userAgent } });
+    } catch (error) {
+      console.error('admin audit write failed', error);
+    }
   }
 }
 
