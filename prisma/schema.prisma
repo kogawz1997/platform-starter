@@ -178,8 +178,8 @@ model Permission {
   name        String   @db.VarChar(120)
   module      String   @db.VarChar(80)
   description String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
 
   roles RolePermission[]
 
@@ -201,7 +201,7 @@ model AdminUserRole {
 model RolePermission {
   roleId       String   @map("role_id") @db.Uuid
   permissionId String   @map("permission_id") @db.Uuid
-  createdAt    DateTime @default(now())
+  createdAt    DateTime @default(now()) @map("created_at")
 
   role       Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
   permission Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
@@ -241,7 +241,7 @@ model LoginHistory {
   ipAddress   String?     @map("ip_address") @db.VarChar(64)
   userAgent   String?     @map("user_agent")
   reason      String?
-  createdAt   DateTime    @default(now())
+  createdAt   DateTime    @default(now()) @map("created_at")
 
   user      User?      @relation(fields: [userId], references: [id], onDelete: SetNull)
   adminUser AdminUser? @relation(fields: [adminUserId], references: [id], onDelete: SetNull)
@@ -258,7 +258,7 @@ model VerificationToken {
   tokenHash String           @map("token_hash")
   expiresAt DateTime         @map("expires_at")
   usedAt    DateTime?        @map("used_at")
-  createdAt DateTime         @default(now())
+  createdAt DateTime         @default(now()) @map("created_at")
 
   @@index([target, type])
   @@map("verification_tokens")
@@ -274,7 +274,7 @@ model AdminAuditLog {
   newData     Json?    @map("new_data")
   ipAddress   String?  @map("ip_address") @db.VarChar(64)
   userAgent   String?  @map("user_agent")
-  createdAt   DateTime @default(now())
+  createdAt   DateTime @default(now()) @map("created_at")
 
   adminUser AdminUser? @relation(fields: [adminUserId], references: [id], onDelete: SetNull)
 
@@ -439,7 +439,7 @@ model SiteSettingHistory {
   changedBy    String?  @map("changed_by") @db.Uuid
   ipAddress    String?  @map("ip_address") @db.VarChar(64)
   userAgent    String?  @map("user_agent")
-  createdAt    DateTime @default(now())
+  createdAt    DateTime @default(now()) @map("created_at")
 
   @@index([settingKey])
   @@index([changedBy])
