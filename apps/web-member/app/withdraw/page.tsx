@@ -78,22 +78,22 @@ export default function WithdrawPage() {
         <label style={labelStyle}>หมายเหตุ<textarea value={note} onChange={(e) => setNote(e.target.value)} placeholder="รายละเอียดเพิ่มเติม ถ้ามี" style={{ ...inputStyle, minHeight: 92 }} /></label>
         <button type="submit" disabled={isSubmitting || activeBanks.length === 0} style={buttonStyle}>{isSubmitting ? 'กำลังส่ง...' : 'ส่งคำขอถอน'}</button>{message && <div style={noticeStyle}>{message}</div>}
       </form>
-      <h2 style={sectionTitleStyle}>ประวัติถอนเงิน</h2><div style={{ display: 'grid', gap: 12 }}>{items.map((item) => <section key={item.id} style={cardStyle}><strong>{item.currency} {Number(item.amount).toLocaleString('th-TH', { minimumFractionDigits: 2 })}</strong><p style={mutedStyle}>Status: {item.status}</p><p style={mutedStyle}>บัญชี: {item.bankName || '-'} / {item.accountNumber || '-'}</p>{item.adminNote && <p style={mutedStyle}>Admin note: {item.adminNote}</p>}</section>)}{items.length === 0 && <div style={noticeStyle}>ยังไม่มีรายการ</div>}</div>
+      <h2 style={sectionTitleStyle}>ประวัติถอนเงิน</h2><div style={{ display: 'grid', gap: 12, minWidth: 0 }}>{items.map((item) => <section key={item.id} style={cardStyle}><strong>{item.currency} {Number(item.amount).toLocaleString('th-TH', { minimumFractionDigits: 2 })}</strong><p style={mutedStyle}>Status: {item.status}</p><p style={mutedStyle}>บัญชี: {item.bankName || '-'} / {item.accountNumber || '-'}</p>{item.adminNote && <p style={mutedStyle}>Admin note: {item.adminNote}</p>}</section>)}{items.length === 0 && <div style={noticeStyle}>ยังไม่มีรายการ</div>}</div>
     </main>
   );
 }
 
-const pageStyle = { minHeight: '100vh', background: '#080808', color: '#fff', padding: '22px 16px 44px', display: 'grid', gap: 14 } as const;
+const pageStyle = { minHeight: '100vh', background: '#080808', color: '#fff', padding: '18px 12px calc(44px + env(safe-area-inset-bottom))', display: 'grid', gap: 14, width: '100%', maxWidth: 920, margin: '0 auto', overflowX: 'hidden' as const } as const;
 const backStyle = { color: '#f5c542', textDecoration: 'none', fontWeight: 900 } as const;
 const eyebrowStyle = { margin: 0, opacity: 0.66, fontSize: 14 } as const;
-const titleStyle = { margin: 0, fontSize: 'clamp(42px, 13vw, 64px)', lineHeight: 0.96, letterSpacing: -1.2 } as const;
+const titleStyle = { margin: 0, fontSize: 'clamp(34px, 11vw, 58px)', lineHeight: 0.98, letterSpacing: -1.2, overflowWrap: 'anywhere' as const };
 const mutedStyle = { margin: 0, opacity: 0.76, lineHeight: 1.55 } as const;
-const heroCardStyle = { border: '1px solid rgba(255,255,255,0.12)', borderRadius: 28, padding: 18, background: '#181818', display: 'grid', gap: 8 } as const;
-const cardStyle = { border: '1px solid rgba(255,255,255,0.12)', borderRadius: 24, padding: 18, background: '#181818', display: 'grid', gap: 12 } as const;
-const amountTitleStyle = { margin: '4px 0', fontSize: 'clamp(34px, 10vw, 54px)', lineHeight: 1 } as const;
+const heroCardStyle = { border: '1px solid rgba(255,255,255,0.12)', borderRadius: 28, padding: 16, background: '#181818', display: 'grid', gap: 8, minWidth: 0, overflow: 'hidden' as const };
+const cardStyle = { border: '1px solid rgba(255,255,255,0.12)', borderRadius: 24, padding: 16, background: '#181818', display: 'grid', gap: 12, minWidth: 0, overflow: 'hidden' as const };
+const amountTitleStyle = { margin: '4px 0', fontSize: 'clamp(30px, 9vw, 50px)', lineHeight: 1, overflowWrap: 'anywhere' as const };
 const sectionTitleStyle = { margin: '14px 0 0', fontSize: 'clamp(24px, 7vw, 34px)' } as const;
-const labelStyle = { display: 'grid', gap: 8, fontWeight: 800 } as const;
-const inputStyle = { display: 'block', width: '100%', padding: '13px 14px', marginTop: 6, borderRadius: 14, border: '1px solid rgba(255,255,255,0.16)', background: '#242424', color: '#fff', boxSizing: 'border-box' } as const;
-const buttonStyle = { padding: 14, borderRadius: 16, cursor: 'pointer', background: '#f5c542', color: '#111', border: 0, fontWeight: 900 } as const;
-const noticeStyle = { border: '1px solid rgba(255,255,255,0.12)', borderRadius: 16, padding: 12, background: 'rgba(255,255,255,0.07)' } as const;
+const labelStyle = { display: 'grid', gap: 8, fontWeight: 800, minWidth: 0 } as const;
+const inputStyle = { display: 'block', width: '100%', padding: '13px 14px', marginTop: 6, borderRadius: 14, border: '1px solid rgba(255,255,255,0.16)', background: '#242424', color: '#fff', boxSizing: 'border-box' as const, fontSize: 16 };
+const buttonStyle = { padding: 14, minHeight: 48, borderRadius: 16, cursor: 'pointer', background: '#f5c542', color: '#111', border: 0, fontWeight: 900, width: '100%' } as const;
+const noticeStyle = { border: '1px solid rgba(255,255,255,0.12)', borderRadius: 16, padding: 12, background: 'rgba(255,255,255,0.07)', overflowWrap: 'anywhere' as const };
 const bankLinkStyle = { color: '#f5c542', textDecoration: 'none', fontWeight: 900 } as const;
