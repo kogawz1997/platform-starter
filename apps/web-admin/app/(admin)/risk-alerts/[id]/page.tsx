@@ -5,6 +5,7 @@ import { useParams } from 'next/navigation';
 import { adminApiFetch } from '../../../admin-api';
 import { AdminBadge, AdminButton, AdminCard, AdminEmpty, AdminGrid, AdminLinkButton, AdminMetric, AdminMetricGrid, AdminNotice, AdminPage, AdminRow, AdminStack } from '../../_components/admin-ui';
 import { RiskMetadataRaw, RiskMetadataView } from '../metadata';
+import { RiskRelatedLinks } from '../related-links';
 
 type RiskAlert = {
   id: string;
@@ -84,11 +85,7 @@ export default function RiskAlertDetailPage() {
           </div>
         </AdminCard>
         <AdminCard title="Related links" description="ทางลัดไปข้อมูลที่เกี่ยวข้อง">
-          <AdminStack>
-            {item.memberId && <AdminRow><strong>Member detail</strong><AdminLinkButton href={`/members/${item.memberId}`}>Open</AdminLinkButton></AdminRow>}
-            {item.refType && item.refId && <AdminRow><strong>{item.refType}</strong><span>{item.refId}</span></AdminRow>}
-            {!item.memberId && !item.refId && <AdminEmpty>ไม่มี reference เพิ่มเติม</AdminEmpty>}
-          </AdminStack>
+          <RiskRelatedLinks item={item} />
         </AdminCard>
       </AdminGrid>
 
