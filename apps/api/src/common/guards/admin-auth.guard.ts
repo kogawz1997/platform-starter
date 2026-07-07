@@ -14,65 +14,30 @@ export class AdminAuthGuard implements CanActivate {
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest();
     const token = this.getBearerToken(request.headers.authorization);
-
-    if (!token) {
-      throw new UnauthorizedException('Missing admin authorization header');
-    }
+    if (!token) throw new UnauthorizedException('Missing admin authorization header');
 
     try {
-      const payload = await this.jwtService.verifyAsync(token, {
-        secret: this.configService.get<string>('JWT_ACCESS_KEY') ?? 'local_access_key',
-      });
-
-      if (payload.type !== 'ADMIN' || !payload.sub || !payload.sessionId) {
-        throw new UnauthorizedException('Invalid admin token');
-      }
+      const payload = await this.jwtService.verifyAsync(token, { secret: this.configService.get<string>('JWT_ACCESS_KEY') ?? 'local_access_key' });
+      if (payload.type !== 'ADMIN' || !payload.sub || !payload.sessionId) throw new UnauthorizedException('Invalid admin token');
 
       const session = await this.prisma.authSession.findFirst({
-        where: {
-          id: payload.sessionId,
-          adminUserId: payload.sub,
-          type: 'ADMIN',
-          revokedAt: null,
-          expiresAt: { gt: new Date() },
-        },
-        include: {
-          adminUser: {
-            include: {
-              roles: {
-                include: {
-                  role: {
-                    include: {
-                      permissions: {
-                        include: { permission: true },
-                      },
-                    },
-                  },
-                },
-              },
-            },
-          },
-        },
+        where: { id: payload.sessionId, adminUserId: payload.sub, type: 'ADMIN', revokedAt: null, expiresAt: { gt: new Date() } },
+        include: { adminUser: true },
       });
 
-      if (!session?.adminUser || session.adminUser.status !== 'ACTIVE') {
-        throw new UnauthorizedException('Admin session is not active');
-      }
-
-      const permissions = session.adminUser.roles.flatMap((userRole: any) =>
-        userRole.role.permissions.map((rolePermission: any) => rolePermission.permission.code),
-      );
+      if (!session?.adminUser || session.adminUser.status !== 'ACTIVE') throw new UnauthorizedException('Admin session is not active');
 
       request.user = {
         id: session.adminUser.id,
         type: 'ADMIN',
         sessionId: session.id,
         username: session.adminUser.username,
-        permissions: [...new Set(permissions)],
+        permissions: [],
       };
 
       return true;
-    } catch {
+    } catch (error) {
+      console.error('admin auth guard failed', error);
       throw new UnauthorizedException('Invalid or expired admin token');
     }
   }
