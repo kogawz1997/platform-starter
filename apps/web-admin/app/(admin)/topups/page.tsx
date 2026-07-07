@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
+import { AdminBadge, AdminButton, AdminCard, AdminEmpty, AdminMetric, AdminMetricGrid, AdminNotice, AdminPage, AdminRow, AdminStack, AdminToolbar, formatMoney } from '../_components/admin-ui';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000';
 
@@ -51,43 +52,19 @@ export default function AdminTopUpsPage() {
     if (!res.ok) { setMessage(data?.message ?? 'ทำรายการไม่สำเร็จ'); return; }
     const updated = data?.item ?? data?.topup ?? data;
     setItems((current) => { const patched = current.map((item) => (item.id === id ? { ...item, ...updated, status: updated?.status ?? nextStatus, adminNote: updated?.adminNote ?? reviewNote } : item)); return status === 'PENDING' ? patched.filter((item) => item.id !== id) : patched; });
-    setReviewNote('');
-    setMessage(action === 'confirm' ? 'อนุมัติสำเร็จ ย้ายรายการออกจากคิว pending แล้ว' : 'ปฏิเสธรายการแล้ว ย้ายออกจากคิว pending แล้ว');
+    setReviewNote(''); setMessage(action === 'confirm' ? 'อนุมัติสำเร็จ ย้ายรายการออกจากคิว pending แล้ว' : 'ปฏิเสธรายการแล้ว ย้ายออกจากคิว pending แล้ว');
     window.setTimeout(() => loadItems(status), 400);
   }
 
   return (
-    <main style={pageStyle}>
-      <a href="/settings" style={backStyle}>← Settings</a>
-      <p style={eyebrowStyle}>Finance Queue</p><h1 style={titleStyle}>Top Up Review</h1><p style={mutedStyle}>ตรวจสลิป เติมยอด และจัดการคำขอเติมเงินของสมาชิก</p>
-      <section style={toolbarStyle}><strong>Pending ในหน้านี้: {counts.pending}</strong><select value={status} onChange={(event) => setStatus(event.target.value)} style={inputStyle}><option value="PENDING">PENDING</option><option value="APPROVED">APPROVED</option><option value="REJECTED">REJECTED</option><option value="ALL">ALL</option></select><button type="button" onClick={() => loadItems()} style={buttonStyle}>Refresh</button></section>
-      {message && <div style={noticeStyle}>{message}</div>}
-      <div style={{ display: 'grid', gap: 14 }}>
-        {items.map((item) => { const proof = parseProofNote(item.note); const slip = proof.slipImageData ? { dataUrl: proof.slipImageData, name: proof.slipImageName } : slips[item.id]; const isPending = item.status === 'PENDING'; return <section key={item.id} style={cardStyle}><div style={topRowStyle}><div><span style={badgeStyle}>{item.status}</span><h2 style={amountStyle}>{item.currency} {Number(item.amount).toLocaleString('th-TH', { minimumFractionDigits: 2 })}</h2><p style={mutedStyle}>Member: {item.user?.username ?? item.userId}</p><p style={mutedStyle}>Method: {item.method ?? '-'}</p><p style={mutedStyle}>Created: {new Date(item.createdAt).toLocaleString('th-TH')}</p></div><div style={reviewBoxStyle}>{isPending ? <><label style={labelStyle}>Admin note<textarea value={reviewNote} onChange={(event) => setReviewNote(event.target.value)} placeholder="หมายเหตุสำหรับรายการนี้" style={{ ...inputStyle, minHeight: 92 }} /></label><div style={actionRowStyle}><button type="button" disabled={busyId === item.id} onClick={() => reviewItem(item.id, 'confirm')} style={confirmButtonStyle}>{busyId === item.id ? 'กำลังทำ...' : 'อนุมัติ'}</button><button type="button" disabled={busyId === item.id} onClick={() => reviewItem(item.id, 'decline')} style={declineButtonStyle}>ไม่อนุมัติ</button></div></> : <div style={noticeStyle}>รายการนี้ตรวจแล้ว: {item.status}</div>}</div></div><div style={proofBoxStyle}><strong>สลิปที่แนบ</strong>{slip?.dataUrl ? <div style={{ marginTop: 10 }}><img src={slip.dataUrl} alt="top up slip" style={slipStyle} /><p style={mutedStyle}>{slip.name || 'slip image'} {proof.slipFileId ? '(private)' : ''}</p></div> : <p style={mutedStyle}>{proof.slipFileId ? 'กำลังโหลดสลิปส่วนตัว...' : 'ไม่มีสลิป'}</p>}<p style={mutedStyle}>Member note: {proof.userNote || '-'}</p>{item.adminNote && <p style={mutedStyle}>Previous admin note: {item.adminNote}</p>}</div></section>; })}
-        {items.length === 0 && <div style={noticeStyle}>ยังไม่มีรายการ</div>}
-      </div>
-    </main>
+    <AdminPage eyebrow="Finance Queue" title="Top Up Review" description="ตรวจสลิป เติมยอด และจัดการคำขอเติมเงินของสมาชิก" actions={<AdminButton onClick={() => loadItems()}>Refresh</AdminButton>}>
+      <AdminMetricGrid><AdminMetric title="Pending ในหน้านี้" value={`${counts.pending}`} /><AdminMetric title="Total loaded" value={`${counts.total}`} /><AdminMetric title="Status filter" value={status} /></AdminMetricGrid>
+      <AdminToolbar><select value={status} onChange={(event) => setStatus(event.target.value)}><option value="PENDING">PENDING</option><option value="APPROVED">APPROVED</option><option value="REJECTED">REJECTED</option><option value="ALL">ALL</option></select></AdminToolbar>
+      {message && <AdminNotice>{message}</AdminNotice>}
+      <AdminStack>{items.map((item) => { const proof = parseProofNote(item.note); const slip = proof.slipImageData ? { dataUrl: proof.slipImageData, name: proof.slipImageName } : slips[item.id]; const isPending = item.status === 'PENDING'; return <AdminCard key={item.id}><AdminRow><div><AdminBadge tone={item.status === 'APPROVED' ? 'success' : item.status === 'REJECTED' ? 'danger' : 'warning'}>{item.status}</AdminBadge><h2 style={{ margin: '10px 0 4px', fontSize: 34 }}>{formatMoney(item.amount)}</h2><p>Member: {item.user?.username ?? item.userId}</p><p>Method: {item.method ?? '-'}</p><p>Created: {new Date(item.createdAt).toLocaleString('th-TH')}</p></div><div style={{ minWidth: 260 }}>{isPending ? <><label style={{ display: 'grid', gap: 6, fontWeight: 800 }}>Admin note<textarea value={reviewNote} onChange={(event) => setReviewNote(event.target.value)} placeholder="หมายเหตุสำหรับรายการนี้" style={{ minHeight: 92 }} /></label><div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginTop: 10 }}><AdminButton disabled={busyId === item.id} onClick={() => reviewItem(item.id, 'confirm')} tone="success">{busyId === item.id ? 'กำลังทำ...' : 'อนุมัติ'}</AdminButton><AdminButton disabled={busyId === item.id} onClick={() => reviewItem(item.id, 'decline')} tone="danger">ไม่อนุมัติ</AdminButton></div></> : <AdminNotice>รายการนี้ตรวจแล้ว: {item.status}</AdminNotice>}</div></AdminRow><div style={{ borderTop: '1px solid rgba(148,163,184,.18)', paddingTop: 14 }}><strong>สลิปที่แนบ</strong>{slip?.dataUrl ? <div style={{ marginTop: 10 }}><img src={slip.dataUrl} alt="top up slip" style={slipStyle} /><p>{slip.name || 'slip image'} {proof.slipFileId ? '(private)' : ''}</p></div> : <p>{proof.slipFileId ? 'กำลังโหลดสลิปส่วนตัว...' : 'ไม่มีสลิป'}</p>}<p>Member note: {proof.userNote || '-'}</p>{item.adminNote && <p>Previous admin note: {item.adminNote}</p>}</div></AdminCard>; })}{items.length === 0 && <AdminEmpty>ยังไม่มีรายการ</AdminEmpty>}</AdminStack>
+    </AdminPage>
   );
 }
 
 function parseProofNote(value?: string | null): Proof { if (!value) return { userNote: '', slipImageData: '', slipImageName: '', slipFileId: '' }; try { const data = JSON.parse(value); return { userNote: typeof data.userNote === 'string' ? data.userNote : '', slipImageData: typeof data.slipImageData === 'string' ? data.slipImageData : '', slipImageName: typeof data.slipImageName === 'string' ? data.slipImageName : '', slipFileId: typeof data.slipFileId === 'string' ? data.slipFileId : '' }; } catch { return { userNote: value, slipImageData: '', slipImageName: '', slipFileId: '' }; } }
-const pageStyle = { maxWidth: 1160, margin: '0 auto', padding: '22px 16px 44px', color: '#fff' } as const;
-const backStyle = { color: '#f5c542', textDecoration: 'none', fontWeight: 900 } as const;
-const eyebrowStyle = { margin: '18px 0 0', opacity: 0.66, fontSize: 14 } as const;
-const titleStyle = { margin: '6px 0 8px', fontSize: 'clamp(36px, 10vw, 68px)', lineHeight: 0.96, letterSpacing: -1.4 } as const;
-const mutedStyle = { margin: 0, opacity: 0.76, lineHeight: 1.55 } as const;
-const toolbarStyle = { display: 'grid', gridTemplateColumns: '1fr minmax(180px, 260px) auto', gap: 10, alignItems: 'center', border: '1px solid rgba(255,255,255,0.14)', borderRadius: 24, padding: 16, margin: '18px 0', background: '#181818' } as const;
-const cardStyle = { border: '1px solid rgba(255,255,255,0.12)', borderRadius: 24, padding: 16, background: '#181818', display: 'grid', gap: 14 } as const;
-const inputStyle = { display: 'block', width: '100%', padding: '13px 14px', borderRadius: 14, border: '1px solid rgba(255,255,255,0.16)', background: '#242424', color: '#fff', marginTop: 6, boxSizing: 'border-box' } as const;
-const buttonStyle = { padding: '13px 14px', borderRadius: 14, cursor: 'pointer', background: '#f5c542', color: '#111', border: 0, fontWeight: 900 } as const;
-const confirmButtonStyle = { padding: '13px 14px', borderRadius: 14, border: 0, cursor: 'pointer', background: '#16a34a', color: '#fff', fontWeight: 900 } as const;
-const declineButtonStyle = { padding: '13px 14px', borderRadius: 14, border: 0, cursor: 'pointer', background: '#dc2626', color: '#fff', fontWeight: 900 } as const;
-const noticeStyle = { border: '1px solid rgba(255,255,255,0.12)', borderRadius: 16, padding: 12, background: 'rgba(255,255,255,0.07)', marginBottom: 12 } as const;
-const topRowStyle = { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 14 } as const;
-const badgeStyle = { display: 'inline-block', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 999, padding: '6px 10px', fontSize: 12, fontWeight: 900, background: 'rgba(255,255,255,0.06)' } as const;
-const amountStyle = { margin: '10px 0 4px', fontSize: 'clamp(28px, 8vw, 42px)', lineHeight: 1 } as const;
-const reviewBoxStyle = { border: '1px solid rgba(255,255,255,0.10)', borderRadius: 18, padding: 14, background: 'rgba(255,255,255,0.04)' } as const;
-const proofBoxStyle = { borderTop: '1px solid rgba(255,255,255,0.10)', paddingTop: 14 } as const;
-const labelStyle = { display: 'grid', gap: 6, fontWeight: 800 } as const;
-const actionRowStyle = { display: 'flex', gap: 10, flexWrap: 'wrap', marginTop: 10 } as const;
-const slipStyle = { width: '100%', maxWidth: 420, borderRadius: 18, border: '1px solid rgba(255,255,255,0.14)' } as const;
+const slipStyle = { width: '100%', maxWidth: 420, borderRadius: 14, border: '1px solid rgba(148,163,184,.22)' } as const;
