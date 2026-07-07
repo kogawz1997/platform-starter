@@ -2,7 +2,7 @@ import { BadRequestException, Injectable, NotFoundException } from '@nestjs/comm
 import { Decimal } from '@prisma/client/runtime/library';
 import { PrismaService } from '../../database/prisma.service';
 
-type RiskFilter = { status?: string; severity?: string; type?: string };
+type RiskFilter = { status?: string; severity?: string; type?: string; createdFrom?: string; createdTo?: string };
 type RiskStatus = 'OPEN' | 'REVIEWING' | 'RESOLVED' | 'DISMISSED';
 type RiskSeverity = 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
 type RiskType = 'REPEATED_TOPUPS' | 'RAPID_DEPOSIT_WITHDRAWAL' | 'HIGH_WITHDRAWAL' | 'BANK_CHANGE_WITHDRAWAL' | 'MULTIPLE_PENDING_TOPUPS' | 'WALLET_LEDGER_MISMATCH';
@@ -21,6 +21,8 @@ export class RiskAlertsService {
     if (filter.status && VALID_STATUSES.includes(filter.status as RiskStatus)) where.status = filter.status;
     if (filter.severity && VALID_SEVERITIES.includes(filter.severity as RiskSeverity)) where.severity = filter.severity;
     if (filter.type && VALID_TYPES.includes(filter.type as RiskType)) where.type = filter.type;
+    const createdAt = this.buildDateRange(filter.createdFrom, filter.createdTo);
+    if (createdAt) where.createdAt = createdAt;
 
     const [items, openCount, criticalCount] = await Promise.all([
       this.prisma.riskAlert.findMany({ where, orderBy: [{ status: 'asc' }, { createdAt: 'desc' }], take: 200 }),
@@ -142,6 +144,19 @@ export class RiskAlertsService {
     const existing = await this.prisma.riskAlert.findFirst({ where: { type: input.type as any, memberId: input.memberId ?? undefined, refType: input.refType ?? undefined, refId: input.refId ?? undefined, status: { in: ACTIVE_ALERT_STATUSES } as any, createdAt: { gte: recentSince } } });
     if (existing) return null;
     return this.prisma.riskAlert.create({ data: { type: input.type as any, severity: input.severity as any, memberId: input.memberId ?? null, refType: input.refType ?? null, refId: input.refId ?? null, title: input.title, description: input.description, metadata: input.metadata ?? undefined } });
+  }
+
+  private buildDateRange(createdFrom?: string, createdTo?: string) {
+    const range: any = {};
+    if (createdFrom) {
+      const from = new Date(`${createdFrom}T00:00:00.000Z`);
+      if (!Number.isNaN(from.getTime())) range.gte = from;
+    }
+    if (createdTo) {
+      const to = new Date(`${createdTo}T23:59:59.999Z`);
+      if (!Number.isNaN(to.getTime())) range.lte = to;
+    }
+    return Object.keys(range).length ? range : null;
   }
 
   private groupByUser(items: any[]) {
