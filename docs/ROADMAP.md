@@ -114,14 +114,20 @@ Backend requirements:
 
 ## Phase 3: Wallet Hardening and Operation Center
 
-Status: in progress
+Status: in progress, ABC hardening pass completed
 
-- Finance dashboard summary
-- Private media storage for slips
-- Notification for review queues
-- Reconciliation reports
-- Export finance records
-- Job lock for high-risk operations
+- Finance dashboard summary: completed
+- Reconciliation reports: completed first pass
+- Export finance records: completed first pass
+- Job lock for high-risk operations: completed first pass
+- Private media storage for slips: next
+- Notification for review queues: next
+
+### ABC hardening pass
+
+- A: top-up review guards, withdrawal review guards, and manual adjustment idempotency from admin UI completed
+- B: reports include queue counters, reconciliation checked count, and exports shortcut completed
+- C: top-up and withdrawal review UX now removes reviewed pending items and hides duplicate action buttons completed
 
 ## Phase 3.5: UX/UI Polish
 
@@ -162,6 +168,8 @@ Status: completed after production mobile regression test
 - Withdrawal review page polish: completed
 - Wallets page polish: completed
 - Ledgers page polish: completed
+- Reports page polish: completed
+- Exports page first pass: completed
 - Settings hub polish: completed
 - Tables, filters, badges, and action buttons: completed first pass
 - Better spacing, cards, and typography: completed
@@ -219,8 +227,7 @@ Status: next
 
 - Monitoring
 - Backup
-- Alerts
-- Deployment
+- Error logging
 - Security review
-- Rate limit
-- Production runbook
+- Deployment checklist
+- Runbook
