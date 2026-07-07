@@ -9,6 +9,7 @@ import { WalletModule } from './modules/wallet/wallet.module';
 import { TopUpsModule } from './modules/topups/topups.module';
 import { WithdrawalsModule } from './modules/withdrawals/withdrawals.module';
 import { FinanceModule } from './modules/finance/finance.module';
+import { ReportsModule } from './modules/reports/reports.module';
 
 @Module({
   imports: [
@@ -22,6 +23,7 @@ import { FinanceModule } from './modules/finance/finance.module';
     TopUpsModule,
     WithdrawalsModule,
     FinanceModule,
+    ReportsModule,
   ],
 })
 export class AppModule {}
