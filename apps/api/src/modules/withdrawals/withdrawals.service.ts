@@ -11,8 +11,14 @@ export class WithdrawalsService {
   async createMemberRequest(userId: string, dto: CreateWithdrawalRequestDto) {
     const amount = new Decimal(dto.amount ?? 0);
     if (amount.lte(0)) throw new BadRequestException('Amount must be greater than zero');
+    if (!dto.accountName || !dto.accountNumber || !dto.bankName) throw new BadRequestException('Withdrawal bank account is required');
 
     return this.prisma.$transaction(async (tx) => {
+      const approvedBank = await tx.memberBankAccount.findFirst({
+        where: { userId, status: 'ACTIVE', bankName: dto.bankName, accountName: dto.accountName, accountNumber: dto.accountNumber },
+      });
+      if (!approvedBank) throw new BadRequestException('กรุณาใช้บัญชีถอนเงินที่แอดมินอนุมัติแล้วเท่านั้น');
+
       const wallet = await tx.wallet.findUnique({ where: { userId } });
       if (!wallet) throw new BadRequestException('Wallet not found');
       if (wallet.status !== 'ACTIVE') throw new BadRequestException('Wallet is not active');
@@ -66,10 +72,7 @@ export class WithdrawalsService {
       const existingLedger = await tx.walletLedger.findUnique({ where: { idempotencyKey: ledgerKey } });
       if (existingLedger) throw new ConflictException('Withdrawal ledger already exists');
 
-      const claim = await tx.withdrawalRequest.updateMany({
-        where: { id, status: 'PENDING' },
-        data: { status: 'COMPLETED', adminNote: dto.adminNote, reviewedBy: adminUser.id, reviewedAt: new Date() },
-      });
+      const claim = await tx.withdrawalRequest.updateMany({ where: { id, status: 'PENDING' }, data: { status: 'COMPLETED', adminNote: dto.adminNote, reviewedBy: adminUser.id, reviewedAt: new Date() } });
       if (claim.count !== 1) throw new ConflictException('Withdrawal request already reviewed');
 
       const wallet = await tx.wallet.findUnique({ where: { userId: request.userId } });
@@ -82,36 +85,8 @@ export class WithdrawalsService {
       const lockedAfter = wallet.lockedBalance.minus(request.amount);
 
       await tx.wallet.update({ where: { id: wallet.id }, data: { balance: balanceAfter, lockedBalance: lockedAfter } });
-      await tx.walletLedger.create({
-        data: {
-          walletId: wallet.id,
-          userId: request.userId,
-          type: 'WITHDRAWAL',
-          direction: 'DEBIT',
-          amount: request.amount,
-          balanceBefore,
-          balanceAfter,
-          referenceType: 'withdrawal_request',
-          referenceId: request.id,
-          idempotencyKey: ledgerKey,
-          metadata: { method: request.method, accountName: request.accountName, bankName: request.bankName },
-          createdByAdminId: adminUser.id,
-        },
-      });
-
-      await tx.adminAuditLog.create({
-        data: {
-          adminUserId: adminUser.id,
-          action: 'COMPLETE_WITHDRAWAL',
-          module: 'withdrawals',
-          targetId: request.id,
-          oldData: { status: request.status, amount: request.amount.toString() } as any,
-          newData: { status: 'COMPLETED', balanceBefore: balanceBefore.toString(), balanceAfter: balanceAfter.toString(), lockedAfter: lockedAfter.toString(), idempotencyKey: ledgerKey } as any,
-          ipAddress: meta.ipAddress,
-          userAgent: meta.userAgent,
-        },
-      });
-
+      await tx.walletLedger.create({ data: { walletId: wallet.id, userId: request.userId, type: 'WITHDRAWAL', direction: 'DEBIT', amount: request.amount, balanceBefore, balanceAfter, referenceType: 'withdrawal_request', referenceId: request.id, idempotencyKey: ledgerKey, metadata: { method: request.method, accountName: request.accountName, bankName: request.bankName }, createdByAdminId: adminUser.id } });
+      await tx.adminAuditLog.create({ data: { adminUserId: adminUser.id, action: 'COMPLETE_WITHDRAWAL', module: 'withdrawals', targetId: request.id, oldData: { status: request.status, amount: request.amount.toString() } as any, newData: { status: 'COMPLETED', balanceBefore: balanceBefore.toString(), balanceAfter: balanceAfter.toString(), lockedAfter: lockedAfter.toString(), idempotencyKey: ledgerKey } as any, ipAddress: meta.ipAddress, userAgent: meta.userAgent } });
       const updated = await tx.withdrawalRequest.findUniqueOrThrow({ where: { id } });
       return this.formatRequest(updated);
     });
@@ -122,19 +97,13 @@ export class WithdrawalsService {
       const request = await tx.withdrawalRequest.findUnique({ where: { id } });
       if (!request) throw new NotFoundException('Withdrawal request not found');
       if (request.status !== 'PENDING') throw new ConflictException(`Withdrawal request already reviewed: ${request.status}`);
-
-      const claim = await tx.withdrawalRequest.updateMany({
-        where: { id, status: 'PENDING' },
-        data: { status: 'REJECTED', adminNote: dto.adminNote, reviewedBy: adminUser.id, reviewedAt: new Date() },
-      });
+      const claim = await tx.withdrawalRequest.updateMany({ where: { id, status: 'PENDING' }, data: { status: 'REJECTED', adminNote: dto.adminNote, reviewedBy: adminUser.id, reviewedAt: new Date() } });
       if (claim.count !== 1) throw new ConflictException('Withdrawal request already reviewed');
-
       const wallet = await tx.wallet.findUnique({ where: { userId: request.userId } });
       if (!wallet) throw new BadRequestException('Wallet not found');
       if (wallet.lockedBalance.lt(request.amount)) throw new BadRequestException('Locked balance is not enough');
       const lockedAfter = wallet.lockedBalance.minus(request.amount);
       await tx.wallet.update({ where: { id: wallet.id }, data: { lockedBalance: lockedAfter } });
-
       await tx.adminAuditLog.create({ data: { adminUserId: adminUser.id, action: 'REJECT_WITHDRAWAL', module: 'withdrawals', targetId: request.id, oldData: { status: request.status, amount: request.amount.toString() } as any, newData: { status: 'REJECTED', adminNote: dto.adminNote, lockedAfter: lockedAfter.toString() } as any, ipAddress: meta.ipAddress, userAgent: meta.userAgent } });
       const updated = await tx.withdrawalRequest.findUniqueOrThrow({ where: { id } });
       return this.formatRequest(updated);
