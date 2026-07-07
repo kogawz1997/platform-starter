@@ -36,9 +36,15 @@ export default function RiskAlertsPage() {
   const [createdTo, setCreatedTo] = useState('');
   const [loading, setLoading] = useState(true);
   const [scanning, setScanning] = useState(false);
+  const [cooldownRemaining, setCooldownRemaining] = useState(0);
   const [message, setMessage] = useState('');
 
   useEffect(() => { load(); }, [status, severity, type]);
+  useEffect(() => {
+    if (cooldownRemaining <= 0) return;
+    const timer = window.setInterval(() => setCooldownRemaining((value) => Math.max(0, value - 1)), 1000);
+    return () => window.clearInterval(timer);
+  }, [cooldownRemaining]);
 
   async function load() {
     setLoading(true);
@@ -63,13 +69,21 @@ export default function RiskAlertsPage() {
   }
 
   async function scan() {
-    if (scanning) return;
+    if (scanning || cooldownRemaining > 0) return;
     setScanning(true);
     setMessage('กำลังสแกนความเสี่ยง...');
     const res = await adminApiFetch('/admin/risk-alerts/scan', { method: 'POST' });
     const data = await res.json().catch(() => null);
-    if (res.ok) setMessage(`สแกนเสร็จ สร้าง alert ใหม่ ${Number(data?.created ?? 0)} รายการ`);
-    else setMessage(data?.retryAfter ? `สแกนถี่เกินไป ลองใหม่ใน ${data.retryAfter} วินาที` : data?.message ?? 'สแกนความเสี่ยงไม่สำเร็จ');
+    if (res.ok) {
+      setMessage(`สแกนเสร็จ สร้าง alert ใหม่ ${Number(data?.created ?? 0)} รายการ`);
+      setCooldownRemaining(45);
+    } else if (data?.retryAfter) {
+      const retryAfter = Number(data.retryAfter);
+      setCooldownRemaining(Number.isFinite(retryAfter) ? retryAfter : 45);
+      setMessage(`สแกนถี่เกินไป ลองใหม่ใน ${data.retryAfter} วินาที`);
+    } else {
+      setMessage(data?.message ?? 'สแกนความเสี่ยงไม่สำเร็จ');
+    }
     setScanning(false);
     await load();
   }
@@ -91,13 +105,16 @@ export default function RiskAlertsPage() {
   }
 
   const activeShowing = useMemo(() => items.filter((item) => item.status === 'OPEN' || item.status === 'REVIEWING').length, [items]);
+  const scanDisabled = scanning || cooldownRemaining > 0;
 
-  return <AdminPage eyebrow="Money Operation" title="Risk Alerts" description="ตรวจพฤติกรรมเสี่ยงจาก topup, withdrawal, bank account และ wallet ledger แบบไม่ปล่อยให้แอดมินเดาเองเหมือนเล่นหวย" actions={<AdminButton onClick={scan} disabled={scanning}>{scanning ? 'Scanning...' : 'Scan now'}</AdminButton>}>
+  return <AdminPage eyebrow="Money Operation" title="Risk Alerts" description="ตรวจพฤติกรรมเสี่ยงจาก topup, withdrawal, bank account และ wallet ledger แบบไม่ปล่อยให้แอดมินเดาเองเหมือนเล่นหวย" actions={<AdminButton onClick={scan} disabled={scanDisabled}>{scanning ? 'Scanning...' : cooldownRemaining > 0 ? `Scan in ${cooldownRemaining}s` : 'Scan now'}</AdminButton>}>
     <AdminMetricGrid>
       <AdminMetric title="Active alerts" value={String(summary.openCount)} helper="OPEN + REVIEWING ทั้งระบบ" />
       <AdminMetric title="High risk" value={String(summary.criticalCount)} helper="HIGH + CRITICAL" />
       <AdminMetric title="Showing" value={String(items.length)} helper={`${activeShowing} active ใน filter นี้`} />
     </AdminMetricGrid>
+
+    {cooldownRemaining > 0 && <AdminNotice>Risk scan cooldown เหลือ {cooldownRemaining} วินาที</AdminNotice>}
 
     <AdminToolbar>
       <label style={fieldStyle}>Status<select value={status} onChange={(event) => setStatus(event.target.value)} style={inputStyle}>{statusOptions.map((value) => <option key={value} value={value}>{value || 'ALL'}</option>)}</select></label>
