@@ -7,7 +7,7 @@ export class ReportsService {
 
   async getDailySummary(query: ReportQuery = {}) {
     const { from, to } = this.dateRange(query);
-    const [topUps, withdrawals, adjustments, walletAgg, ledgerAgg] = await Promise.all([
+    const [topUps, withdrawals, adjustments, walletAgg, ledgerAgg, pendingTopUps, pendingWithdrawals] = await Promise.all([
       this.prisma.topUpRequest.groupBy({
         by: ['status'],
         where: { createdAt: { gte: from, lte: to } },
@@ -28,6 +28,8 @@ export class ReportsService {
       }),
       this.prisma.wallet.aggregate({ _count: { _all: true }, _sum: { balance: true, lockedBalance: true } }),
       this.prisma.walletLedger.aggregate({ where: { createdAt: { gte: from, lte: to } }, _count: { _all: true }, _sum: { amount: true } }),
+      this.prisma.topUpRequest.aggregate({ where: { status: 'PENDING' }, _count: { _all: true }, _sum: { amount: true } }),
+      this.prisma.withdrawalRequest.aggregate({ where: { status: 'PENDING' }, _count: { _all: true }, _sum: { amount: true } }),
     ]);
 
     return {
@@ -41,6 +43,10 @@ export class ReportsService {
         totalLockedBalance: walletAgg._sum.lockedBalance?.toString() ?? '0',
       },
       ledgers: { count: ledgerAgg._count._all, amount: ledgerAgg._sum.amount?.toString() ?? '0' },
+      pendingQueues: {
+        topUps: { count: pendingTopUps._count._all, amount: pendingTopUps._sum.amount?.toString() ?? '0' },
+        withdrawals: { count: pendingWithdrawals._count._all, amount: pendingWithdrawals._sum.amount?.toString() ?? '0' },
+      },
       generatedAt: new Date().toISOString(),
     };
   }
@@ -60,6 +66,7 @@ export class ReportsService {
         actualBalance: actual,
         latestLedgerBalance: expected,
         lockedBalance: wallet.lockedBalance.toString(),
+        availableBalance: wallet.balance.minus(wallet.lockedBalance).toString(),
         status: actual === expected || !latestLedger ? 'OK' : 'MISMATCH',
         latestLedgerAt: latestLedger?.createdAt ?? null,
       };
@@ -67,6 +74,7 @@ export class ReportsService {
 
     return {
       items: results,
+      checkedCount: results.length,
       mismatchCount: results.filter((item) => item.status === 'MISMATCH').length,
       generatedAt: new Date().toISOString(),
     };
