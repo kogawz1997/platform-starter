@@ -25,6 +25,7 @@ export class HttpExceptionFilter implements ExceptionFilter {
     }
 
     response.status(status).json({
+      ...this.safePayload(payload),
       statusCode: status,
       message,
       error: status >= 500 ? 'Internal Server Error' : this.resolveError(payload),
@@ -32,6 +33,16 @@ export class HttpExceptionFilter implements ExceptionFilter {
       timestamp: new Date().toISOString(),
       path: request?.originalUrl ?? request?.url,
     });
+  }
+
+  private safePayload(payload: unknown) {
+    if (!payload || typeof payload !== 'object' || Array.isArray(payload)) return {};
+    const source = payload as Record<string, unknown>;
+    const allowed: Record<string, unknown> = {};
+    for (const key of ['retryAfter', 'code', 'details']) {
+      if (source[key] !== undefined) allowed[key] = source[key];
+    }
+    return allowed;
   }
 
   private resolveMessage(payload: unknown, exception: unknown) {
