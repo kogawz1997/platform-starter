@@ -6,21 +6,34 @@ import { AdminBadge, AdminButton, AdminCard, AdminMetric, AdminMetricGrid, Admin
 
 type AdminMe = { id: string; username: string; permissions?: string[] };
 type SetupResponse = { secret: string; otpAuthUrl: string };
+type SessionItem = { id: string; deviceId?: string | null; ipAddress?: string | null; userAgent?: string | null; createdAt: string; expiresAt: string; revokedAt?: string | null; current: boolean; active: boolean };
 
 export default function AdminSecurityPage() {
   const [me, setMe] = useState<AdminMe | null>(null);
   const [setup, setSetup] = useState<SetupResponse | null>(null);
+  const [sessions, setSessions] = useState<SessionItem[]>([]);
   const [code, setCode] = useState('');
   const [message, setMessage] = useState('');
   const [loading, setLoading] = useState(false);
 
-  useEffect(() => { loadMe(); }, []);
+  useEffect(() => { loadAll(); }, []);
+
+  async function loadAll() {
+    await Promise.all([loadMe(), loadSessions()]);
+  }
 
   async function loadMe() {
     const res = await adminApiFetch('/admin/auth/me');
     const data = await res.json().catch(() => null);
     if (!res.ok) { setMessage(data?.message ?? 'โหลดข้อมูลแอดมินไม่สำเร็จ'); return; }
     setMe(data);
+  }
+
+  async function loadSessions() {
+    const res = await adminApiFetch('/admin/auth/sessions');
+    const data = await res.json().catch(() => null);
+    if (!res.ok) { setMessage(data?.message ?? 'โหลด sessions ไม่สำเร็จ'); return; }
+    setSessions(data.items ?? []);
   }
 
   async function startSetup() {
@@ -50,13 +63,15 @@ export default function AdminSecurityPage() {
     catch { setMessage(`คัดลอก${label}ไม่สำเร็จ`); }
   }
 
-  return <AdminPage eyebrow="Security" title="Admin 2FA" description="ตั้งค่า two-factor authentication สำหรับบัญชีแอดมิน" actions={<AdminButton onClick={loadMe}>Reload</AdminButton>}>
+  const activeCount = sessions.filter((item) => item.active).length;
+
+  return <AdminPage eyebrow="Security" title="Admin Security" description="ตั้งค่า 2FA และดู session ของบัญชีแอดมิน" actions={<AdminButton onClick={loadAll}>Reload</AdminButton>}>
     {message && <AdminNotice>{message}</AdminNotice>}
 
     <AdminMetricGrid>
       <AdminMetric title="Admin" value={me?.username ?? '-'} helper={me?.id ?? ''} />
       <AdminMetric title="Permissions" value={String(me?.permissions?.length ?? 0)} helper="from current session" />
-      <AdminMetric title="Mode" value="TOTP" helper="Authenticator app" />
+      <AdminMetric title="Active sessions" value={String(activeCount)} helper={`${sessions.length} loaded`} />
     </AdminMetricGrid>
 
     <AdminCard title="2FA Setup" description="สร้าง secret แล้วเปิดในแอป Authenticator เช่น Google Authenticator, 1Password หรือ Authy">
@@ -82,6 +97,10 @@ export default function AdminSecurityPage() {
         </section>}
       </AdminStack>
     </AdminCard>
+
+    <AdminCard title="Admin Sessions" description="รายการ session ล่าสุดของบัญชีแอดมินนี้">
+      <AdminStack>{sessions.map((session) => <section key={session.id} style={sessionBoxStyle}><div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}><AdminBadge tone={session.active ? 'success' : 'neutral'}>{session.active ? 'ACTIVE' : 'ENDED'}</AdminBadge>{session.current && <AdminBadge tone="warning">CURRENT</AdminBadge>}</div><strong>{session.deviceId || 'Unknown device'}</strong><p>IP: {session.ipAddress || '-'}</p><p style={agentStyle}>UA: {session.userAgent || '-'}</p><p>Created: {new Date(session.createdAt).toLocaleString('th-TH')}</p><p>Expires: {new Date(session.expiresAt).toLocaleString('th-TH')}</p>{session.revokedAt && <p>Ended: {new Date(session.revokedAt).toLocaleString('th-TH')}</p>}</section>)}{sessions.length === 0 && <AdminNotice>ยังไม่มี session ให้แสดง</AdminNotice>}</AdminStack>
+    </AdminCard>
   </AdminPage>;
 }
 
@@ -91,3 +110,5 @@ const labelStyle = { display: 'grid', gap: 7, fontWeight: 850, minWidth: 0 } as 
 const copyRowStyle = { display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) auto', gap: 8, minWidth: 0 } as const;
 const inputStyle = { minHeight: 44, borderRadius: 12, border: '1px solid rgba(148,163,184,.22)', background: '#0b1220', color: '#f8fafc', padding: '0 12px', minWidth: 0, width: '100%', boxSizing: 'border-box' as const };
 const copyButtonStyle = { border: '1px solid rgba(245,197,66,.35)', borderRadius: 12, padding: '0 12px', background: 'rgba(245,197,66,.14)', color: '#f5c542', fontWeight: 900, cursor: 'pointer' } as const;
+const sessionBoxStyle = { border: '1px solid rgba(148,163,184,.18)', borderRadius: 16, padding: 12, display: 'grid', gap: 6, minWidth: 0 } as const;
+const agentStyle = { overflowWrap: 'anywhere' as const, color: '#94a3b8' };
