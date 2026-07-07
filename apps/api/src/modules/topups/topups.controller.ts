@@ -28,7 +28,7 @@ export class TopUpsController {
 
   @UseGuards(AdminAuthGuard)
   @Get('admin/topups')
-  getAdminRequests(@Query('status') status?: string) { return this.topUpsService.getAdminRequests(status); }
+  getAdminRequests(@Query('status') status?: string, @Query('page') page?: string, @Query('take') take?: string) { return this.topUpsService.getAdminRequests(status, { page, take }); }
 
   @UseGuards(AdminAuthGuard)
   @Get('admin/topups/:id/slip')
