@@ -20,22 +20,10 @@ export class WithdrawalsService {
       const available = wallet.balance.minus(wallet.lockedBalance);
       if (available.lt(amount)) throw new BadRequestException('Insufficient available balance');
 
-      await tx.wallet.update({
-        where: { id: wallet.id },
-        data: { lockedBalance: wallet.lockedBalance.plus(amount) },
-      });
+      await tx.wallet.update({ where: { id: wallet.id }, data: { lockedBalance: wallet.lockedBalance.plus(amount) } });
 
       const request = await tx.withdrawalRequest.create({
-        data: {
-          userId,
-          amount,
-          currency: wallet.currency,
-          method: dto.method,
-          accountName: dto.accountName,
-          accountNumber: dto.accountNumber,
-          bankName: dto.bankName,
-          note: dto.note,
-        },
+        data: { userId, amount, currency: wallet.currency, method: dto.method, accountName: dto.accountName, accountNumber: dto.accountNumber, bankName: dto.bankName, note: dto.note },
       });
 
       return this.formatRequest(request);
@@ -64,10 +52,7 @@ export class WithdrawalsService {
   }
 
   async getAdminRequest(id: string) {
-    const request = await this.prisma.withdrawalRequest.findUnique({
-      where: { id },
-      include: { user: { select: { id: true, username: true, phone: true, email: true } } },
-    });
+    const request = await this.prisma.withdrawalRequest.findUnique({ where: { id }, include: { user: { select: { id: true, username: true, phone: true, email: true } } } });
     if (!request) throw new NotFoundException('Withdrawal request not found');
     return { ...this.formatRequest(request), user: request.user };
   }
@@ -76,7 +61,12 @@ export class WithdrawalsService {
     return this.prisma.$transaction(async (tx) => {
       const request = await tx.withdrawalRequest.findUnique({ where: { id } });
       if (!request) throw new NotFoundException('Withdrawal request not found');
-      if (request.status !== 'PENDING') throw new ConflictException('Withdrawal request already reviewed');
+
+      const claim = await tx.withdrawalRequest.updateMany({
+        where: { id, status: 'PENDING' },
+        data: { status: 'COMPLETED', adminNote: dto.adminNote, reviewedBy: adminUser.id, reviewedAt: new Date() },
+      });
+      if (claim.count !== 1) throw new ConflictException('Withdrawal request already reviewed');
 
       const wallet = await tx.wallet.findUnique({ where: { userId: request.userId } });
       if (!wallet) throw new BadRequestException('Wallet not found');
@@ -105,8 +95,20 @@ export class WithdrawalsService {
         },
       });
 
-      const updated = await tx.withdrawalRequest.update({ where: { id }, data: { status: 'COMPLETED', adminNote: dto.adminNote, reviewedBy: adminUser.id, reviewedAt: new Date() } });
-      await tx.adminAuditLog.create({ data: { adminUserId: adminUser.id, action: 'COMPLETE_WITHDRAWAL', module: 'withdrawals', targetId: request.id, oldData: { status: request.status, amount: request.amount.toString() } as any, newData: { status: updated.status, balanceBefore: balanceBefore.toString(), balanceAfter: balanceAfter.toString() } as any, ipAddress: meta.ipAddress, userAgent: meta.userAgent } });
+      await tx.adminAuditLog.create({
+        data: {
+          adminUserId: adminUser.id,
+          action: 'COMPLETE_WITHDRAWAL',
+          module: 'withdrawals',
+          targetId: request.id,
+          oldData: { status: request.status, amount: request.amount.toString() } as any,
+          newData: { status: 'COMPLETED', balanceBefore: balanceBefore.toString(), balanceAfter: balanceAfter.toString() } as any,
+          ipAddress: meta.ipAddress,
+          userAgent: meta.userAgent,
+        },
+      });
+
+      const updated = await tx.withdrawalRequest.findUniqueOrThrow({ where: { id } });
       return this.formatRequest(updated);
     });
   }
@@ -115,13 +117,20 @@ export class WithdrawalsService {
     return this.prisma.$transaction(async (tx) => {
       const request = await tx.withdrawalRequest.findUnique({ where: { id } });
       if (!request) throw new NotFoundException('Withdrawal request not found');
-      if (request.status !== 'PENDING') throw new ConflictException('Withdrawal request already reviewed');
+
+      const claim = await tx.withdrawalRequest.updateMany({
+        where: { id, status: 'PENDING' },
+        data: { status: 'REJECTED', adminNote: dto.adminNote, reviewedBy: adminUser.id, reviewedAt: new Date() },
+      });
+      if (claim.count !== 1) throw new ConflictException('Withdrawal request already reviewed');
+
       const wallet = await tx.wallet.findUnique({ where: { userId: request.userId } });
       if (!wallet) throw new BadRequestException('Wallet not found');
       const lockedAfter = wallet.lockedBalance.minus(request.amount);
       await tx.wallet.update({ where: { id: wallet.id }, data: { lockedBalance: lockedAfter.lt(0) ? new Decimal(0) : lockedAfter } });
-      const updated = await tx.withdrawalRequest.update({ where: { id }, data: { status: 'REJECTED', adminNote: dto.adminNote, reviewedBy: adminUser.id, reviewedAt: new Date() } });
-      await tx.adminAuditLog.create({ data: { adminUserId: adminUser.id, action: 'REJECT_WITHDRAWAL', module: 'withdrawals', targetId: request.id, oldData: { status: request.status, amount: request.amount.toString() } as any, newData: { status: updated.status, adminNote: dto.adminNote } as any, ipAddress: meta.ipAddress, userAgent: meta.userAgent } });
+
+      await tx.adminAuditLog.create({ data: { adminUserId: adminUser.id, action: 'REJECT_WITHDRAWAL', module: 'withdrawals', targetId: request.id, oldData: { status: request.status, amount: request.amount.toString() } as any, newData: { status: 'REJECTED', adminNote: dto.adminNote } as any, ipAddress: meta.ipAddress, userAgent: meta.userAgent } });
+      const updated = await tx.withdrawalRequest.findUniqueOrThrow({ where: { id } });
       return this.formatRequest(updated);
     });
   }
