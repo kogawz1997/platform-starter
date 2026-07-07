@@ -88,17 +88,8 @@ export default function MemberHome(props: MemberHomeProps) {
           {ledgers.length === 0 && !activityMessage && <span>ยังไม่มีรายการล่าสุด</span>}
         </div>
       </section>}
-
-      {props.showPromotion && <InfoCard title="ประกาศ" text="ติดตามสถานะรายการ ฝาก ถอน และข่าวสำคัญจากระบบได้ที่นี่" />}
-      {props.showCategories && <InfoCard title="ขั้นตอนใช้งาน" text="ฝากเงินผ่านบัญชีที่ระบบแสดง แนบสลิป แล้วรอแอดมินตรวจสอบ" />}
-      {props.showProviders && <InfoCard title="ความปลอดภัย" text="ข้อมูลสลิปและธุรกรรมถูกเก็บแบบ private และตรวจสอบผ่านระบบหลังบ้าน" />}
-      {props.showRecommended && <InfoCard title="แนะนำ" text="ตรวจสอบบัญชีถอนให้พร้อมก่อนส่งคำขอถอนเงิน" />}
     </section>
   );
-}
-
-function InfoCard({ title, text }: { title: string; text: string }) {
-  return <section className="member-info-card"><p>Overview</p><h2>{title}</h2><span>{text}</span></section>;
 }
 
 function ActivityRow({ title, href, item }: { title: string; href: string; item: MoneyRequest }) {
