@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { adminApiFetch } from '../../admin-api';
 import { AdminBadge, AdminButton, AdminCard, AdminEmpty, AdminLinkButton, AdminMetric, AdminMetricGrid, AdminNotice, AdminPage, AdminRow, AdminStack, AdminToolbar } from '../_components/admin-ui';
+import { RiskMetadataRaw, RiskMetadataView } from './metadata';
 
 type RiskAlert = {
   id: string;
@@ -124,7 +125,7 @@ export default function RiskAlertsPage() {
             <span>Ref: {item.refType ?? '-'} / {item.refId ? item.refId.slice(0, 8) : '-'}</span>
             <span>Created: {new Date(item.createdAt).toLocaleString('th-TH')}</span>
           </div>
-          {item.metadata && <details style={detailsStyle}><summary>Metadata</summary><pre style={preStyle}>{JSON.stringify(item.metadata, null, 2)}</pre></details>}
+          {item.metadata && <details style={detailsStyle}><summary>Metadata</summary><RiskMetadataView metadata={item.metadata} /><RiskMetadataRaw metadata={item.metadata} /></details>}
         </div>
         <div style={actionStyle}>
           <AdminLinkButton href={`/risk-alerts/${item.id}`}>Detail</AdminLinkButton>
@@ -159,4 +160,3 @@ const actionStyle = { display: 'flex', gap: 8, flexWrap: 'wrap' as const, alignI
 const detailGridStyle = { display: 'grid', gap: 5, color: '#94a3b8', fontSize: 13, minWidth: 0 } as const;
 const linkStyle = { color: '#f5c542', fontWeight: 900 } as const;
 const detailsStyle = { border: '1px solid rgba(148,163,184,.18)', borderRadius: 12, padding: 10, background: 'rgba(15,23,42,.45)', minWidth: 0, maxWidth: '100%', overflow: 'hidden' as const };
-const preStyle = { margin: '10px 0 0', whiteSpace: 'pre-wrap' as const, color: '#cbd5e1', fontSize: 12, overflowX: 'auto' as const, maxWidth: '100%' };
