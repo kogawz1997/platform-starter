@@ -60,13 +60,13 @@ export default function WalletCard({ primaryColor, cardColor, showButtons }: { p
   );
 }
 
-const cardStyle = { border: '1px solid rgba(255,255,255,0.10)', borderRadius: 30, padding: 20, display: 'grid', gap: 16, boxShadow: '0 22px 70px rgba(0,0,0,0.22)', overflow: 'hidden', minWidth: 0 } as const;
-const topRowStyle = { display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'flex-start', flexWrap: 'wrap' as const, minWidth: 0 };
-const mutedStyle = { margin: 0, opacity: 0.72, fontSize: 14 } as const;
-const amountStyle = { margin: '6px 0 0', fontSize: 'clamp(30px, 9vw, 48px)', lineHeight: 1, letterSpacing: -0.8, overflowWrap: 'anywhere' as const };
-const statusStyle = { border: '1px solid rgba(255,255,255,0.12)', borderRadius: 999, padding: '7px 10px', fontSize: 12, fontWeight: 800, flex: '0 0 auto' } as const;
-const miniGridStyle = { display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 10 } as const;
-const miniBoxStyle = { border: '1px solid rgba(255,255,255,0.10)', borderRadius: 18, padding: 12, display: 'grid', gap: 4, background: 'rgba(255,255,255,0.05)', minWidth: 0, overflow: 'hidden' as const };
-const noticeStyle = { border: '1px solid rgba(255,255,255,0.12)', borderRadius: 16, padding: 12, background: 'rgba(255,255,255,0.06)' } as const;
-const actionRowStyle = { display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 10 } as const;
-const actionStyle = { border: '1px solid rgba(255,255,255,0.12)', borderRadius: 16, minHeight: 48, padding: '13px 10px', textAlign: 'center' as const, textDecoration: 'none', color: 'inherit', fontWeight: 900, background: 'rgba(255,255,255,0.10)', display: 'grid', placeItems: 'center' };
+const cardStyle = { border: '1px solid rgba(255,255,255,0.10)', borderRadius: 24, padding: 16, display: 'grid', gap: 12, boxShadow: '0 16px 45px rgba(0,0,0,0.20)', overflow: 'hidden', minWidth: 0 } as const;
+const topRowStyle = { display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'flex-start', flexWrap: 'wrap' as const, minWidth: 0 };
+const mutedStyle = { margin: 0, opacity: 0.72, fontSize: 13, fontWeight: 800 } as const;
+const amountStyle = { margin: '4px 0 0', fontSize: 'clamp(28px, 8vw, 42px)', lineHeight: 1, letterSpacing: -0.8, overflowWrap: 'anywhere' as const };
+const statusStyle = { border: '1px solid rgba(255,255,255,0.12)', borderRadius: 999, padding: '6px 9px', fontSize: 11, fontWeight: 900, flex: '0 0 auto' } as const;
+const miniGridStyle = { display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 8 } as const;
+const miniBoxStyle = { border: '1px solid rgba(255,255,255,0.10)', borderRadius: 16, padding: '10px 11px', display: 'grid', gap: 3, background: 'rgba(255,255,255,0.05)', minWidth: 0, overflow: 'hidden' as const };
+const noticeStyle = { border: '1px solid rgba(255,255,255,0.12)', borderRadius: 14, padding: 10, background: 'rgba(255,255,255,0.06)', fontSize: 13 } as const;
+const actionRowStyle = { display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 8 } as const;
+const actionStyle = { border: '1px solid rgba(255,255,255,0.12)', borderRadius: 14, minHeight: 44, padding: '11px 8px', textAlign: 'center' as const, textDecoration: 'none', color: 'inherit', fontWeight: 950, background: 'rgba(255,255,255,0.10)', display: 'grid', placeItems: 'center', fontSize: 15, lineHeight: 1.15 };
