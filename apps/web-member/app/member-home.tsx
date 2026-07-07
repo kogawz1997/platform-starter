@@ -89,14 +89,6 @@ export default function MemberHome(props: MemberHomeProps) {
         </div>
       </section>}
 
-      {isLoggedIn && <section className="member-info-card">
-        <div style={sectionHeadStyle}><div><p>Latest requests</p><h2>คำขอล่าสุด</h2></div><button type="button" onClick={loadActivity} style={refreshButtonStyle}>Refresh</button></div>
-        <div style={twoColStyle}>
-          <RequestBox title="ฝากล่าสุด" href="/deposit" items={topups.slice(0, 3)} />
-          <RequestBox title="ถอนล่าสุด" href="/withdraw" items={withdrawals.slice(0, 3)} />
-        </div>
-      </section>}
-
       {props.showPromotion && <InfoCard title="ประกาศ" text="ติดตามสถานะรายการ ฝาก ถอน และข่าวสำคัญจากระบบได้ที่นี่" />}
       {props.showCategories && <InfoCard title="ขั้นตอนใช้งาน" text="ฝากเงินผ่านบัญชีที่ระบบแสดง แนบสลิป แล้วรอแอดมินตรวจสอบ" />}
       {props.showProviders && <InfoCard title="ความปลอดภัย" text="ข้อมูลสลิปและธุรกรรมถูกเก็บแบบ private และตรวจสอบผ่านระบบหลังบ้าน" />}
@@ -117,10 +109,6 @@ function LedgerRow({ item }: { item: LedgerItem }) {
   return <div style={rowStyle}><div><strong>{item.type} / {item.direction}</strong><span>{new Date(item.createdAt).toLocaleString('th-TH')}</span></div><div style={rightStyle}><strong>{item.direction === 'CREDIT' ? '+' : '-'} {formatMoney(item.amount, 'THB')}</strong><span>หลัง: {formatMoney(item.balanceAfter, 'THB')}</span></div></div>;
 }
 
-function RequestBox({ title, href, items }: { title: string; href: string; items: MoneyRequest[] }) {
-  return <div style={requestBoxStyle}><div style={sectionHeadStyle}><strong>{title}</strong><a href={href} style={smallLinkStyle}>เปิด</a></div>{items.map((item) => <ActivityRow key={item.id} title={item.status} href={href} item={item} />)}{items.length === 0 && <span>ยังไม่มีรายการ</span>}</div>;
-}
-
 function formatMoney(value: string | number, currency: string) {
   return `${currency} ${Number(value).toLocaleString('th-TH', { minimumFractionDigits: 2 })}`;
 }
@@ -132,7 +120,3 @@ const rowStyle = { display: 'flex', justifyContent: 'space-between', gap: 12, bo
 const rowLinkStyle = { ...rowStyle, color: 'inherit', textDecoration: 'none' } as const;
 const rightStyle = { textAlign: 'right' as const, display: 'grid', gap: 4, minWidth: 0 };
 const noticeStyle = { border: '1px solid rgba(255,255,255,.12)', borderRadius: 16, padding: 12, background: 'rgba(255,255,255,.06)', marginTop: 12 } as const;
-const twoColStyle = { display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 12, marginTop: 12 } as const;
-const requestBoxStyle = { border: '1px solid rgba(255,255,255,.10)', borderRadius: 18, padding: 12, background: 'rgba(255,255,255,.04)', display: 'grid', gap: 10, minWidth: 0 } as const;
-const smallLinkStyle = { color: '#f5c542', fontWeight: 900, textDecoration: 'none' } as const;
-const refreshButtonStyle = { border: '1px solid rgba(255,255,255,.14)', borderRadius: 999, background: 'rgba(255,255,255,.08)', color: '#fff', padding: '9px 12px', fontWeight: 900, cursor: 'pointer' } as const;
