@@ -1,4 +1,4 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import { Injectable, NotFoundException, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import * as argon2 from 'argon2';
@@ -82,6 +82,48 @@ export class AdminAuthService {
     await this.prisma.authSession.updateMany({ where: { id: sessionId, type: 'ADMIN', revokedAt: null }, data: { revokedAt: new Date() } });
     await this.safeWriteAudit(adminUserId, 'admin.logout', 'auth', adminUserId, meta);
     return { success: true };
+  }
+
+  async listSessions(adminUserId: string, currentSessionId: string) {
+    const sessions = await this.prisma.authSession.findMany({
+      where: { adminUserId, type: 'ADMIN' },
+      orderBy: { createdAt: 'desc' },
+      take: 30,
+    });
+    const now = new Date();
+    return {
+      items: sessions.map((session) => ({
+        id: session.id,
+        deviceId: session.deviceId,
+        ipAddress: session.ipAddress,
+        userAgent: session.userAgent,
+        createdAt: session.createdAt,
+        expiresAt: session.expiresAt,
+        revokedAt: session.revokedAt,
+        current: session.id === currentSessionId,
+        active: !session.revokedAt && session.expiresAt > now,
+      })),
+    };
+  }
+
+  async revokeSession(adminUserId: string, currentSessionId: string, sessionId: string, meta: RequestMeta = {}) {
+    const session = await this.prisma.authSession.findFirst({ where: { id: sessionId, adminUserId, type: 'ADMIN' } });
+    if (!session) throw new NotFoundException('Session not found');
+    await this.prisma.authSession.updateMany({ where: { id: sessionId, adminUserId, type: 'ADMIN', revokedAt: null }, data: { revokedAt: new Date() } });
+    await this.safeWriteAudit(adminUserId, sessionId === currentSessionId ? 'admin.session.revoke.current' : 'admin.session.revoke', 'auth', sessionId, meta);
+    return { success: true, current: sessionId === currentSessionId };
+  }
+
+  async revokeOtherSessions(adminUserId: string, currentSessionId: string, meta: RequestMeta = {}) {
+    const result = await this.prisma.authSession.updateMany({ where: { adminUserId, type: 'ADMIN', id: { not: currentSessionId }, revokedAt: null }, data: { revokedAt: new Date() } });
+    await this.safeWriteAudit(adminUserId, 'admin.session.revoke_others', 'auth', adminUserId, meta);
+    return { success: true, revoked: result.count };
+  }
+
+  async revokeAllSessions(adminUserId: string, meta: RequestMeta = {}) {
+    const result = await this.prisma.authSession.updateMany({ where: { adminUserId, type: 'ADMIN', revokedAt: null }, data: { revokedAt: new Date() } });
+    await this.safeWriteAudit(adminUserId, 'admin.session.revoke_all', 'auth', adminUserId, meta);
+    return { success: true, revoked: result.count };
   }
 
   private async createAdminSession(adminUserId: string, meta: RequestMeta = {}) {
