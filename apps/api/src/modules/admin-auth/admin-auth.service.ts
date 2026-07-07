@@ -2,6 +2,7 @@ import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import * as argon2 from 'argon2';
+import { authenticator } from 'otplib';
 import { randomBytes } from 'crypto';
 import { PrismaService } from '../../database/prisma.service';
 import { AdminSignInDto } from './dto/admin-sign-in.dto';
@@ -29,7 +30,7 @@ export class AdminAuthService {
     }
 
     if (admin.twoFactorEnabled && !dto.twoFactorCode) return { requiresTwoFactor: true, challengeId: admin.id };
-    if (admin.twoFactorEnabled) this.assertOtp(dto.twoFactorCode ?? '');
+    if (admin.twoFactorEnabled) this.assertTotp(admin.twoFactorSecret, dto.twoFactorCode ?? '');
 
     await this.safeWriteLoginHistory(admin.id, true, meta);
     await this.safeWriteAudit(admin.id, 'admin.login', 'auth', admin.id, meta);
@@ -39,9 +40,9 @@ export class AdminAuthService {
   async setupTwoFactor(adminUserId: string, meta: RequestMeta = {}) {
     const admin = await this.prisma.adminUser.findUnique({ where: { id: adminUserId } });
     if (!admin || admin.status !== 'ACTIVE') throw new UnauthorizedException('Admin is not active');
-    const secret = randomBytes(20).toString('base64url');
+    const secret = authenticator.generateSecret();
     const issuer = this.configService.get<string>('ADMIN_OTP_ISSUER') ?? 'Platform Admin';
-    const otpAuthUrl = `otpauth://totp/${encodeURIComponent(issuer)}:${encodeURIComponent(admin.username)}?secret=${encodeURIComponent(secret)}&issuer=${encodeURIComponent(issuer)}`;
+    const otpAuthUrl = authenticator.keyuri(admin.username, issuer, secret);
     await this.prisma.adminUser.update({ where: { id: admin.id }, data: { twoFactorSecret: secret, twoFactorEnabled: false } });
     await this.safeWriteAudit(admin.id, 'admin.otp.setup', 'auth', admin.id, meta);
     return { secret, otpAuthUrl };
@@ -50,7 +51,7 @@ export class AdminAuthService {
   async enableTwoFactor(adminUserId: string, code: string, meta: RequestMeta = {}) {
     const admin = await this.prisma.adminUser.findUnique({ where: { id: adminUserId } });
     if (!admin || admin.status !== 'ACTIVE' || !admin.twoFactorSecret) throw new UnauthorizedException('Two factor setup is not ready');
-    this.assertOtp(code);
+    this.assertTotp(admin.twoFactorSecret, code);
     await this.prisma.adminUser.update({ where: { id: admin.id }, data: { twoFactorEnabled: true } });
     await this.safeWriteAudit(admin.id, 'admin.otp.enable', 'auth', admin.id, meta);
     return { success: true };
@@ -59,7 +60,7 @@ export class AdminAuthService {
   async verifyTwoFactor(dto: VerifyAdminTwoFactorDto, meta: RequestMeta = {}) {
     const admin = await this.prisma.adminUser.findUnique({ where: { id: dto.challengeId } });
     if (!admin || admin.status !== 'ACTIVE' || !admin.twoFactorEnabled) throw new UnauthorizedException('Invalid challenge');
-    this.assertOtp(dto.code);
+    this.assertTotp(admin.twoFactorSecret, dto.code);
     await this.safeWriteLoginHistory(admin.id, true, meta);
     await this.safeWriteAudit(admin.id, 'admin.otp.verify', 'auth', admin.id, meta);
     return this.createAdminSession(admin.id, meta);
@@ -90,9 +91,11 @@ export class AdminAuthService {
     return { accessToken, refreshToken: `${session.id}.${rawToken}`, expiresAt };
   }
 
-  private assertOtp(code: string) {
-    const configuredCode = this.configService.get<string>('ADMIN_OTP_FOR_DEV');
-    if (!configuredCode || code !== configuredCode) throw new UnauthorizedException('Invalid code');
+  private assertTotp(secret: string | null, code: string) {
+    if (!secret) throw new UnauthorizedException('Two factor secret is missing');
+    const normalized = String(code ?? '').replace(/\s/g, '');
+    const valid = authenticator.check(normalized, secret);
+    if (!valid) throw new UnauthorizedException('Invalid code');
   }
 
   private readRefreshTokenParts(value: string) {
