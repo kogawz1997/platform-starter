@@ -232,19 +232,22 @@ Backend requirements:
 
 ## Phase 3: Wallet Hardening and Operation Center
 
-Status: in progress, operation center first pass expanded
+Status: completed
+
+Closeout: `docs/P3_CLOSEOUT.md`
 
 - Finance dashboard summary: completed
 - Reconciliation reports: completed first pass
 - Export finance records: completed first pass
 - Job lock for high-risk operations: completed first pass
-- Private media storage for slips: first pass completed
+- Private media storage for slips: completed first pass and production guide added
 - Notification for review queues: queue summary endpoint completed
-- Idempotency key for money actions
-- Prisma transaction atomicity for money actions
-- Queue claim / release / timeout hardening
-- Negative balance prevention
-- Duplicate request prevention
+- Idempotency key for money actions: completed first pass
+- Prisma transaction atomicity for money actions: completed first pass
+- Negative balance prevention: completed first pass
+- Duplicate request prevention: completed first pass
+- Risk alert summary: completed first pass
+- Member detail: completed first pass
 
 ### ABC hardening pass
 
@@ -256,8 +259,10 @@ Status: in progress, operation center first pass expanded
 
 - Private Slip Storage: member uploads slips to a private server path and admin loads slips through a guarded endpoint completed first pass
 - Queue Badge: admin drawer/topbar now uses /admin/queues/summary completed
-- Operation Dashboard: /dashboard aggregates wallet totals, finance queues, and recent ledgers completed first pass
+- Operation Dashboard: /dashboard aggregates wallet totals, finance queues, recent ledgers, and risk alerts completed first pass
 - Activity History: /activity and /admin/operations/history completed first pass
+- Member Detail: /member-detail and /admin/members/:id completed first pass
+- Risk Summary: /admin/risk/summary completed first pass
 
 ## Phase 3.5: UX/UI Polish
 
@@ -275,7 +280,7 @@ Status: completed after production mobile regression test
 - Error alert for wrong credentials: completed
 - Error alert for validation failure: completed
 - Success feedback after register/login: completed
-- Redirect UX after login: completed
+- Redirect after login: completed
 - Password visibility toggle: completed
 
 ### Member UX/UI
@@ -301,6 +306,7 @@ Status: completed after production mobile regression test
 - Ledgers page polish: completed
 - Reports page polish: completed
 - Activity page first pass: completed
+- Member detail page first pass: completed
 - Exports page first pass: completed
 - Settings hub polish: completed
 - Tables, filters, badges, and action buttons: completed first pass
@@ -319,18 +325,12 @@ Status: completed after production mobile regression test
 
 ## Phase 4: Admin Operation Center
 
-Status: started
+Status: next
 
-- Dashboard: first pass completed
-- Finance queues: first pass completed
-- Member detail
 - Member search and filters
 - Member status management
 - Member bank account review
-- Risk alert
-- Reports: first pass completed
-- Audit log viewer: first pass completed as Activity
-- Admin activity history: first pass completed
+- Advanced risk alert rules
 - In-app admin notifications
 - Queue owner / lock status UI
 - Queue timeout / release UI
