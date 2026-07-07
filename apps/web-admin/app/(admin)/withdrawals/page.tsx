@@ -38,6 +38,8 @@ export default function AdminWithdrawalsPage() {
     const current = items.find((item) => item.id === id);
     if (!current?.claimedBy) { setMessage('ต้องกด Claim ก่อนตรวจรายการ'); return; }
     const nextStatus = action === 'complete' ? 'COMPLETED' : 'REJECTED';
+    const ok = window.confirm(action === 'complete' ? `ยืนยันว่าจ่ายเงินจริงแล้ว และต้องการ complete withdrawal ${formatMoney(current.amount)} ให้ ${current.user?.username ?? current.userId}?` : `ยืนยันปฏิเสธ withdrawal ${formatMoney(current.amount)} และคืนยอดล็อกให้ ${current.user?.username ?? current.userId}?`);
+    if (!ok) return;
     setBusyId(id); setMessage(action === 'complete' ? 'กำลังปิดรายการถอน...' : 'กำลังปฏิเสธรายการ...');
     const res = await adminApiFetch(`/admin/withdrawals/${id}/${action}`, { method: 'POST', body: JSON.stringify({ adminNote: reviewNote }) });
     const data = await res.json().catch(() => null); setBusyId('');
