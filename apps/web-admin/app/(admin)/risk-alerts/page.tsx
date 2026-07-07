@@ -37,9 +37,7 @@ export default function RiskAlertsPage() {
   const [scanning, setScanning] = useState(false);
   const [message, setMessage] = useState('');
 
-  useEffect(() => {
-    load();
-  }, [status, severity, type]);
+  useEffect(() => { load(); }, [status, severity, type]);
 
   async function load() {
     setLoading(true);
@@ -106,14 +104,14 @@ export default function RiskAlertsPage() {
       <label style={fieldStyle}>Type<select value={type} onChange={(event) => setType(event.target.value)} style={inputStyle}>{typeOptions.map((value) => <option key={value} value={value}>{value || 'ALL'}</option>)}</select></label>
       <label style={fieldStyle}>From<input type="date" value={createdFrom} onChange={(event) => setCreatedFrom(event.target.value)} style={inputStyle} /></label>
       <label style={fieldStyle}>To<input type="date" value={createdTo} onChange={(event) => setCreatedTo(event.target.value)} style={inputStyle} /></label>
-      <div style={{ display: 'flex', alignItems: 'end', gap: 8, flexWrap: 'wrap' }}><AdminButton tone="secondary" onClick={load}>Apply</AdminButton><AdminButton tone="secondary" onClick={clearFilters}>Reset</AdminButton></div>
+      <div style={filterActionStyle}><AdminButton tone="secondary" onClick={load}>Apply</AdminButton><AdminButton tone="secondary" onClick={clearFilters}>Reset</AdminButton></div>
     </AdminToolbar>
 
     {message && <AdminNotice>{message}</AdminNotice>}
 
     <AdminCard title="Alert queue" description="รายการความเสี่ยงล่าสุดจากกฎ Risk Alerts v2">
       {loading ? <AdminEmpty>กำลังโหลด...</AdminEmpty> : items.length === 0 ? <AdminEmpty>ไม่มี alert ตาม filter นี้</AdminEmpty> : <AdminStack>{items.map((item) => <AdminRow key={item.id}>
-        <div style={{ display: 'grid', gap: 8, flex: 1, minWidth: 240 }}>
+        <div style={alertBodyStyle}>
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
             <AdminBadge tone={severityTone(item.severity)}>{item.severity}</AdminBadge>
             <AdminBadge tone={statusTone(item.status)}>{item.status}</AdminBadge>
@@ -152,11 +150,13 @@ function statusTone(value: RiskAlert['status']) {
   return 'danger';
 }
 
-const fieldStyle = { display: 'grid', gap: 6, color: '#94a3b8', fontSize: 12, fontWeight: 900 } as const;
-const inputStyle = { minHeight: 44, borderRadius: 12, border: '1px solid rgba(148,163,184,.22)', background: '#0b1220', color: '#f8fafc', padding: '0 12px', width: '100%' } as const;
+const fieldStyle = { display: 'grid', gap: 6, color: '#94a3b8', fontSize: 12, fontWeight: 900, minWidth: 0, width: '100%', maxWidth: '100%', overflow: 'hidden' as const } as const;
+const inputStyle = { minHeight: 44, borderRadius: 12, border: '1px solid rgba(148,163,184,.22)', background: '#0b1220', color: '#f8fafc', padding: '0 12px', width: '100%', minWidth: 0, maxWidth: '100%', boxSizing: 'border-box' as const, fontSize: 16 };
+const filterActionStyle = { display: 'grid', gridTemplateColumns: 'repeat(2,minmax(0,1fr))', alignItems: 'end', gap: 8, minWidth: 0, width: '100%' } as const;
+const alertBodyStyle = { display: 'grid', gap: 8, flex: '1 1 240px', minWidth: 0, maxWidth: '100%', overflow: 'hidden' as const };
 const mutedStyle = { color: '#94a3b8', fontSize: 13, lineHeight: 1.45 } as const;
-const actionStyle = { display: 'flex', gap: 8, flexWrap: 'wrap' as const, alignItems: 'start', justifyContent: 'flex-end' as const };
-const detailGridStyle = { display: 'grid', gap: 5, color: '#94a3b8', fontSize: 13 } as const;
+const actionStyle = { display: 'flex', gap: 8, flexWrap: 'wrap' as const, alignItems: 'start', justifyContent: 'flex-end' as const, minWidth: 0, maxWidth: '100%' };
+const detailGridStyle = { display: 'grid', gap: 5, color: '#94a3b8', fontSize: 13, minWidth: 0 } as const;
 const linkStyle = { color: '#f5c542', fontWeight: 900 } as const;
-const detailsStyle = { border: '1px solid rgba(148,163,184,.18)', borderRadius: 12, padding: 10, background: 'rgba(15,23,42,.45)' } as const;
-const preStyle = { margin: '10px 0 0', whiteSpace: 'pre-wrap' as const, color: '#cbd5e1', fontSize: 12, overflowX: 'auto' as const };
+const detailsStyle = { border: '1px solid rgba(148,163,184,.18)', borderRadius: 12, padding: 10, background: 'rgba(15,23,42,.45)', minWidth: 0, maxWidth: '100%', overflow: 'hidden' as const };
+const preStyle = { margin: '10px 0 0', whiteSpace: 'pre-wrap' as const, color: '#cbd5e1', fontSize: 12, overflowX: 'auto' as const, maxWidth: '100%' };
