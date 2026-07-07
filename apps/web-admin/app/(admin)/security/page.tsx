@@ -87,6 +87,17 @@ export default function AdminSecurityPage() {
     await loadSessions();
   }
 
+  async function endEverySession() {
+    if (!window.confirm('ยืนยันปิด session ทั้งหมด รวมเครื่องนี้?')) return;
+    setLoading(true); setMessage('กำลังปิด session ทั้งหมด...');
+    const res = await adminApiFetch('/admin/auth/sessions/' + 'logout-all', { method: 'POST' });
+    const data = await res.json().catch(() => null);
+    setLoading(false);
+    if (!res.ok) { setMessage(data?.message ?? 'ปิด session ทั้งหมดไม่สำเร็จ'); return; }
+    clearAdminSession();
+    window.location.replace('/login');
+  }
+
   async function copy(value: string, label: string) {
     try { await navigator.clipboard.writeText(value); setMessage(`คัดลอก${label}แล้ว`); }
     catch { setMessage(`คัดลอก${label}ไม่สำเร็จ`); }
@@ -130,7 +141,7 @@ export default function AdminSecurityPage() {
     </AdminCard>
 
     <AdminCard title="Admin Sessions" description="รายการ session ล่าสุดของบัญชีแอดมินนี้">
-      <div style={sessionToolbarStyle}><AdminButton disabled={loading || otherActiveCount === 0} onClick={logoutOtherDevices}>Logout other devices</AdminButton></div>
+      <div style={sessionToolbarStyle}><AdminButton disabled={loading || otherActiveCount === 0} onClick={logoutOtherDevices}>Logout other devices</AdminButton><AdminButton disabled={loading || activeCount === 0} tone="danger" onClick={endEverySession}>End all sessions</AdminButton></div>
       <AdminStack>{sessions.map((session) => <section key={session.id} style={sessionBoxStyle}><div style={sessionTopStyle}><div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}><AdminBadge tone={session.active ? 'success' : 'neutral'}>{session.active ? 'ACTIVE' : 'ENDED'}</AdminBadge>{session.current && <AdminBadge tone="warning">CURRENT</AdminBadge>}</div>{session.active && <AdminButton disabled={loading} tone="danger" onClick={() => revokeSession(session)}>Revoke</AdminButton>}</div><strong>{session.deviceId || 'Unknown device'}</strong><p>IP: {session.ipAddress || '-'}</p><p style={agentStyle}>UA: {session.userAgent || '-'}</p><p>Created: {new Date(session.createdAt).toLocaleString('th-TH')}</p><p>Expires: {new Date(session.expiresAt).toLocaleString('th-TH')}</p>{session.revokedAt && <p>Ended: {new Date(session.revokedAt).toLocaleString('th-TH')}</p>}</section>)}{sessions.length === 0 && <AdminNotice>ยังไม่มี session ให้แสดง</AdminNotice>}</AdminStack>
     </AdminCard>
   </AdminPage>;
