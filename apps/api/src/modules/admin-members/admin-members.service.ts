@@ -1,5 +1,7 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../database/prisma.service';
+
+const MEMBER_STATUSES = ['ACTIVE', 'SUSPENDED', 'LOCKED', 'CLOSED'] as const;
 
 @Injectable()
 export class AdminMembersService {
@@ -49,5 +51,25 @@ export class AdminMembersService {
       activity: activity.map((item) => ({ id: item.id, action: item.action, module: item.module, targetId: item.targetId, oldData: item.oldData, newData: item.newData, createdAt: item.createdAt, adminUser: item.adminUser })),
       generatedAt: new Date().toISOString(),
     };
+  }
+
+  async updateMemberStatus(id: string, status?: string, reason?: string, admin?: any, meta?: any) {
+    if (!status || !MEMBER_STATUSES.includes(status as any)) throw new BadRequestException('Invalid member status');
+    const existing = await this.prisma.user.findUnique({ where: { id }, select: { id: true, username: true, status: true } });
+    if (!existing) throw new NotFoundException('Member not found');
+    const updated = await this.prisma.user.update({ where: { id }, data: { status: status as any } });
+    await this.prisma.adminAuditLog.create({
+      data: {
+        adminUserId: admin?.id,
+        module: 'members',
+        action: 'UPDATE_MEMBER_STATUS',
+        targetId: id,
+        oldData: { status: existing.status },
+        newData: { status: updated.status, reason: reason ?? null },
+        ipAddress: meta?.ipAddress,
+        userAgent: meta?.userAgent,
+      },
+    });
+    return { user: { id: updated.id, username: updated.username, status: updated.status, updatedAt: updated.updatedAt } };
   }
 }
