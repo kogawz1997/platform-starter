@@ -33,9 +33,7 @@ export default function ReportsPage() {
     <main style={pageStyle}>
       <a href="/settings" style={backStyle}>← Settings</a>
       <p style={eyebrowStyle}>Finance Reports</p>
-      <h1 style={titleStyle}>Reports</h1>
-      <p style={mutedStyle}>รายงานรายวันและตรวจยอด wallet เทียบ ledger</p>
-      <button type="button" onClick={loadReports} style={buttonStyle}>Refresh</button>
+      <div style={headerRowStyle}><div><h1 style={titleStyle}>Reports</h1><p style={mutedStyle}>รายงานรายวันและตรวจยอด wallet เทียบ ledger</p></div><div style={actionRowStyle}><button type="button" onClick={loadReports} style={buttonStyle}>Refresh</button><a href="/exports" style={linkButtonStyle}>Exports</a></div></div>
       {message && <div style={noticeStyle}>{message}</div>}
       {daily && <section style={gridStyle}><Metric title="Wallets" value={daily.wallets.count.toLocaleString('th-TH')} /><Metric title="Total Balance" value={money(daily.wallets.totalBalance)} /><Metric title="Locked" value={money(daily.wallets.totalLockedBalance)} /><Metric title="Ledger Items" value={daily.ledgers.count.toLocaleString('th-TH')} /></section>}
       {daily && <section style={twoColStyle}><GroupCard title="Top-ups" items={daily.topUps} /><GroupCard title="Withdrawals" items={daily.withdrawals} /><GroupCard title="Adjustments" items={daily.adjustments.map((item) => ({ status: item.direction, count: item.count, amount: item.amount }))} /></section>}
@@ -53,7 +51,10 @@ const backStyle = { color: '#f5c542', textDecoration: 'none', fontWeight: 900 } 
 const eyebrowStyle = { margin: '18px 0 0', opacity: 0.66, fontSize: 14 } as const;
 const titleStyle = { margin: '6px 0 8px', fontSize: 'clamp(36px, 10vw, 68px)', lineHeight: 0.96, letterSpacing: -1.4 } as const;
 const mutedStyle = { margin: 0, opacity: 0.76, lineHeight: 1.55 } as const;
-const buttonStyle = { padding: '13px 14px', borderRadius: 14, cursor: 'pointer', background: '#f5c542', color: '#111', border: 0, fontWeight: 900, margin: '16px 0' } as const;
+const headerRowStyle = { display: 'flex', justifyContent: 'space-between', gap: 14, alignItems: 'flex-end', flexWrap: 'wrap' } as const;
+const actionRowStyle = { display: 'flex', gap: 10, flexWrap: 'wrap' } as const;
+const buttonStyle = { padding: '13px 14px', borderRadius: 14, cursor: 'pointer', background: '#f5c542', color: '#111', border: 0, fontWeight: 900 } as const;
+const linkButtonStyle = { padding: '13px 14px', borderRadius: 14, cursor: 'pointer', background: 'rgba(255,255,255,0.08)', color: '#fff', border: '1px solid rgba(255,255,255,0.14)', fontWeight: 900, textDecoration: 'none' } as const;
 const noticeStyle = { border: '1px solid rgba(255,255,255,0.12)', borderRadius: 16, padding: 12, background: 'rgba(255,255,255,0.07)', marginBottom: 12 } as const;
 const gridStyle = { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: 12, margin: '18px 0' } as const;
 const twoColStyle = { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 12 } as const;
