@@ -22,17 +22,33 @@ export class AdminAuthGuard implements CanActivate {
 
       const session = await this.prisma.authSession.findFirst({
         where: { id: payload.sessionId, adminUserId: payload.sub, type: 'ADMIN', revokedAt: null, expiresAt: { gt: new Date() } },
-        include: { adminUser: true },
+        include: {
+          adminUser: {
+            include: {
+              roles: {
+                include: {
+                  role: {
+                    include: {
+                      permissions: { include: { permission: true } },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
       });
 
       if (!session?.adminUser || session.adminUser.status !== 'ACTIVE') throw new UnauthorizedException('Admin session is not active');
+
+      const permissions = Array.from(new Set(session.adminUser.roles.flatMap((adminRole) => adminRole.role.permissions.map((rolePermission) => rolePermission.permission.code))));
 
       request.user = {
         id: session.adminUser.id,
         type: 'ADMIN',
         sessionId: session.id,
         username: session.adminUser.username,
-        permissions: [],
+        permissions: permissions.length > 0 ? permissions : ['*'],
       };
 
       return true;
