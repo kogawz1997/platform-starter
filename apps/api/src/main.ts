@@ -4,6 +4,7 @@ import { ValidationPipe } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
+import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 
 type RateBucket = { count: number; resetAt: number };
 type RateRule = { method: string; path: string; max: number; env?: string };
@@ -36,6 +37,8 @@ async function bootstrap() {
     res.setHeader('X-Request-Id', requestId);
     next();
   });
+
+  app.useGlobalFilters(new HttpExceptionFilter());
 
   app.use((req: any, res: any, next: any) => {
     res.setHeader('X-Content-Type-Options', 'nosniff');
