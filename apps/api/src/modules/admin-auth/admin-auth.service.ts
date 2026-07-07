@@ -2,11 +2,12 @@ import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import * as argon2 from 'argon2';
-import { authenticator } from 'otplib';
-import { randomBytes } from 'crypto';
+import { createHmac, randomBytes } from 'crypto';
 import { PrismaService } from '../../database/prisma.service';
 import { AdminSignInDto } from './dto/admin-sign-in.dto';
 import { VerifyAdminTwoFactorDto } from './dto/verify-admin-2fa.dto';
+
+const BASE32_ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
 
 @Injectable()
 export class AdminAuthService {
@@ -40,9 +41,10 @@ export class AdminAuthService {
   async setupTwoFactor(adminUserId: string, meta: RequestMeta = {}) {
     const admin = await this.prisma.adminUser.findUnique({ where: { id: adminUserId } });
     if (!admin || admin.status !== 'ACTIVE') throw new UnauthorizedException('Admin is not active');
-    const secret = authenticator.generateSecret();
+    const secret = this.generateBase32Secret();
     const issuer = this.configService.get<string>('ADMIN_OTP_ISSUER') ?? 'Platform Admin';
-    const otpAuthUrl = authenticator.keyuri(admin.username, issuer, secret);
+    const label = `${issuer}:${admin.username}`;
+    const otpAuthUrl = `otpauth://totp/${encodeURIComponent(label)}?secret=${encodeURIComponent(secret)}&issuer=${encodeURIComponent(issuer)}&algorithm=SHA1&digits=6&period=30`;
     await this.prisma.adminUser.update({ where: { id: admin.id }, data: { twoFactorSecret: secret, twoFactorEnabled: false } });
     await this.safeWriteAudit(admin.id, 'admin.otp.setup', 'auth', admin.id, meta);
     return { secret, otpAuthUrl };
@@ -94,8 +96,46 @@ export class AdminAuthService {
   private assertTotp(secret: string | null, code: string) {
     if (!secret) throw new UnauthorizedException('Two factor secret is missing');
     const normalized = String(code ?? '').replace(/\s/g, '');
-    const valid = authenticator.check(normalized, secret);
+    if (!/^\d{6}$/.test(normalized)) throw new UnauthorizedException('Invalid code');
+    const nowCounter = Math.floor(Date.now() / 1000 / 30);
+    const valid = [-1, 0, 1].some((offset) => this.generateTotp(secret, nowCounter + offset) === normalized);
     if (!valid) throw new UnauthorizedException('Invalid code');
+  }
+
+  private generateTotp(secret: string, counter: number) {
+    const key = this.base32Decode(secret);
+    const buffer = Buffer.alloc(8);
+    buffer.writeUInt32BE(Math.floor(counter / 0x100000000), 0);
+    buffer.writeUInt32BE(counter >>> 0, 4);
+    const hmac = createHmac('sha1', key).update(buffer).digest();
+    const offset = hmac[hmac.length - 1] & 0xf;
+    const binary = ((hmac[offset] & 0x7f) << 24) | ((hmac[offset + 1] & 0xff) << 16) | ((hmac[offset + 2] & 0xff) << 8) | (hmac[offset + 3] & 0xff);
+    return String(binary % 1_000_000).padStart(6, '0');
+  }
+
+  private generateBase32Secret() {
+    const bytes = randomBytes(20);
+    let bits = '';
+    for (const byte of bytes) bits += byte.toString(2).padStart(8, '0');
+    let output = '';
+    for (let i = 0; i < bits.length; i += 5) {
+      const chunk = bits.slice(i, i + 5).padEnd(5, '0');
+      output += BASE32_ALPHABET[parseInt(chunk, 2)];
+    }
+    return output;
+  }
+
+  private base32Decode(value: string) {
+    const clean = value.toUpperCase().replace(/=+$/g, '').replace(/\s/g, '');
+    let bits = '';
+    for (const char of clean) {
+      const index = BASE32_ALPHABET.indexOf(char);
+      if (index < 0) throw new UnauthorizedException('Invalid two factor secret');
+      bits += index.toString(2).padStart(5, '0');
+    }
+    const bytes: number[] = [];
+    for (let i = 0; i + 8 <= bits.length; i += 8) bytes.push(parseInt(bits.slice(i, i + 8), 2));
+    return Buffer.from(bytes);
   }
 
   private readRefreshTokenParts(value: string) {
