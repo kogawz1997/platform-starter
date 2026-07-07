@@ -8,12 +8,7 @@ type ReceivingAccount = { id: string; bankName: string; accountName: string; acc
 type MethodCode = 'bank_transfer' | 'promptpay' | 'wallet' | 'other';
 
 const AMOUNTS = [100, 300, 500, 1000, 3000, 5000];
-const METHODS: Record<MethodCode, { label: string; numberLabel: string }> = {
-  bank_transfer: { label: 'บัญชีธนาคาร', numberLabel: 'เลขบัญชี' },
-  promptpay: { label: 'พร้อมเพย์', numberLabel: 'เบอร์พร้อมเพย์' },
-  wallet: { label: 'วอเลต', numberLabel: 'วอเลต' },
-  other: { label: 'อื่น ๆ', numberLabel: 'รายละเอียด' },
-};
+const METHODS: Record<MethodCode, { label: string; numberLabel: string }> = { bank_transfer: { label: 'บัญชีธนาคาร', numberLabel: 'เลขบัญชี' }, promptpay: { label: 'พร้อมเพย์', numberLabel: 'เบอร์พร้อมเพย์' }, wallet: { label: 'วอเลต', numberLabel: 'วอเลต' }, other: { label: 'อื่น ๆ', numberLabel: 'รายละเอียด' } };
 
 export default function DepositClient() {
   const [step, setStep] = useState<'select' | 'transfer' | 'waiting'>('select');
@@ -31,7 +26,6 @@ export default function DepositClient() {
   const parsedAmount = useMemo(() => Number(amount.replace(/,/g, '').trim()), [amount]);
   const usable = useMemo(() => accounts.filter((account) => matchAmount(account, parsedAmount)), [accounts, parsedAmount]);
   const availableMethods = useMemo(() => Array.from(new Set(usable.map(accountType))) as MethodCode[], [usable]);
-  const methodAccounts = useMemo(() => usable.filter((account) => accountType(account) === method).sort((a, b) => Number(a.sortOrder ?? 100) - Number(b.sortOrder ?? 100)), [usable, method]);
 
   useEffect(() => { loadInitial(); }, []);
   useEffect(() => { if (availableMethods.length > 0 && !availableMethods.includes(method)) setMethod(availableMethods[0]); }, [availableMethods, method]);
@@ -45,24 +39,20 @@ export default function DepositClient() {
     if (!historyRes.ok || !accountRes.ok) setMessage(historyData?.message ?? accountData?.message ?? 'โหลดข้อมูลไม่สำเร็จ');
   }
 
-  function nextStep(event: FormEvent<HTMLFormElement>) {
+  async function nextStep(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!Number.isFinite(parsedAmount) || parsedAmount <= 0) { setMessage('กรุณาใส่จำนวนเงินมากกว่า 0'); return; }
-    if (methodAccounts.length === 0) { setMessage('ยังไม่มีบัญชีรับเงินสำหรับช่องทางนี้'); return; }
-    const index = Math.floor(Date.now() / 60000) % methodAccounts.length;
-    setSelected(methodAccounts[index]);
-    setMessage('');
-    setStep('transfer');
+    setMessage('กำลังเตรียมข้อมูลรับเงิน...');
+    const res = await memberApiFetch(`/member/receiving-bank-account?paymentType=${encodeURIComponent(method)}&amount=${encodeURIComponent(String(parsedAmount))}`);
+    const data = await res.json().catch(() => null);
+    if (!res.ok || !data?.item) { setMessage(data?.message ?? 'ยังไม่มีบัญชีรับเงินสำหรับช่องทางนี้'); return; }
+    setSelected(data.item); setMessage(''); setStep('transfer');
   }
 
   async function uploadSlip(event: ChangeEvent<HTMLInputElement>) {
-    const file = event.target.files?.[0];
-    if (!file) return;
+    const file = event.target.files?.[0]; if (!file) return;
     if (!file.type.startsWith('image/')) { setMessage('กรุณาเลือกไฟล์รูปภาพ'); return; }
-    const imageData = await resizeImage(file, 900, 0.72);
-    setSlipImageName(file.name);
-    setSlipImageData(imageData);
-    setMessage('แนบสลิปแล้ว');
+    const imageData = await resizeImage(file, 900, 0.72); setSlipImageName(file.name); setSlipImageData(imageData); setMessage('แนบสลิปแล้ว');
   }
 
   async function submit() {
@@ -74,15 +64,12 @@ export default function DepositClient() {
     if (!slipRes.ok) { setLoading(false); setMessage(slipData?.message ?? 'อัปโหลดสลิปไม่สำเร็จ'); return; }
     const proofNote = JSON.stringify({ userNote: note, slipImageName: slipData.slipImageName ?? slipImageName, slipFileId: slipData.slipFileId, storage: 'private', paymentType: method, receivingBankAccountId: selected.id, receivingBank: selected });
     const res = await memberApiFetch('/member/topups', { method: 'POST', body: JSON.stringify({ amount: parsedAmount, method, note: proofNote }) });
-    const data = await res.json().catch(() => null);
-    setLoading(false);
+    const data = await res.json().catch(() => null); setLoading(false);
     if (!res.ok) { setMessage(data?.message ?? 'ส่งรายการไม่สำเร็จ'); return; }
-    setHistory((current) => [data, ...current]);
-    setMessage('ส่งรายการแล้ว รอแอดมินตรวจสอบ');
-    setStep('waiting');
+    setHistory((current) => [data, ...current]); setMessage('ส่งรายการแล้ว รอแอดมินตรวจสอบ'); setStep('waiting');
   }
 
-  return <main style={pageStyle}><a href="/" style={backStyle}>← หน้าแรก</a><h1 style={titleStyle}>ฝากเงิน</h1><p style={mutedStyle}>เลือกยอดเงินและวิธีการโอน จากนั้นทำรายการตามข้อมูลที่ระบบแสดง</p>{step === 'select' && <form onSubmit={nextStep} style={cardStyle}><h2>เลือกยอดเงิน</h2><div style={amountGridStyle}>{AMOUNTS.map((value) => <button key={value} type="button" onClick={() => setAmount(String(value))} style={amountButtonStyle(Number(amount) === value)}>฿{value.toLocaleString('th-TH')}</button>)}</div><label style={labelStyle}>จำนวนเงิน<input value={amount} onChange={(e) => setAmount(e.target.value)} inputMode="decimal" style={inputStyle} /></label><h2>วิธีการโอน</h2>{(['bank_transfer', 'promptpay', 'wallet', 'other'] as MethodCode[]).map((code) => { const count = usable.filter((account) => accountType(account) === code).length; const enabled = count > 0; return <button key={code} type="button" disabled={!enabled} onClick={() => enabled && setMethod(code)} style={methodStyle(method === code, enabled)}><strong>{METHODS[code].label}</strong><span>{enabled ? 'พร้อมใช้งาน' : 'ยังไม่เปิดใช้งาน'}</span></button>; })}<button type="submit" style={primaryButtonStyle}>ถัดไป</button></form>}{step === 'transfer' && selected && <section style={cardStyle}><h2>{METHODS[method].label}</h2><h1 style={amountTitleStyle}>฿{parsedAmount.toLocaleString('th-TH', { minimumFractionDigits: 2 })}</h1><section style={boxStyle}><p>ชื่อบัญชี: {selected.accountName}</p><p>{METHODS[method].numberLabel}: {selected.accountNumber}</p>{selected.promptPay && <p>PromptPay: {selected.promptPay}</p>}{selected.qrImageUrl && <img src={selected.qrImageUrl} alt="QR" style={qrStyle} />}<p>โอนเสร็จแล้วแนบสลิป แล้วกดเสร็จ</p></section><label style={labelStyle}>แนบสลิป<input type="file" accept="image/*" onChange={uploadSlip} style={inputStyle} /></label>{slipImageData && <img src={slipImageData} alt="slip" style={slipStyle} />}<label style={labelStyle}>หมายเหตุ<textarea value={note} onChange={(e) => setNote(e.target.value)} style={inputStyle} /></label><div style={actionRowStyle}><button type="button" onClick={() => setStep('select')} style={secondaryButtonStyle}>ย้อนกลับ</button><button type="button" onClick={submit} disabled={loading} style={primaryButtonStyle}>{loading ? 'กำลังส่ง...' : 'เสร็จ'}</button></div></section>}{step === 'waiting' && <section style={cardStyle}><h2>รอแอดมินอนุมัติ</h2><p style={mutedStyle}>ส่งรายการแล้ว กรุณารอตรวจสอบ</p></section>}{message && <div style={noticeStyle}>{message}</div>}<h2>ประวัติคำขอ</h2>{history.map((item) => <section key={item.id} style={cardStyle}><strong>{item.currency} {Number(item.amount).toLocaleString('th-TH', { minimumFractionDigits: 2 })}</strong><p>Status: {item.status}</p><p>Method: {item.method ?? '-'}</p>{item.adminNote && <p>Admin note: {item.adminNote}</p>}</section>)}</main>;
+  return <main style={pageStyle}><a href="/" style={backStyle}>← หน้าแรก</a><h1 style={titleStyle}>ฝากเงิน</h1><p style={mutedStyle}>เลือกยอดเงินและวิธีการโอน จากนั้นทำรายการตามข้อมูลที่ระบบแสดง</p>{step === 'select' && <form onSubmit={nextStep} style={cardStyle}><h2>เลือกยอดเงิน</h2><div style={amountGridStyle}>{AMOUNTS.map((value) => <button key={value} type="button" onClick={() => setAmount(String(value))} style={amountButtonStyle(Number(amount) === value)}>฿{value.toLocaleString('th-TH')}</button>)}</div><label style={labelStyle}>จำนวนเงิน<input value={amount} onChange={(e) => setAmount(e.target.value)} inputMode="decimal" style={inputStyle} /></label><h2>วิธีการโอน</h2>{(['bank_transfer', 'promptpay', 'wallet', 'other'] as MethodCode[]).map((code) => { const enabled = usable.some((account) => accountType(account) === code); return <button key={code} type="button" disabled={!enabled} onClick={() => enabled && setMethod(code)} style={methodStyle(method === code, enabled)}><strong>{METHODS[code].label}</strong><span>{enabled ? 'พร้อมใช้งาน' : 'ยังไม่เปิดใช้งาน'}</span></button>; })}<button type="submit" style={primaryButtonStyle}>ถัดไป</button></form>}{step === 'transfer' && selected && <section style={cardStyle}><h2>{METHODS[method].label}</h2><h1 style={amountTitleStyle}>฿{parsedAmount.toLocaleString('th-TH', { minimumFractionDigits: 2 })}</h1><section style={boxStyle}><p>ชื่อบัญชี: {selected.accountName}</p><p>{METHODS[method].numberLabel}: {selected.accountNumber}</p>{selected.promptPay && <p>PromptPay: {selected.promptPay}</p>}{selected.qrImageUrl && <img src={selected.qrImageUrl} alt="QR" style={qrStyle} />}<p>โอนเสร็จแล้วแนบสลิป แล้วกดเสร็จ</p></section><label style={labelStyle}>แนบสลิป<input type="file" accept="image/*" onChange={uploadSlip} style={inputStyle} /></label>{slipImageData && <img src={slipImageData} alt="slip" style={slipStyle} />}<label style={labelStyle}>หมายเหตุ<textarea value={note} onChange={(e) => setNote(e.target.value)} style={inputStyle} /></label><div style={actionRowStyle}><button type="button" onClick={() => setStep('select')} style={secondaryButtonStyle}>ย้อนกลับ</button><button type="button" onClick={submit} disabled={loading} style={primaryButtonStyle}>{loading ? 'กำลังส่ง...' : 'เสร็จ'}</button></div></section>}{step === 'waiting' && <section style={cardStyle}><h2>รอแอดมินอนุมัติ</h2><p style={mutedStyle}>ส่งรายการแล้ว กรุณารอตรวจสอบ</p></section>}{message && <div style={noticeStyle}>{message}</div>}<h2>ประวัติคำขอ</h2>{history.map((item) => <section key={item.id} style={cardStyle}><strong>{item.currency} {Number(item.amount).toLocaleString('th-TH', { minimumFractionDigits: 2 })}</strong><p>Status: {item.status}</p><p>Method: {item.method ?? '-'}</p>{item.adminNote && <p>Admin note: {item.adminNote}</p>}</section>)}</main>;
 }
 
 function accountType(account: ReceivingAccount): MethodCode { if (account.bankName === 'พร้อมเพย์') return 'promptpay'; if (account.bankName === 'วอเลต') return 'wallet'; if (account.bankName === 'อื่น ๆ') return 'other'; return 'bank_transfer'; }
