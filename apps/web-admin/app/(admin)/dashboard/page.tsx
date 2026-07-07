@@ -6,6 +6,7 @@ import { AdminBadge, AdminButton, AdminCard, AdminEmpty, AdminGrid, AdminLinkBut
 
 type FinanceSummary = {
   totals: { walletCount: number; totalBalance: string; totalLockedBalance: string; totalAvailableBalance: string; pendingTopUps: number; pendingWithdrawals: number };
+  today?: { date: string; topUpAmount: string; topUpCount: number; withdrawalAmount: string; withdrawalCount: number; netFlow: string };
   queues: { topUps: QueueItem[]; withdrawals: QueueItem[] };
   recentLedgers: { id: string; type: string; direction: string; amount: string; createdAt: string; user?: { username?: string | null; shortId?: string | null } | null }[];
   generatedAt: string;
@@ -51,6 +52,14 @@ export default function OperationDashboardPage() {
         <AdminMetric title="Wallets" value={summary.totals.walletCount.toLocaleString('th-TH')} helper="จำนวน wallet ทั้งหมด" />
         <AdminMetric title="Risk Alerts" value={`${riskSummary.openCount}`} helper={`${riskSummary.criticalCount} high/critical`} />
       </AdminMetricGrid>}
+
+      {summary?.today && <AdminCard title="Today Volume" description={`UTC date ${summary.today.date}`} action={<AdminLinkButton href="/reports">Reports</AdminLinkButton>}>
+        <AdminMetricGrid>
+          <AdminMetric title="Top-up today" value={formatMoney(summary.today.topUpAmount)} helper={`${summary.today.topUpCount} approved`} />
+          <AdminMetric title="Withdrawal today" value={formatMoney(summary.today.withdrawalAmount)} helper={`${summary.today.withdrawalCount} completed`} />
+          <AdminMetric title="Net flow" value={formatMoney(summary.today.netFlow)} helper="topup - withdrawal" />
+        </AdminMetricGrid>
+      </AdminCard>}
 
       <AdminGrid>
         <QuickCard title="Top-up Review" href="/topups" count={summary?.totals.pendingTopUps ?? 0} tone="warning" />
