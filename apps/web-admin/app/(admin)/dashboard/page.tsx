@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { adminApiFetch } from '../../admin-api';
-import { AdminButton, AdminCard, AdminEmpty, AdminGrid, AdminLinkButton, AdminMetric, AdminMetricGrid, AdminNotice, AdminPage, AdminRow, AdminStack, formatMoney } from '../_components/admin-ui';
+import { AdminBadge, AdminButton, AdminCard, AdminEmpty, AdminGrid, AdminLinkButton, AdminMetric, AdminMetricGrid, AdminNotice, AdminPage, AdminRow, AdminStack, formatMoney } from '../_components/admin-ui';
 
 type FinanceSummary = {
   totals: { walletCount: number; totalBalance: string; totalLockedBalance: string; totalAvailableBalance: string; pendingTopUps: number; pendingWithdrawals: number };
@@ -11,12 +11,13 @@ type FinanceSummary = {
   generatedAt: string;
 };
 type QueueItem = { id: string; shortUserId: string; amount: string; currency: string; status: string; method?: string | null; createdAt: string; user?: { username?: string | null; shortId?: string | null } | null };
-type RiskSummary = { counts: { high: number; medium: number; low: number; total: number }; alerts: RiskAlert[]; checkedWallets: number; generatedAt: string };
-type RiskAlert = { type: string; severity: string; message: string; userId?: string; username?: string | null; targetId?: string; amount?: string; walletId?: string; createdAt?: string };
+type RiskAlert = { id: string; type: string; severity: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL'; status: string; title: string; memberId?: string | null; shortMemberId?: string | null; createdAt: string };
+type RiskAlertsResponse = { items?: RiskAlert[]; summary?: { openCount?: number; criticalCount?: number } };
 
 export default function OperationDashboardPage() {
   const [summary, setSummary] = useState<FinanceSummary | null>(null);
-  const [risk, setRisk] = useState<RiskSummary | null>(null);
+  const [riskItems, setRiskItems] = useState<RiskAlert[]>([]);
+  const [riskSummary, setRiskSummary] = useState({ openCount: 0, criticalCount: 0 });
   const [message, setMessage] = useState('');
 
   useEffect(() => { loadSummary(); }, []);
@@ -25,27 +26,59 @@ export default function OperationDashboardPage() {
     setMessage('กำลังโหลด Operation Center...');
     const [financeRes, riskRes] = await Promise.all([
       adminApiFetch('/admin/finance/summary'),
-      adminApiFetch('/admin/risk/summary'),
+      adminApiFetch('/admin/risk-alerts?status=OPEN'),
     ]);
     const financeData = await financeRes.json().catch(() => null);
-    const riskData = await riskRes.json().catch(() => null);
+    const riskData = await riskRes.json().catch(() => null) as RiskAlertsResponse | null;
     if (!financeRes.ok) { setMessage(financeData?.message ?? 'โหลด dashboard ไม่สำเร็จ'); return; }
     setSummary(financeData);
-    if (riskRes.ok) setRisk(riskData);
+    if (riskRes.ok && riskData) {
+      setRiskItems(riskData.items ?? []);
+      setRiskSummary({ openCount: Number(riskData.summary?.openCount ?? 0), criticalCount: Number(riskData.summary?.criticalCount ?? 0) });
+    }
     setMessage('');
   }
 
+  const pendingTotal = summary ? summary.totals.pendingTopUps + summary.totals.pendingWithdrawals : 0;
+
   return (
-    <AdminPage eyebrow="Operation Center" title="Dashboard" description="ศูนย์รวมคิวการเงิน ยอด wallet ความเสี่ยง และรายการล่าสุด" actions={<AdminButton onClick={loadSummary}>Refresh</AdminButton>}>
+    <AdminPage eyebrow="Operation Center" title="Dashboard" description="ศูนย์รวมคิวการเงิน ความเสี่ยง และรายการล่าสุด" actions={<AdminButton onClick={loadSummary}>Refresh</AdminButton>}>
       {message && <AdminNotice>{message}</AdminNotice>}
-      {summary && <AdminMetricGrid><AdminMetric title="Wallets" value={summary.totals.walletCount.toLocaleString('th-TH')} /><AdminMetric title="Available" value={formatMoney(summary.totals.totalAvailableBalance)} /><AdminMetric title="Locked" value={formatMoney(summary.totals.totalLockedBalance)} /><AdminMetric title="Pending" value={`${summary.totals.pendingTopUps + summary.totals.pendingWithdrawals}`} />{risk && <AdminMetric title="Risk Alerts" value={`${risk.counts.total}`} helper={`High ${risk.counts.high} · Medium ${risk.counts.medium} · Low ${risk.counts.low}`} />}</AdminMetricGrid>}
-      {risk && <AdminCard title="Risk Alerts" description={`High ${risk.counts.high} · Medium ${risk.counts.medium} · Low ${risk.counts.low}`} action={<AdminLinkButton href="/risk-alerts">Risk queue</AdminLinkButton>}><AdminStack>{risk.alerts.slice(0, 8).map((item, index) => <AdminRow key={`${item.type}-${item.userId ?? item.targetId ?? index}`}><div><strong>{item.severity} · {item.type}</strong><p>{item.message}</p><p>{item.username ?? item.userId ?? item.targetId ?? '-'}</p></div>{item.userId && <AdminLinkButton href={`/members/${item.userId}`}>Member</AdminLinkButton>}</AdminRow>)}{risk.alerts.length === 0 && <AdminEmpty>ยังไม่พบ alert สำคัญ</AdminEmpty>}</AdminStack></AdminCard>}
+      {summary && <AdminMetricGrid>
+        <AdminMetric title="Pending queues" value={String(pendingTotal)} helper={`${summary.totals.pendingTopUps} topups · ${summary.totals.pendingWithdrawals} withdrawals`} />
+        <AdminMetric title="Available" value={formatMoney(summary.totals.totalAvailableBalance)} helper="ยอดที่สมาชิกใช้ได้รวม" />
+        <AdminMetric title="Locked" value={formatMoney(summary.totals.totalLockedBalance)} helper="ยอดถูกล็อกระหว่างรอดำเนินการ" />
+        <AdminMetric title="Wallets" value={summary.totals.walletCount.toLocaleString('th-TH')} helper="จำนวน wallet ทั้งหมด" />
+        <AdminMetric title="Risk Alerts" value={`${riskSummary.openCount}`} helper={`${riskSummary.criticalCount} high/critical`} />
+      </AdminMetricGrid>}
+
+      <AdminGrid>
+        <QuickCard title="Top-up Review" href="/topups" count={summary?.totals.pendingTopUps ?? 0} tone="warning" />
+        <QuickCard title="Withdrawal Review" href="/withdrawals" count={summary?.totals.pendingWithdrawals ?? 0} tone="danger" />
+        <QuickCard title="Risk Alerts" href="/risk-alerts" count={riskSummary.openCount} tone="danger" />
+        <QuickCard title="Finance Summary" href="/finance" count={summary?.totals.walletCount ?? 0} tone="neutral" />
+      </AdminGrid>
+
+      <AdminCard title="Risk Alerts" description={`${riskSummary.openCount} open · ${riskSummary.criticalCount} high/critical`} action={<AdminLinkButton href="/risk-alerts">Risk queue</AdminLinkButton>}>
+        <AdminStack>{riskItems.slice(0, 8).map((item) => <AdminRow key={item.id}><div><div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}><AdminBadge tone={riskTone(item.severity)}>{item.severity}</AdminBadge><AdminBadge>{item.type}</AdminBadge></div><strong>{item.title}</strong><p>{new Date(item.createdAt).toLocaleString('th-TH')}</p></div><div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'flex-end' }}>{item.memberId && <AdminLinkButton href={`/members/${item.memberId}`}>Member</AdminLinkButton>}<AdminLinkButton href={`/risk-alerts/${item.id}`}>Detail</AdminLinkButton></div></AdminRow>)}{riskItems.length === 0 && <AdminEmpty>ยังไม่พบ alert สำคัญ</AdminEmpty>}</AdminStack>
+      </AdminCard>
+
       {summary && <AdminGrid><QueueCard title="Top-up Queue" href="/topups" count={summary.totals.pendingTopUps} items={summary.queues.topUps} /><QueueCard title="Withdrawal Queue" href="/withdrawals" count={summary.totals.pendingWithdrawals} items={summary.queues.withdrawals} /></AdminGrid>}
-      {summary && <AdminCard title="Recent Ledger" action={<AdminLinkButton href="/ledgers">ดูทั้งหมด</AdminLinkButton>}><AdminStack>{summary.recentLedgers.map((item) => <AdminRow key={item.id}><div><strong>{item.type} / {item.direction}</strong><p>{item.user?.username ?? item.user?.shortId ?? '-'}</p></div><div style={{ textAlign: 'right' }}><strong>{formatMoney(item.amount)}</strong><p>{new Date(item.createdAt).toLocaleString('th-TH')}</p></div></AdminRow>)}</AdminStack></AdminCard>}
+      {summary && <AdminCard title="Recent Ledger" description={`Generated ${new Date(summary.generatedAt).toLocaleString('th-TH')}`} action={<AdminLinkButton href="/ledgers">ดูทั้งหมด</AdminLinkButton>}><AdminStack>{summary.recentLedgers.map((item) => <AdminRow key={item.id}><div><strong>{item.type} / {item.direction}</strong><p>{item.user?.username ?? item.user?.shortId ?? '-'}</p></div><div style={{ textAlign: 'right' }}><strong>{formatMoney(item.amount)}</strong><p>{new Date(item.createdAt).toLocaleString('th-TH')}</p></div></AdminRow>)}</AdminStack></AdminCard>}
     </AdminPage>
   );
 }
 
+function QuickCard({ title, href, count, tone }: { title: string; href: string; count: number; tone: 'neutral' | 'warning' | 'danger' }) {
+  return <AdminCard><div style={{ display: 'grid', gap: 12 }}><AdminBadge tone={tone}>{count > 0 ? 'Needs action' : 'Clear'}</AdminBadge><h2 style={{ margin: 0 }}>{title}</h2><strong style={{ fontSize: 34, lineHeight: 1 }}>{count.toLocaleString('th-TH')}</strong><AdminLinkButton href={href}>Open</AdminLinkButton></div></AdminCard>;
+}
+
 function QueueCard({ title, href, count, items }: { title: string; href: string; count: number; items: QueueItem[] }) {
   return <AdminCard title={title} description={`${count} pending`} action={<AdminLinkButton href={href}>เปิดคิว</AdminLinkButton>}><AdminStack>{items.slice(0, 5).map((item) => <AdminRow key={item.id}><div><strong>{item.user?.username ?? item.shortUserId}</strong><p>{item.method ?? '-'} · {new Date(item.createdAt).toLocaleString('th-TH')}</p></div><strong>{formatMoney(item.amount)}</strong></AdminRow>)}{items.length === 0 && <AdminEmpty>ไม่มีรายการรอตรวจ</AdminEmpty>}</AdminStack></AdminCard>;
+}
+
+function riskTone(severity: RiskAlert['severity']) {
+  if (severity === 'CRITICAL' || severity === 'HIGH') return 'danger';
+  if (severity === 'MEDIUM') return 'warning';
+  return 'neutral';
 }
