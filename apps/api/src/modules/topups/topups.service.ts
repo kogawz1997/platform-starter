@@ -90,7 +90,7 @@ export class TopUpsService {
   async releaseRequest(id: string, adminUser: any, meta: RequestMeta = {}) {
     const request = await this.prisma.topUpRequest.findUnique({ where: { id } });
     if (!request) throw new NotFoundException('Top up request not found');
-    if (request.claimedBy && request.claimedBy !== adminUser.id) throw new ConflictException('ปล่อยงานได้เฉพาะคนที่ claim หรือ super admin เท่านั้น');
+    if (request.claimedBy && request.claimedBy !== adminUser.id) throw new ConflictException('ปล่อยงานได้เฉพาะคนที่ claim เท่านั้น');
     const updated = await this.prisma.topUpRequest.update({ where: { id }, data: { claimedBy: null, claimedAt: null } });
     await this.audit(adminUser.id, 'RELEASE_TOP_UP', id, { claimedBy: request.claimedBy }, { claimedBy: null }, meta);
     return this.formatRequest(updated);
@@ -101,11 +101,12 @@ export class TopUpsService {
     return this.prisma.$transaction(async (tx) => {
       const request = await tx.topUpRequest.findUnique({ where: { id } });
       if (!request) throw new NotFoundException('Top up request not found');
-      if (request.claimedBy && request.claimedBy !== adminUser.id) throw new ConflictException('ต้อง claim รายการก่อนอนุมัติ');
+      if (!request.claimedBy) throw new ConflictException('ต้อง claim รายการก่อนอนุมัติ');
+      if (request.claimedBy !== adminUser.id) throw new ConflictException('รายการนี้มีแอดมินคนอื่นกำลังตรวจอยู่');
       if (request.status !== 'PENDING') throw new ConflictException(`Top up request already reviewed: ${request.status}`);
       const existingLedger = await tx.walletLedger.findUnique({ where: { idempotencyKey } });
       if (existingLedger) throw new ConflictException('Top up approval ledger already exists');
-      const claim = await tx.topUpRequest.updateMany({ where: { id, status: 'PENDING' }, data: { status: 'APPROVED', adminNote: dto.adminNote, reviewedBy: adminUser.id, reviewedAt: new Date(), claimedBy: null, claimedAt: null } });
+      const claim = await tx.topUpRequest.updateMany({ where: { id, status: 'PENDING', claimedBy: adminUser.id }, data: { status: 'APPROVED', adminNote: dto.adminNote, reviewedBy: adminUser.id, reviewedAt: new Date(), claimedBy: null, claimedAt: null } });
       if (claim.count !== 1) throw new ConflictException('Top up request already reviewed');
       let wallet = await tx.wallet.findUnique({ where: { userId: request.userId } });
       if (!wallet) wallet = await tx.wallet.create({ data: { userId: request.userId, currency: request.currency } });
@@ -124,9 +125,10 @@ export class TopUpsService {
     return this.prisma.$transaction(async (tx) => {
       const request = await tx.topUpRequest.findUnique({ where: { id } });
       if (!request) throw new NotFoundException('Top up request not found');
-      if (request.claimedBy && request.claimedBy !== adminUser.id) throw new ConflictException('ต้อง claim รายการก่อนปฏิเสธ');
+      if (!request.claimedBy) throw new ConflictException('ต้อง claim รายการก่อนปฏิเสธ');
+      if (request.claimedBy !== adminUser.id) throw new ConflictException('รายการนี้มีแอดมินคนอื่นกำลังตรวจอยู่');
       if (request.status !== 'PENDING') throw new ConflictException(`Top up request already reviewed: ${request.status}`);
-      const claim = await tx.topUpRequest.updateMany({ where: { id, status: 'PENDING' }, data: { status: 'REJECTED', adminNote: dto.adminNote, reviewedBy: adminUser.id, reviewedAt: new Date(), claimedBy: null, claimedAt: null } });
+      const claim = await tx.topUpRequest.updateMany({ where: { id, status: 'PENDING', claimedBy: adminUser.id }, data: { status: 'REJECTED', adminNote: dto.adminNote, reviewedBy: adminUser.id, reviewedAt: new Date(), claimedBy: null, claimedAt: null } });
       if (claim.count !== 1) throw new ConflictException('Top up request already reviewed');
       await tx.adminAuditLog.create({ data: { adminUserId: adminUser.id, action: 'REJECT_TOP_UP', module: 'topups', targetId: request.id, oldData: { status: request.status, amount: request.amount.toString() } as any, newData: { status: 'REJECTED', adminNote: dto.adminNote } as any, ipAddress: meta.ipAddress, userAgent: meta.userAgent } });
       const updated = await tx.topUpRequest.findUniqueOrThrow({ where: { id } });
