@@ -31,9 +31,9 @@ export default function AdminProtectedLayout({ children }: { children: ReactNode
   }, []);
 
   async function loadQueueCount(token: string) {
-    const res = await fetch(`${API_URL}/admin/finance/summary`, { headers: { Authorization: `Bearer ${token}` } });
+    const res = await fetch(`${API_URL}/admin/queues/summary`, { headers: { Authorization: `Bearer ${token}` } });
     const data = await res.json().catch(() => null);
-    if (res.ok && data?.totals) setQueueCount({ topups: Number(data.totals.pendingTopUps ?? 0), withdrawals: Number(data.totals.pendingWithdrawals ?? 0) });
+    if (res.ok && data) setQueueCount({ topups: Number(data.topUps?.count ?? 0), withdrawals: Number(data.withdrawals?.count ?? 0) });
   }
 
   function logout() {
