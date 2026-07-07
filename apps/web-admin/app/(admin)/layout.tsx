@@ -14,16 +14,27 @@ const navGroups = [
 
 export default function AdminProtectedLayout({ children }: { children: ReactNode }) {
   const pathname = usePathname();
+  const [ready, setReady] = useState(false);
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [queueCount, setQueueCount] = useState({ topups: 0, withdrawals: 0 });
 
   useEffect(() => {
     const token = window.localStorage.getItem('admin_access_token');
-    if (!token) { window.location.href = '/login'; return; }
+    const hasToken = Boolean(token);
+    setIsLoggedIn(hasToken);
+    setReady(true);
+
+    if (!token) {
+      const next = encodeURIComponent(`${pathname}${window.location.search}`);
+      window.location.replace(`/login?next=${next}`);
+      return;
+    }
+
     loadQueueCount(token);
     const interval = window.setInterval(() => loadQueueCount(token), 60000);
     return () => window.clearInterval(interval);
-  }, []);
+  }, [pathname]);
 
   async function loadQueueCount(token: string) {
     const res = await fetch(`${API_URL}/admin/queues/summary`, { headers: { Authorization: `Bearer ${token}` } });
@@ -42,6 +53,10 @@ export default function AdminProtectedLayout({ children }: { children: ReactNode
     if (href === '/withdrawals' && queueCount.withdrawals > 0) return queueCount.withdrawals;
     if (href === '/dashboard' && queueCount.topups + queueCount.withdrawals > 0) return queueCount.topups + queueCount.withdrawals;
     return 0;
+  }
+
+  if (!ready || !isLoggedIn) {
+    return <main className="admin-shell" style={{ minHeight: '100dvh', display: 'grid', placeItems: 'center', color: '#fff' }}>กำลังตรวจสอบสิทธิ์...</main>;
   }
 
   return (
