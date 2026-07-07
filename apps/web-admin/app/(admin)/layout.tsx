@@ -11,6 +11,7 @@ const navItems = [
   ['Reports', '/reports'],
   ['Exports', '/exports'],
   ['Activity', '/activity'],
+  ['Member Detail', '/member-detail'],
   ['Settings', '/settings'],
   ['Topups', '/topups'],
   ['Withdrawals', '/withdrawals'],
