@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Post, Req, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Post, Req, UseGuards } from '@nestjs/common';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { AdminAuthGuard } from '../../common/guards/admin-auth.guard';
 import { AdminAuthService } from './admin-auth.service';
@@ -40,6 +40,30 @@ export class AdminAuthController {
   @Post('logout')
   signOut(@CurrentUser() user: any, @Req() req: any) {
     return this.adminAuthService.signOut(user.sessionId, user.id, this.meta(req));
+  }
+
+  @UseGuards(AdminAuthGuard)
+  @Get('sessions')
+  sessions(@CurrentUser() user: any) {
+    return this.adminAuthService.listSessions(user.id, user.sessionId);
+  }
+
+  @UseGuards(AdminAuthGuard)
+  @Post('sessions/logout-others')
+  logoutOtherSessions(@CurrentUser() user: any, @Req() req: any) {
+    return this.adminAuthService.revokeOtherSessions(user.id, user.sessionId, this.meta(req));
+  }
+
+  @UseGuards(AdminAuthGuard)
+  @Post('sessions/logout-all')
+  logoutAllSessions(@CurrentUser() user: any, @Req() req: any) {
+    return this.adminAuthService.revokeAllSessions(user.id, this.meta(req));
+  }
+
+  @UseGuards(AdminAuthGuard)
+  @Delete('sessions/:sessionId')
+  revokeSession(@CurrentUser() user: any, @Param('sessionId') sessionId: string, @Req() req: any) {
+    return this.adminAuthService.revokeSession(user.id, user.sessionId, sessionId, this.meta(req));
   }
 
   @UseGuards(AdminAuthGuard)
