@@ -30,12 +30,20 @@ export default function AdminWithdrawalsPage() {
   async function reviewItem(id: string, action: 'complete' | 'reject') {
     const token = window.localStorage.getItem('admin_access_token');
     if (!token) { setMessage('กรุณา login admin ก่อน'); return; }
+    const nextStatus = action === 'complete' ? 'COMPLETED' : 'REJECTED';
     setBusyId(id); setMessage(action === 'complete' ? 'กำลังปิดรายการถอน...' : 'กำลังปฏิเสธรายการ...');
     const res = await fetch(`${API_URL}/admin/withdrawals/${id}/${action}`, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }, body: JSON.stringify({ adminNote: reviewNote }) });
     const data = await res.json().catch(() => null); setBusyId('');
     if (!res.ok) { setMessage(data?.message ?? 'ทำรายการไม่สำเร็จ'); return; }
-    setItems((current) => current.map((item) => (item.id === data.id ? { ...item, ...data } : item))); setReviewNote('');
-    setMessage(action === 'complete' ? 'ทำรายการสำเร็จ ยอดถูกหักจาก wallet แล้ว' : 'ปฏิเสธรายการแล้ว และคืนยอดล็อกแล้ว');
+
+    const updated = data?.item ?? data?.withdrawal ?? data;
+    setItems((current) => {
+      const patched = current.map((item) => (item.id === id ? { ...item, ...updated, status: updated?.status ?? nextStatus, adminNote: updated?.adminNote ?? reviewNote } : item));
+      return status === 'PENDING' ? patched.filter((item) => item.id !== id) : patched;
+    });
+    setReviewNote('');
+    setMessage(action === 'complete' ? 'ทำรายการสำเร็จ รายการถูกย้ายออกจากคิว PENDING แล้ว' : 'ปฏิเสธรายการแล้ว และคืนยอดล็อกแล้ว');
+    window.setTimeout(() => loadItems(status), 400);
   }
 
   return (
@@ -52,7 +60,10 @@ export default function AdminWithdrawalsPage() {
       </section>
       {message && <div style={noticeStyle}>{message}</div>}
       <div style={{ display: 'grid', gap: 14 }}>
-        {items.map((item) => { const isPending = item.status === 'PENDING'; return <section key={item.id} style={cardStyle}><div style={topRowStyle}><div><span style={badgeStyle}>{item.status}</span><h2 style={amountStyle}>{item.currency} {Number(item.amount).toLocaleString('th-TH', { minimumFractionDigits: 2 })}</h2><p style={mutedStyle}>Member: {item.user?.username ?? item.userId}</p><p style={mutedStyle}>Method: {item.method ?? '-'}</p><p style={mutedStyle}>Created: {new Date(item.createdAt).toLocaleString('th-TH')}</p></div><div style={accountBoxStyle}><strong>Account</strong><p style={mutedStyle}>{item.accountName || '-'}</p><p style={mutedStyle}>{item.bankName || '-'} / {item.accountNumber || '-'}</p><p style={mutedStyle}>Note: {item.note || '-'}</p></div></div><label style={labelStyle}>Admin note<textarea value={reviewNote} onChange={(event) => setReviewNote(event.target.value)} placeholder="หมายเหตุสำหรับรายการนี้" style={{ ...inputStyle, minHeight: 92 }} /></label><div style={actionRowStyle}><button type="button" disabled={!isPending || busyId === item.id} onClick={() => reviewItem(item.id, 'complete')} style={confirmButtonStyle}>{busyId === item.id ? 'กำลังทำ...' : 'จ่ายแล้ว / สำเร็จ'}</button><button type="button" disabled={!isPending || busyId === item.id} onClick={() => reviewItem(item.id, 'reject')} style={declineButtonStyle}>ไม่อนุมัติ / คืนยอด</button></div></section>; })}
+        {items.map((item) => {
+          const isPending = item.status === 'PENDING';
+          return <section key={item.id} style={cardStyle}><div style={topRowStyle}><div><span style={badgeStyle}>{item.status}</span><h2 style={amountStyle}>{item.currency} {Number(item.amount).toLocaleString('th-TH', { minimumFractionDigits: 2 })}</h2><p style={mutedStyle}>Member: {item.user?.username ?? item.userId}</p><p style={mutedStyle}>Method: {item.method ?? '-'}</p><p style={mutedStyle}>Created: {new Date(item.createdAt).toLocaleString('th-TH')}</p></div><div style={accountBoxStyle}><strong>Account</strong><p style={mutedStyle}>{item.accountName || '-'}</p><p style={mutedStyle}>{item.bankName || '-'} / {item.accountNumber || '-'}</p><p style={mutedStyle}>Note: {item.note || '-'}</p></div></div>{isPending ? <><label style={labelStyle}>Admin note<textarea value={reviewNote} onChange={(event) => setReviewNote(event.target.value)} placeholder="หมายเหตุสำหรับรายการนี้" style={{ ...inputStyle, minHeight: 92 }} /></label><div style={actionRowStyle}><button type="button" disabled={busyId === item.id} onClick={() => reviewItem(item.id, 'complete')} style={confirmButtonStyle}>{busyId === item.id ? 'กำลังทำ...' : 'จ่ายแล้ว / สำเร็จ'}</button><button type="button" disabled={busyId === item.id} onClick={() => reviewItem(item.id, 'reject')} style={declineButtonStyle}>ไม่อนุมัติ / คืนยอด</button></div></> : <div style={doneBoxStyle}>รายการนี้ตรวจสอบแล้ว ไม่ต้องกดซ้ำ</div>}</section>;
+        })}
         {items.length === 0 && <div style={noticeStyle}>ยังไม่มีรายการ</div>}
       </div>
     </main>
@@ -77,3 +88,4 @@ const amountStyle = { margin: '10px 0 4px', fontSize: 'clamp(28px, 8vw, 42px)', 
 const accountBoxStyle = { border: '1px solid rgba(255,255,255,0.10)', borderRadius: 18, padding: 14, background: 'rgba(255,255,255,0.04)' } as const;
 const labelStyle = { display: 'grid', gap: 6, fontWeight: 800 } as const;
 const actionRowStyle = { display: 'flex', gap: 10, flexWrap: 'wrap' } as const;
+const doneBoxStyle = { border: '1px solid rgba(255,255,255,0.10)', borderRadius: 16, padding: 12, background: 'rgba(255,255,255,0.05)', color: 'rgba(255,255,255,0.72)', fontWeight: 800 } as const;
