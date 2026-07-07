@@ -88,6 +88,13 @@ enum WithdrawalRequestStatus {
   CANCELLED
 }
 
+enum BankAccountStatus {
+  ACTIVE
+  DISABLED
+  PENDING_REVIEW
+  REJECTED
+}
+
 model User {
   id              String     @id @default(uuid()) @db.Uuid
   username        String     @unique @db.VarChar(50)
@@ -108,6 +115,7 @@ model User {
   walletLedgers      WalletLedger[]
   topUpRequests      TopUpRequest[]
   withdrawalRequests WithdrawalRequest[]
+  bankAccounts       MemberBankAccount[]
 
   @@map("users")
 }
@@ -170,8 +178,8 @@ model Permission {
   name        String   @db.VarChar(120)
   module      String   @db.VarChar(80)
   description String?
-  createdAt   DateTime @default(now()) @map("created_at")
-  updatedAt   DateTime @updatedAt @map("updated_at")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
   roles RolePermission[]
 
@@ -193,7 +201,7 @@ model AdminUserRole {
 model RolePermission {
   roleId       String   @map("role_id") @db.Uuid
   permissionId String   @map("permission_id") @db.Uuid
-  createdAt    DateTime @default(now()) @map("created_at")
+  createdAt    DateTime @default(now())
 
   role       Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
   permission Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
@@ -233,7 +241,7 @@ model LoginHistory {
   ipAddress   String?     @map("ip_address") @db.VarChar(64)
   userAgent   String?     @map("user_agent")
   reason      String?
-  createdAt   DateTime    @default(now()) @map("created_at")
+  createdAt   DateTime    @default(now())
 
   user      User?      @relation(fields: [userId], references: [id], onDelete: SetNull)
   adminUser AdminUser? @relation(fields: [adminUserId], references: [id], onDelete: SetNull)
@@ -250,7 +258,7 @@ model VerificationToken {
   tokenHash String           @map("token_hash")
   expiresAt DateTime         @map("expires_at")
   usedAt    DateTime?        @map("used_at")
-  createdAt DateTime         @default(now()) @map("created_at")
+  createdAt DateTime         @default(now())
 
   @@index([target, type])
   @@map("verification_tokens")
@@ -266,7 +274,7 @@ model AdminAuditLog {
   newData     Json?    @map("new_data")
   ipAddress   String?  @map("ip_address") @db.VarChar(64)
   userAgent   String?  @map("user_agent")
-  createdAt   DateTime @default(now()) @map("created_at")
+  createdAt   DateTime @default(now())
 
   adminUser AdminUser? @relation(fields: [adminUserId], references: [id], onDelete: SetNull)
 
@@ -369,6 +377,43 @@ model WithdrawalRequest {
   @@map("withdrawal_requests")
 }
 
+model ReceivingBankAccount {
+  id            String            @id @default(uuid()) @db.Uuid
+  bankName      String            @map("bank_name") @db.VarChar(120)
+  accountName   String            @map("account_name") @db.VarChar(160)
+  accountNumber String            @map("account_number") @db.VarChar(160)
+  promptPay     String?           @map("prompt_pay") @db.VarChar(160)
+  qrImageUrl    String?           @map("qr_image_url")
+  minAmount     Decimal?          @map("min_amount") @db.Decimal(18, 2)
+  maxAmount     Decimal?          @map("max_amount") @db.Decimal(18, 2)
+  status        BankAccountStatus @default(ACTIVE)
+  sortOrder     Int               @default(100) @map("sort_order")
+  createdAt     DateTime          @default(now()) @map("created_at")
+  updatedAt     DateTime          @updatedAt @map("updated_at")
+
+  @@index([status])
+  @@map("receiving_bank_accounts")
+}
+
+model MemberBankAccount {
+  id            String            @id @default(uuid()) @db.Uuid
+  userId        String            @map("user_id") @db.Uuid
+  bankName      String            @map("bank_name") @db.VarChar(120)
+  accountName   String            @map("account_name") @db.VarChar(160)
+  accountNumber String            @map("account_number") @db.VarChar(160)
+  isPrimary     Boolean           @default(false) @map("is_primary")
+  status        BankAccountStatus @default(PENDING_REVIEW)
+  adminNote     String?           @map("admin_note")
+  createdAt     DateTime          @default(now()) @map("created_at")
+  updatedAt     DateTime          @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([status])
+  @@map("member_bank_accounts")
+}
+
 model SiteSetting {
   id          String           @id @default(uuid()) @db.Uuid
   key         String           @unique @db.VarChar(160)
@@ -394,7 +439,7 @@ model SiteSettingHistory {
   changedBy    String?  @map("changed_by") @db.Uuid
   ipAddress    String?  @map("ip_address") @db.VarChar(64)
   userAgent    String?  @map("user_agent")
-  createdAt    DateTime @default(now()) @map("created_at")
+  createdAt    DateTime @default(now())
 
   @@index([settingKey])
   @@index([changedBy])
