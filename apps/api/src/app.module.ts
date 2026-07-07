@@ -13,6 +13,7 @@ import { ReportsModule } from './modules/reports/reports.module';
 import { ExportsModule } from './modules/exports/exports.module';
 import { BankAccountsModule } from './modules/bank-accounts/bank-accounts.module';
 import { RiskAlertsModule } from './modules/risk-alerts/risk-alerts.module';
+import { AdminAccessModule } from './modules/admin-access/admin-access.module';
 import { HealthModule } from './modules/health/health.module';
 
 @Module({
@@ -31,6 +32,7 @@ import { HealthModule } from './modules/health/health.module';
     ExportsModule,
     BankAccountsModule,
     RiskAlertsModule,
+    AdminAccessModule,
     HealthModule,
   ],
 })
