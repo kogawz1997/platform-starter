@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, NotFoundException, TooManyRequestsException } from '@nestjs/common';
+import { BadRequestException, HttpException, HttpStatus, Injectable, NotFoundException } from '@nestjs/common';
 import { Decimal } from '@prisma/client/runtime/library';
 import { PrismaService } from '../../database/prisma.service';
 
@@ -56,7 +56,7 @@ export class RiskAlertsService {
     const cooldownMs = Number(process.env.RISK_SCAN_COOLDOWN_SECONDS ?? 45) * 1000;
     const retryAfterMs = this.lastScanAt + cooldownMs - now;
     if (retryAfterMs > 0) {
-      throw new TooManyRequestsException({ message: 'Risk scan is cooling down', retryAfter: Math.ceil(retryAfterMs / 1000) });
+      throw new HttpException({ message: 'Risk scan is cooling down', retryAfter: Math.ceil(retryAfterMs / 1000) }, HttpStatus.TOO_MANY_REQUESTS);
     }
     this.lastScanAt = now;
 
