@@ -38,6 +38,11 @@ export default function WithdrawPage() {
     }
   }
 
+  async function copyText(value: string, label: string) {
+    try { await navigator.clipboard.writeText(value); setMessage(`คัดลอก${label}แล้ว`); }
+    catch { setMessage(`คัดลอก${label}ไม่สำเร็จ`); }
+  }
+
   function chooseBank(id: string, source = banks) {
     setBankAccountId(id);
     const selected = source.find((item) => item.id === id);
@@ -72,9 +77,11 @@ export default function WithdrawPage() {
         <label style={labelStyle}>บัญชีถอนที่อนุมัติแล้ว<select value={bankAccountId} onChange={(e) => chooseBank(e.target.value)} style={inputStyle}><option value="">เลือกบัญชีถอน</option>{banks.map((item) => <option key={item.id} value={item.id} disabled={item.status !== 'ACTIVE'}>{item.bankName} / {item.accountNumber} {item.isPrimary ? '(หลัก)' : ''} {item.status !== 'ACTIVE' ? `- ${item.status}` : ''}</option>)}</select></label>
         {activeBanks.length === 0 && <div style={noticeStyle}>ยังไม่มีบัญชีถอนที่อนุมัติแล้ว ไปเพิ่มบัญชีและรอแอดมินตรวจสอบก่อน</div>}
         <a href="/bank-accounts" style={bankLinkStyle}>จัดการบัญชีถอนเงิน</a>
-        <label style={labelStyle}>ชื่อบัญชี<input value={accountName} readOnly placeholder="เลือกจากบัญชีที่บันทึกไว้" style={inputStyle} /></label>
-        <label style={labelStyle}>เลขบัญชี<input value={accountNumber} readOnly placeholder="เลือกจากบัญชีที่บันทึกไว้" style={inputStyle} /></label>
-        <label style={labelStyle}>ธนาคาร<input value={bankName} readOnly placeholder="เลือกจากบัญชีที่บันทึกไว้" style={inputStyle} /></label>
+        <section style={accountBoxStyle}>
+          <InfoRow label="ชื่อบัญชี" value={accountName || '-'} />
+          <InfoRow label="เลขบัญชี" value={accountNumber || '-'} action={accountNumber ? <button type="button" onClick={() => copyText(accountNumber, 'เลขบัญชี')} style={copyButtonStyle}>คัดลอก</button> : null} />
+          <InfoRow label="ธนาคาร" value={bankName || '-'} action={bankName ? <button type="button" onClick={() => copyText(bankName, 'ชื่อธนาคาร')} style={copyButtonStyle}>คัดลอก</button> : null} />
+        </section>
         <label style={labelStyle}>หมายเหตุ<textarea value={note} onChange={(e) => setNote(e.target.value)} placeholder="รายละเอียดเพิ่มเติม ถ้ามี" style={{ ...inputStyle, minHeight: 92 }} /></label>
         <button type="submit" disabled={isSubmitting || activeBanks.length === 0} style={buttonStyle}>{isSubmitting ? 'กำลังส่ง...' : 'ส่งคำขอถอน'}</button>{message && <div style={noticeStyle}>{message}</div>}
       </form>
@@ -83,12 +90,13 @@ export default function WithdrawPage() {
   );
 }
 
+function InfoRow({ label, value, action }: { label: string; value: string; action?: React.ReactNode }) { return <div style={infoRowStyle}><div><span>{label}</span><strong>{value}</strong></div>{action}</div>; }
 const pageStyle = { minHeight: '100vh', background: '#080808', color: '#fff', padding: '18px 12px calc(44px + env(safe-area-inset-bottom))', display: 'grid', gap: 14, width: '100%', maxWidth: 920, margin: '0 auto', overflowX: 'hidden' as const } as const;
 const backStyle = { color: '#f5c542', textDecoration: 'none', fontWeight: 900 } as const;
 const eyebrowStyle = { margin: 0, opacity: 0.66, fontSize: 14 } as const;
 const titleStyle = { margin: 0, fontSize: 'clamp(34px, 11vw, 58px)', lineHeight: 0.98, letterSpacing: -1.2, overflowWrap: 'anywhere' as const };
 const mutedStyle = { margin: 0, opacity: 0.76, lineHeight: 1.55 } as const;
-const heroCardStyle = { border: '1px solid rgba(255,255,255,0.12)', borderRadius: 28, padding: 16, background: '#181818', display: 'grid', gap: 8, minWidth: 0, overflow: 'hidden' as const };
+const heroCardStyle = { border: '1px solid rgba(255,255,255,0.12)', borderRadius: 24, padding: 14, background: '#181818', display: 'grid', gap: 6, minWidth: 0, overflow: 'hidden' as const };
 const cardStyle = { border: '1px solid rgba(255,255,255,0.12)', borderRadius: 24, padding: 16, background: '#181818', display: 'grid', gap: 12, minWidth: 0, overflow: 'hidden' as const };
 const amountTitleStyle = { margin: '4px 0', fontSize: 'clamp(30px, 9vw, 50px)', lineHeight: 1, overflowWrap: 'anywhere' as const };
 const sectionTitleStyle = { margin: '14px 0 0', fontSize: 'clamp(24px, 7vw, 34px)' } as const;
@@ -97,3 +105,6 @@ const inputStyle = { display: 'block', width: '100%', padding: '13px 14px', marg
 const buttonStyle = { padding: 14, minHeight: 48, borderRadius: 16, cursor: 'pointer', background: '#f5c542', color: '#111', border: 0, fontWeight: 900, width: '100%' } as const;
 const noticeStyle = { border: '1px solid rgba(255,255,255,0.12)', borderRadius: 16, padding: 12, background: 'rgba(255,255,255,0.07)', overflowWrap: 'anywhere' as const };
 const bankLinkStyle = { color: '#f5c542', textDecoration: 'none', fontWeight: 900 } as const;
+const accountBoxStyle = { border: '1px solid rgba(255,255,255,.10)', borderRadius: 18, padding: 12, background: 'rgba(255,255,255,.04)', display: 'grid', gap: 10, minWidth: 0 } as const;
+const infoRowStyle = { display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'center', flexWrap: 'wrap' as const, border: '1px solid rgba(255,255,255,.10)', borderRadius: 14, padding: 10, background: 'rgba(255,255,255,.04)', overflowWrap: 'anywhere' as const };
+const copyButtonStyle = { border: '1px solid rgba(245,197,66,.35)', borderRadius: 999, padding: '8px 10px', background: 'rgba(245,197,66,.14)', color: '#f5c542', fontWeight: 900, cursor: 'pointer' } as const;
