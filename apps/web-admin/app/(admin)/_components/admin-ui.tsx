@@ -12,18 +12,18 @@ export function AdminPage({ eyebrow, title, description, actions, children }: Pa
 }
 
 export function AdminCard({ title, description, action, children }: CardProps) {
-  return <section style={cardStyle}>{(title || description || action) && <div style={cardHeadStyle}><div>{title && <h2 style={cardTitleStyle}>{title}</h2>}{description && <p style={mutedStyle}>{description}</p>}</div>{action}</div>}<div style={stackStyle}>{children}</div></section>;
+  return <div style={cardStyle}>{(title || description || action) && <div style={cardHeadStyle}><div>{title && <h2 style={cardTitleStyle}>{title}</h2>}{description && <p style={mutedStyle}>{description}</p>}</div>{action}</div>}<div style={stackStyle}>{children}</div></div>;
 }
 
 export function AdminMetric({ title, value, helper }: MetricProps) {
-  return <section style={metricStyle}><p style={metricLabelStyle}>{title}</p><strong style={metricValueStyle}>{value}</strong>{helper && <span style={metricHelperStyle}>{helper}</span>}</section>;
+  return <div style={metricStyle}><p style={metricLabelStyle}>{title}</p><strong style={metricValueStyle}>{value}</strong>{helper && <span style={metricHelperStyle}>{helper}</span>}</div>;
 }
 
-export function AdminMetricGrid({ children }: { children: ReactNode }) { return <section style={metricGridStyle}>{children}</section>; }
-export function AdminGrid({ children }: { children: ReactNode }) { return <section style={gridStyle}>{children}</section>; }
+export function AdminMetricGrid({ children }: { children: ReactNode }) { return <div style={metricGridStyle}>{children}</div>; }
+export function AdminGrid({ children }: { children: ReactNode }) { return <div style={gridStyle}>{children}</div>; }
 export function AdminStack({ children }: { children: ReactNode }) { return <div style={stackStyle}>{children}</div>; }
 export function AdminRow({ children }: { children: ReactNode }) { return <div style={rowStyle}>{children}</div>; }
-export function AdminToolbar({ children }: { children: ReactNode }) { return <section style={toolbarStyle}>{children}</section>; }
+export function AdminToolbar({ children }: { children: ReactNode }) { return <div style={toolbarStyle}>{children}</div>; }
 export function AdminNotice({ children }: { children: ReactNode }) { return <div style={noticeStyle}>{children}</div>; }
 export function AdminEmpty({ children }: { children: ReactNode }) { return <div style={emptyStyle}>{children}</div>; }
 
