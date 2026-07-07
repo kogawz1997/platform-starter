@@ -62,12 +62,13 @@ export class WithdrawalsService {
     return this.prisma.$transaction(async (tx) => {
       const request = await tx.withdrawalRequest.findUnique({ where: { id } });
       if (!request) throw new NotFoundException('Withdrawal request not found');
-      if (request.claimedBy && request.claimedBy !== adminUser.id) throw new ConflictException('ต้อง claim รายการก่อนดำเนินการ');
+      if (!request.claimedBy) throw new ConflictException('ต้อง claim รายการก่อนดำเนินการ');
+      if (request.claimedBy !== adminUser.id) throw new ConflictException('รายการนี้มีแอดมินคนอื่นกำลังตรวจอยู่');
       if (request.status !== 'PENDING') throw new ConflictException(`Withdrawal request already reviewed: ${request.status}`);
       const ledgerKey = `withdrawal:${request.id}:complete`;
       const existingLedger = await tx.walletLedger.findUnique({ where: { idempotencyKey: ledgerKey } });
       if (existingLedger) throw new ConflictException('Withdrawal ledger already exists');
-      const claim = await tx.withdrawalRequest.updateMany({ where: { id, status: 'PENDING' }, data: { status: 'COMPLETED', adminNote: dto.adminNote, reviewedBy: adminUser.id, reviewedAt: new Date(), claimedBy: null, claimedAt: null } });
+      const claim = await tx.withdrawalRequest.updateMany({ where: { id, status: 'PENDING', claimedBy: adminUser.id }, data: { status: 'COMPLETED', adminNote: dto.adminNote, reviewedBy: adminUser.id, reviewedAt: new Date(), claimedBy: null, claimedAt: null } });
       if (claim.count !== 1) throw new ConflictException('Withdrawal request already reviewed');
       const wallet = await tx.wallet.findUnique({ where: { userId: request.userId } });
       if (!wallet) throw new BadRequestException('Wallet not found');
@@ -86,9 +87,10 @@ export class WithdrawalsService {
     return this.prisma.$transaction(async (tx) => {
       const request = await tx.withdrawalRequest.findUnique({ where: { id } });
       if (!request) throw new NotFoundException('Withdrawal request not found');
-      if (request.claimedBy && request.claimedBy !== adminUser.id) throw new ConflictException('ต้อง claim รายการก่อนปฏิเสธ');
+      if (!request.claimedBy) throw new ConflictException('ต้อง claim รายการก่อนปฏิเสธ');
+      if (request.claimedBy !== adminUser.id) throw new ConflictException('รายการนี้มีแอดมินคนอื่นกำลังตรวจอยู่');
       if (request.status !== 'PENDING') throw new ConflictException(`Withdrawal request already reviewed: ${request.status}`);
-      const claim = await tx.withdrawalRequest.updateMany({ where: { id, status: 'PENDING' }, data: { status: 'REJECTED', adminNote: dto.adminNote, reviewedBy: adminUser.id, reviewedAt: new Date(), claimedBy: null, claimedAt: null } });
+      const claim = await tx.withdrawalRequest.updateMany({ where: { id, status: 'PENDING', claimedBy: adminUser.id }, data: { status: 'REJECTED', adminNote: dto.adminNote, reviewedBy: adminUser.id, reviewedAt: new Date(), claimedBy: null, claimedAt: null } });
       if (claim.count !== 1) throw new ConflictException('Withdrawal request already reviewed');
       const wallet = await tx.wallet.findUnique({ where: { userId: request.userId } });
       if (!wallet) throw new BadRequestException('Wallet not found');
