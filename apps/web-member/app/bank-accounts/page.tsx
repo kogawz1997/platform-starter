@@ -5,9 +5,11 @@ import { memberApiFetch } from '../member-api';
 
 type BankItem = { id: string; bankName: string; accountName: string; accountNumber: string; isPrimary: boolean; status: string; adminNote?: string | null };
 
+const THAI_BANKS = ['ธนาคารกสิกรไทย', 'ธนาคารไทยพาณิชย์', 'ธนาคารกรุงเทพ', 'ธนาคารกรุงไทย', 'ธนาคารกรุงศรีอยุธยา', 'ธนาคารทหารไทยธนชาต', 'ธนาคารออมสิน', 'ธนาคารอาคารสงเคราะห์', 'ธนาคารเพื่อการเกษตรและสหกรณ์การเกษตร', 'ธนาคารยูโอบี', 'ธนาคารซีไอเอ็มบีไทย', 'ธนาคารเกียรตินาคินภัทร', 'ธนาคารแลนด์ แอนด์ เฮ้าส์', 'ธนาคารไอซีบีซี ไทย', 'ธนาคารไทยเครดิต'];
+
 export default function MemberBankAccountsPage() {
   const [items, setItems] = useState<BankItem[]>([]);
-  const [bankName, setBankName] = useState('');
+  const [bankName, setBankName] = useState(THAI_BANKS[0]);
   const [accountName, setAccountName] = useState('');
   const [accountNumber, setAccountNumber] = useState('');
   const [message, setMessage] = useState('');
@@ -25,12 +27,13 @@ export default function MemberBankAccountsPage() {
 
   async function addBank(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (items.length > 0) { setMessage('สมาชิก 1 คนเพิ่มบัญชีถอนได้ 1 บัญชีเท่านั้น'); return; }
     if (!bankName.trim() || !accountName.trim() || !accountNumber.trim()) { setMessage('กรอกข้อมูลบัญชีให้ครบก่อน'); return; }
     setBusy(true); setMessage('กำลังเพิ่มบัญชี...');
     const res = await memberApiFetch('/member/bank-accounts', { method: 'POST', body: JSON.stringify({ bankName, accountName, accountNumber }) });
     const data = await res.json().catch(() => null); setBusy(false);
     if (!res.ok) { setMessage(data?.message ?? 'เพิ่มบัญชีไม่สำเร็จ'); return; }
-    setItems((current) => [data.item, ...current]); setBankName(''); setAccountName(''); setAccountNumber(''); setMessage('เพิ่มบัญชีแล้ว รอแอดมินตรวจสอบ');
+    setItems((current) => [data.item, ...current]); setBankName(THAI_BANKS[0]); setAccountName(''); setAccountNumber(''); setMessage('เพิ่มบัญชีแล้ว รอแอดมินตรวจสอบ');
   }
 
   async function setPrimary(id: string) {
@@ -47,16 +50,17 @@ export default function MemberBankAccountsPage() {
       <a href="/" style={backStyle}>← หน้าแรก</a>
       <p style={eyebrowStyle}>Wallet</p>
       <h1 style={titleStyle}>บัญชีถอนเงิน</h1>
-      <p style={mutedStyle}>เพิ่มบัญชีธนาคารของคุณ และรอแอดมินตรวจสอบก่อนใช้ถอนเงิน</p>
+      <p style={mutedStyle}>สมาชิก 1 คนเพิ่มบัญชีถอนได้ 1 บัญชี และชื่อบัญชีต้องตรงกับชื่อบัญชีสมาชิก</p>
 
-      <form onSubmit={addBank} style={cardStyle}>
+      {items.length === 0 && <form onSubmit={addBank} style={cardStyle}>
         <h2 style={{ margin: 0 }}>เพิ่มบัญชีใหม่</h2>
-        <label style={labelStyle}>ธนาคาร<input value={bankName} onChange={(e) => setBankName(e.target.value)} placeholder="เช่น กสิกรไทย" style={inputStyle} /></label>
-        <label style={labelStyle}>ชื่อบัญชี<input value={accountName} onChange={(e) => setAccountName(e.target.value)} placeholder="ต้องตรงกับชื่อผู้ใช้งาน" style={inputStyle} /></label>
+        <label style={labelStyle}>ธนาคาร<select value={bankName} onChange={(e) => setBankName(e.target.value)} style={inputStyle}>{THAI_BANKS.map((bank) => <option key={bank} value={bank}>{bank}</option>)}</select></label>
+        <label style={labelStyle}>ชื่อบัญชี<input value={accountName} onChange={(e) => setAccountName(e.target.value)} placeholder="ต้องตรงกับชื่อบัญชีสมาชิก" style={inputStyle} /></label>
         <label style={labelStyle}>เลขบัญชี<input value={accountNumber} onChange={(e) => setAccountNumber(e.target.value)} placeholder="เลขบัญชี" inputMode="numeric" style={inputStyle} /></label>
         <button type="submit" disabled={busy} style={primaryButtonStyle}>{busy ? 'กำลังเพิ่ม...' : 'เพิ่มบัญชี'}</button>
-      </form>
+      </form>}
 
+      {items.length > 0 && <div style={noticeStyle}>เพิ่มบัญชีแล้ว หากต้องการเปลี่ยนบัญชีให้ติดต่อแอดมิน</div>}
       {message && <div style={noticeStyle}>{message}</div>}
 
       <section style={listStyle}>
