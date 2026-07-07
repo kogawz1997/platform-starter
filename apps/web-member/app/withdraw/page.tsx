@@ -1,10 +1,11 @@
 'use client';
 
 import { FormEvent, useEffect, useState } from 'react';
-import { API_URL } from '../site-settings';
+import { memberApiFetch } from '../member-api';
 
 type WalletResponse = { currency: string; availableBalance: string; lockedBalance: string; status: string };
 type WithdrawalItem = { id: string; amount: string; currency: string; status: string; method?: string | null; accountName?: string | null; accountNumber?: string | null; bankName?: string | null; note?: string | null; adminNote?: string | null; createdAt: string };
+type BankItem = { id: string; bankName: string; accountName: string; accountNumber: string; isPrimary: boolean; status: string };
 
 export default function WithdrawPage() {
   const [wallet, setWallet] = useState<WalletResponse | null>(null);
@@ -13,6 +14,8 @@ export default function WithdrawPage() {
   const [accountName, setAccountName] = useState('');
   const [accountNumber, setAccountNumber] = useState('');
   const [bankName, setBankName] = useState('');
+  const [bankAccountId, setBankAccountId] = useState('');
+  const [banks, setBanks] = useState<BankItem[]>([]);
   const [note, setNote] = useState('');
   const [items, setItems] = useState<WithdrawalItem[]>([]);
   const [message, setMessage] = useState('');
@@ -21,27 +24,36 @@ export default function WithdrawPage() {
   useEffect(() => { loadAll(); }, []);
 
   async function loadAll() {
-    const token = window.localStorage.getItem('member_access_token');
-    if (!token) { setMessage('กรุณาเข้าสู่ระบบก่อนทำรายการ'); return; }
-    const [walletRes, listRes] = await Promise.all([
-      fetch(`${API_URL}/member/wallet`, { headers: { Authorization: `Bearer ${token}` } }),
-      fetch(`${API_URL}/member/withdrawals`, { headers: { Authorization: `Bearer ${token}` } }),
-    ]);
+    const [walletRes, listRes, bankRes] = await Promise.all([memberApiFetch('/member/wallet'), memberApiFetch('/member/withdrawals'), memberApiFetch('/member/bank-accounts')]);
     const walletData = await walletRes.json().catch(() => null);
     const listData = await listRes.json().catch(() => null);
+    const bankData = await bankRes.json().catch(() => null);
     if (walletRes.ok) setWallet(walletData);
     if (listRes.ok) setItems(listData.items ?? []);
+    if (bankRes.ok) {
+      const nextBanks = bankData.items ?? [];
+      setBanks(nextBanks);
+      const primary = nextBanks.find((item: BankItem) => item.isPrimary && item.status === 'ACTIVE') ?? nextBanks.find((item: BankItem) => item.status === 'ACTIVE');
+      if (primary && !bankAccountId) chooseBank(primary.id, nextBanks);
+    }
+  }
+
+  function chooseBank(id: string, source = banks) {
+    setBankAccountId(id);
+    const selected = source.find((item) => item.id === id);
+    if (!selected) return;
+    setBankName(selected.bankName);
+    setAccountName(selected.accountName);
+    setAccountNumber(selected.accountNumber);
   }
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const parsedAmount = Number(amount.replace(/,/g, '').trim());
     if (!Number.isFinite(parsedAmount) || parsedAmount <= 0) { setMessage('กรุณาใส่จำนวนเงินมากกว่า 0'); return; }
-    if (!accountName || !accountNumber || !bankName) { setMessage('กรุณากรอกข้อมูลบัญชีรับเงินให้ครบ'); return; }
-    const token = window.localStorage.getItem('member_access_token');
-    if (!token) { setMessage('กรุณาเข้าสู่ระบบก่อนทำรายการ'); return; }
+    if (!accountName || !accountNumber || !bankName) { setMessage('กรุณาเลือกหรือกรอกบัญชีรับเงินให้ครบ'); return; }
     setIsSubmitting(true); setMessage('กำลังส่งคำขอถอน...');
-    const res = await fetch(`${API_URL}/member/withdrawals`, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }, body: JSON.stringify({ amount: parsedAmount, method, accountName, accountNumber, bankName, note }) });
+    const res = await memberApiFetch('/member/withdrawals', { method: 'POST', body: JSON.stringify({ amount: parsedAmount, method, accountName, accountNumber, bankName, note }) });
     const data = await res.json().catch(() => null); setIsSubmitting(false);
     if (!res.ok) { setMessage(data?.message ?? 'ส่งคำขอถอนไม่สำเร็จ'); return; }
     setAmount(''); setNote(''); setItems((current) => [data, ...current]); setMessage('ส่งคำขอถอนสำเร็จ รอแอดมินดำเนินการ'); await loadAll();
@@ -54,6 +66,8 @@ export default function WithdrawPage() {
       <form onSubmit={submit} style={cardStyle}>
         <label style={labelStyle}>จำนวนเงิน<input value={amount} onChange={(e) => setAmount(e.target.value)} inputMode="decimal" placeholder="เช่น 100" style={inputStyle} /></label>
         <label style={labelStyle}>ช่องทาง<select value={method} onChange={(e) => setMethod(e.target.value)} style={inputStyle}><option value="bank_transfer">โอนธนาคาร</option><option value="manual">Manual</option></select></label>
+        <label style={labelStyle}>บัญชีถอนที่บันทึกไว้<select value={bankAccountId} onChange={(e) => chooseBank(e.target.value)} style={inputStyle}><option value="">เลือกบัญชี หรือกรอกเอง</option>{banks.map((item) => <option key={item.id} value={item.id} disabled={item.status !== 'ACTIVE'}>{item.bankName} / {item.accountNumber} {item.isPrimary ? '(หลัก)' : ''} {item.status !== 'ACTIVE' ? `- ${item.status}` : ''}</option>)}</select></label>
+        <a href="/bank-accounts" style={bankLinkStyle}>จัดการบัญชีถอนเงิน</a>
         <label style={labelStyle}>ชื่อบัญชี<input value={accountName} onChange={(e) => setAccountName(e.target.value)} placeholder="ชื่อบัญชีรับเงิน" style={inputStyle} /></label>
         <label style={labelStyle}>เลขบัญชี<input value={accountNumber} onChange={(e) => setAccountNumber(e.target.value)} placeholder="เลขบัญชี" style={inputStyle} /></label>
         <label style={labelStyle}>ธนาคาร<input value={bankName} onChange={(e) => setBankName(e.target.value)} placeholder="ชื่อธนาคาร" style={inputStyle} /></label>
@@ -78,3 +92,4 @@ const labelStyle = { display: 'grid', gap: 8, fontWeight: 800 } as const;
 const inputStyle = { display: 'block', width: '100%', padding: '13px 14px', marginTop: 6, borderRadius: 14, border: '1px solid rgba(255,255,255,0.16)', background: '#242424', color: '#fff', boxSizing: 'border-box' } as const;
 const buttonStyle = { padding: 14, borderRadius: 16, cursor: 'pointer', background: '#f5c542', color: '#111', border: 0, fontWeight: 900 } as const;
 const noticeStyle = { border: '1px solid rgba(255,255,255,0.12)', borderRadius: 16, padding: 12, background: 'rgba(255,255,255,0.07)' } as const;
+const bankLinkStyle = { color: '#f5c542', textDecoration: 'none', fontWeight: 900 } as const;
