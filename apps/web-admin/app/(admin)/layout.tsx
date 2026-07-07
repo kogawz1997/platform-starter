@@ -8,7 +8,7 @@ const navGroups = [
   { title: 'Overview', items: [['Dashboard', '/dashboard'], ['Finance', '/finance']] },
   { title: 'Queues', items: [['Top-ups', '/topups'], ['Withdrawals', '/withdrawals']] },
   { title: 'Money', items: [['Wallets', '/wallets'], ['Ledgers', '/ledgers'], ['Reports', '/reports'], ['Exports', '/exports']] },
-  { title: 'Admin', items: [['Activity', '/activity'], ['Member Detail', '/member-detail'], ['Bank Accounts', '/bank-accounts'], ['Settings', '/settings']] },
+  { title: 'Admin', items: [['Members', '/members'], ['Activity', '/activity'], ['Member Detail', '/member-detail'], ['Bank Accounts', '/bank-accounts'], ['Settings', '/settings']] },
 ];
 
 export default function AdminProtectedLayout({ children }: { children: ReactNode }) {
@@ -23,13 +23,7 @@ export default function AdminProtectedLayout({ children }: { children: ReactNode
     const hasToken = Boolean(token);
     setIsLoggedIn(hasToken);
     setReady(true);
-
-    if (!token) {
-      const next = encodeURIComponent(`${pathname}${window.location.search}`);
-      window.location.replace(`/login?next=${next}`);
-      return;
-    }
-
+    if (!token) { const next = encodeURIComponent(`${pathname}${window.location.search}`); window.location.replace(`/login?next=${next}`); return; }
     loadQueueCount();
     const interval = window.setInterval(loadQueueCount, 60000);
     return () => window.clearInterval(interval);
@@ -41,18 +35,8 @@ export default function AdminProtectedLayout({ children }: { children: ReactNode
     if (res.ok && data) setQueueCount({ topups: Number(data.topUps?.count ?? 0), withdrawals: Number(data.withdrawals?.count ?? 0) });
   }
 
-  function logout() {
-    clearAdminSession();
-    window.location.href = '/login';
-  }
-
-  function badgeFor(href: string) {
-    if (href === '/topups' && queueCount.topups > 0) return queueCount.topups;
-    if (href === '/withdrawals' && queueCount.withdrawals > 0) return queueCount.withdrawals;
-    if (href === '/dashboard' && queueCount.topups + queueCount.withdrawals > 0) return queueCount.topups + queueCount.withdrawals;
-    return 0;
-  }
-
+  function logout() { clearAdminSession(); window.location.href = '/login'; }
+  function badgeFor(href: string) { if (href === '/topups' && queueCount.topups > 0) return queueCount.topups; if (href === '/withdrawals' && queueCount.withdrawals > 0) return queueCount.withdrawals; if (href === '/dashboard' && queueCount.topups + queueCount.withdrawals > 0) return queueCount.topups + queueCount.withdrawals; return 0; }
   if (!ready || !isLoggedIn) return <main className="admin-shell" style={{ minHeight: '100dvh', display: 'grid', placeItems: 'center', color: '#fff' }}>กำลังตรวจสอบสิทธิ์...</main>;
 
   return (
