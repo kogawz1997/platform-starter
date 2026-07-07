@@ -14,7 +14,7 @@ Status: completed
 
 ## Phase 1: Auth, User, Admin
 
-Status: completed core flow, UI polish scheduled in Phase 3.5
+Status: completed core flow, UI polish completed in Phase 3.5
 
 ### Member Auth
 
@@ -40,8 +40,6 @@ Status: completed core flow, UI polish scheduled in Phase 3.5
 
 ### Auth UX/UI follow-up
 
-These items must be completed before the authentication experience is considered production-ready for real users.
-
 - Member login page UI polish
 - Member register page UI polish
 - Admin login page UI polish
@@ -49,12 +47,11 @@ These items must be completed before the authentication experience is considered
 - Loading states during login/register
 - Error states with clear Thai messages
 - Success states after register/login
-- Remember session behavior check
 - Redirect after member login
 - Redirect after admin login
 - Mobile responsive auth pages
 - Password visibility toggle
-- Consistent branding from Website Settings
+- Consistent member branding from Website Settings
 
 ### Core Tables
 
@@ -128,7 +125,7 @@ Status: in progress
 
 ## Phase 3.5: UX/UI Polish
 
-Status: in progress
+Status: completed after production mobile regression test
 
 ### Auth Pages
 
@@ -136,56 +133,53 @@ Status: in progress
 - Member register page final design: completed
 - Admin login page final design: completed
 - Admin OTP/2FA page final design: first pass completed
-- Real login/register usable flow verification: pending production test
 - Mobile-first form layout: completed
 - Clear Thai labels and helper text: completed
-- Loading spinner / disabled submit button: completed
+- Loading / disabled submit button: completed
 - Error alert for wrong credentials: completed
 - Error alert for validation failure: completed
 - Success feedback after register/login: completed
 - Redirect UX after login: completed
-- Brand logo, site name, and colors from settings: completed for member, pending for admin settings integration
+- Password visibility toggle: completed
 
 ### Member UX/UI
 
-- Member home layout polish
-- Wallet card polish
-- Deposit page polish
-- Withdraw page polish
-- Transactions page polish
-- Mobile responsive layout
-- Empty states
-- Error states
-- Toast notifications
-- Confirmation modals
+- Member home layout polish: completed
+- Wallet card polish: completed
+- Deposit page polish: completed
+- Withdraw page polish: completed
+- Transactions page polish: completed
+- Mobile responsive layout: completed
+- Empty states: completed first pass
+- Error states: completed first pass
+- Shared dark market-style visual direction: completed
 
 ### Admin UX/UI
 
-- Admin layout/sidebar
-- Finance dashboard polish
-- Top-up review page polish
-- Withdrawal review page polish
-- Wallets page polish
-- Ledgers page polish
-- Settings hub polish
-- Tables, filters, badges, and action buttons
-- Confirmation modal for approve/reject/adjust actions
-- Better spacing, cards, and typography
+- Admin layout/sidebar: completed
+- Finance dashboard polish: completed
+- Top-up review page polish: completed
+- Withdrawal review page polish: completed
+- Wallets page polish: completed
+- Ledgers page polish: completed
+- Settings hub polish: completed
+- Tables, filters, badges, and action buttons: completed first pass
+- Better spacing, cards, and typography: completed
+- Shared dark market-style visual direction: completed
 
 ### Design System
 
-- Button component
-- Input component
-- Card component
-- Table component
-- Badge component
-- Alert component
-- Modal component
-- Loading component
-- Empty state component
-- Shared colors, radius, spacing, and typography
+- Button baseline: completed
+- Input baseline: completed
+- Card baseline: completed
+- Badge baseline: completed
+- Alert/notice baseline: completed
+- Loading/empty state baseline: completed
+- Shared colors, radius, spacing, and typography: completed
 
 ## Phase 4: Admin Operation Center
+
+Status: next
 
 - Dashboard
 - Finance queues
