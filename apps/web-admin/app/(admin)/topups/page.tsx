@@ -46,6 +46,8 @@ export default function AdminTopUpsPage() {
     const current = items.find((item) => item.id === id);
     if (!current?.claimedBy) { setMessage('ต้องกดรับงานก่อนตรวจรายการ'); return; }
     const nextStatus = action === 'confirm' ? 'APPROVED' : 'REJECTED';
+    const ok = window.confirm(action === 'confirm' ? `ยืนยันอนุมัติ topup ${formatMoney(current.amount)} ให้ ${current.user?.username ?? current.userId}?` : `ยืนยันปฏิเสธ topup ${formatMoney(current.amount)} ของ ${current.user?.username ?? current.userId}?`);
+    if (!ok) return;
     setBusyId(id); setMessage(action === 'confirm' ? 'กำลังอนุมัติ...' : 'กำลังปฏิเสธ...');
     const res = await adminApiFetch(`/admin/topups/${id}/${action}`, { method: 'POST', body: JSON.stringify({ adminNote: reviewNote }) });
     const data = await res.json().catch(() => null); setBusyId('');
