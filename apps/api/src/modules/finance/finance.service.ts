@@ -6,7 +6,11 @@ export class FinanceService {
   constructor(private readonly prisma: PrismaService) {}
 
   async getSummary() {
-    const [walletAgg, walletCount, topUpPending, withdrawalPending, recentLedgers, recentTopUps, recentWithdrawals] = await Promise.all([
+    const now = new Date();
+    const todayStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 0, 0, 0, 0));
+    const todayEnd = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 23, 59, 59, 999));
+
+    const [walletAgg, walletCount, topUpPending, withdrawalPending, recentLedgers, recentTopUps, recentWithdrawals, todayTopUps, todayWithdrawals] = await Promise.all([
       this.prisma.wallet.aggregate({ _sum: { balance: true, lockedBalance: true } }),
       this.prisma.wallet.count(),
       this.prisma.topUpRequest.count({ where: { status: 'PENDING' } }),
@@ -31,10 +35,22 @@ export class FinanceService {
         orderBy: { createdAt: 'desc' },
         take: 10,
       }),
+      this.prisma.topUpRequest.aggregate({
+        where: { status: 'APPROVED', reviewedAt: { gte: todayStart, lte: todayEnd } },
+        _sum: { amount: true },
+        _count: { _all: true },
+      }),
+      this.prisma.withdrawalRequest.aggregate({
+        where: { status: 'COMPLETED', reviewedAt: { gte: todayStart, lte: todayEnd } },
+        _sum: { amount: true },
+        _count: { _all: true },
+      }),
     ]);
 
     const totalBalance = walletAgg._sum.balance ?? 0;
     const totalLocked = walletAgg._sum.lockedBalance ?? 0;
+    const todayTopUpAmount = todayTopUps._sum.amount ?? 0;
+    const todayWithdrawalAmount = todayWithdrawals._sum.amount ?? 0;
 
     return {
       totals: {
@@ -44,6 +60,14 @@ export class FinanceService {
         totalAvailableBalance: (totalBalance as any).minus ? (totalBalance as any).minus(totalLocked as any).toString() : '0',
         pendingTopUps: topUpPending,
         pendingWithdrawals: withdrawalPending,
+      },
+      today: {
+        date: todayStart.toISOString().slice(0, 10),
+        topUpAmount: todayTopUpAmount.toString(),
+        topUpCount: todayTopUps._count._all,
+        withdrawalAmount: todayWithdrawalAmount.toString(),
+        withdrawalCount: todayWithdrawals._count._all,
+        netFlow: (todayTopUpAmount as any).minus ? (todayTopUpAmount as any).minus(todayWithdrawalAmount as any).toString() : '0',
       },
       queues: {
         topUps: recentTopUps.map((item) => this.formatRequest(item)),
