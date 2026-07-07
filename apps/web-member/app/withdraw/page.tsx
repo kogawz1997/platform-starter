@@ -41,7 +41,7 @@ export default function WithdrawPage() {
   function chooseBank(id: string, source = banks) {
     setBankAccountId(id);
     const selected = source.find((item) => item.id === id);
-    if (!selected) return;
+    if (!selected) { setBankName(''); setAccountName(''); setAccountNumber(''); return; }
     setBankName(selected.bankName);
     setAccountName(selected.accountName);
     setAccountNumber(selected.accountNumber);
@@ -50,29 +50,33 @@ export default function WithdrawPage() {
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const parsedAmount = Number(amount.replace(/,/g, '').trim());
+    const selected = banks.find((item) => item.id === bankAccountId && item.status === 'ACTIVE');
     if (!Number.isFinite(parsedAmount) || parsedAmount <= 0) { setMessage('กรุณาใส่จำนวนเงินมากกว่า 0'); return; }
-    if (!accountName || !accountNumber || !bankName) { setMessage('กรุณาเลือกหรือกรอกบัญชีรับเงินให้ครบ'); return; }
+    if (!selected) { setMessage('กรุณาเลือกบัญชีถอนเงินที่แอดมินอนุมัติแล้ว'); return; }
     setIsSubmitting(true); setMessage('กำลังส่งคำขอถอน...');
-    const res = await memberApiFetch('/member/withdrawals', { method: 'POST', body: JSON.stringify({ amount: parsedAmount, method, accountName, accountNumber, bankName, note }) });
+    const res = await memberApiFetch('/member/withdrawals', { method: 'POST', body: JSON.stringify({ amount: parsedAmount, method, accountName: selected.accountName, accountNumber: selected.accountNumber, bankName: selected.bankName, note }) });
     const data = await res.json().catch(() => null); setIsSubmitting(false);
     if (!res.ok) { setMessage(data?.message ?? 'ส่งคำขอถอนไม่สำเร็จ'); return; }
     setAmount(''); setNote(''); setItems((current) => [data, ...current]); setMessage('ส่งคำขอถอนสำเร็จ รอแอดมินดำเนินการ'); await loadAll();
   }
 
+  const activeBanks = banks.filter((item) => item.status === 'ACTIVE');
+
   return (
     <main style={pageStyle}>
-      <a href="/" style={backStyle}>← หน้าแรก</a><p style={eyebrowStyle}>Wallet</p><h1 style={titleStyle}>ถอนเงิน</h1><p style={mutedStyle}>สร้างคำขอถอน ระบบจะล็อกยอดไว้ก่อนจนกว่าแอดมินจะดำเนินการ</p>
+      <a href="/" style={backStyle}>← หน้าแรก</a><p style={eyebrowStyle}>Wallet</p><h1 style={titleStyle}>ถอนเงิน</h1><p style={mutedStyle}>ถอนเข้าบัญชีที่บันทึกไว้และผ่านการอนุมัติแล้วเท่านั้น</p>
       <section style={heroCardStyle}><p style={mutedStyle}>ยอดที่ถอนได้</p><h1 style={amountTitleStyle}>{wallet ? `${wallet.currency} ${Number(wallet.availableBalance).toLocaleString('th-TH', { minimumFractionDigits: 2 })}` : 'THB 0.00'}</h1>{wallet && <p style={mutedStyle}>Locked: {wallet.lockedBalance} / Status: {wallet.status}</p>}</section>
       <form onSubmit={submit} style={cardStyle}>
         <label style={labelStyle}>จำนวนเงิน<input value={amount} onChange={(e) => setAmount(e.target.value)} inputMode="decimal" placeholder="เช่น 100" style={inputStyle} /></label>
-        <label style={labelStyle}>ช่องทาง<select value={method} onChange={(e) => setMethod(e.target.value)} style={inputStyle}><option value="bank_transfer">โอนธนาคาร</option><option value="manual">Manual</option></select></label>
-        <label style={labelStyle}>บัญชีถอนที่บันทึกไว้<select value={bankAccountId} onChange={(e) => chooseBank(e.target.value)} style={inputStyle}><option value="">เลือกบัญชี หรือกรอกเอง</option>{banks.map((item) => <option key={item.id} value={item.id} disabled={item.status !== 'ACTIVE'}>{item.bankName} / {item.accountNumber} {item.isPrimary ? '(หลัก)' : ''} {item.status !== 'ACTIVE' ? `- ${item.status}` : ''}</option>)}</select></label>
+        <label style={labelStyle}>ช่องทาง<select value={method} onChange={(e) => setMethod(e.target.value)} style={inputStyle}><option value="bank_transfer">โอนธนาคาร</option></select></label>
+        <label style={labelStyle}>บัญชีถอนที่อนุมัติแล้ว<select value={bankAccountId} onChange={(e) => chooseBank(e.target.value)} style={inputStyle}><option value="">เลือกบัญชีถอน</option>{banks.map((item) => <option key={item.id} value={item.id} disabled={item.status !== 'ACTIVE'}>{item.bankName} / {item.accountNumber} {item.isPrimary ? '(หลัก)' : ''} {item.status !== 'ACTIVE' ? `- ${item.status}` : ''}</option>)}</select></label>
+        {activeBanks.length === 0 && <div style={noticeStyle}>ยังไม่มีบัญชีถอนที่อนุมัติแล้ว ไปเพิ่มบัญชีและรอแอดมินตรวจสอบก่อน</div>}
         <a href="/bank-accounts" style={bankLinkStyle}>จัดการบัญชีถอนเงิน</a>
-        <label style={labelStyle}>ชื่อบัญชี<input value={accountName} onChange={(e) => setAccountName(e.target.value)} placeholder="ชื่อบัญชีรับเงิน" style={inputStyle} /></label>
-        <label style={labelStyle}>เลขบัญชี<input value={accountNumber} onChange={(e) => setAccountNumber(e.target.value)} placeholder="เลขบัญชี" style={inputStyle} /></label>
-        <label style={labelStyle}>ธนาคาร<input value={bankName} onChange={(e) => setBankName(e.target.value)} placeholder="ชื่อธนาคาร" style={inputStyle} /></label>
+        <label style={labelStyle}>ชื่อบัญชี<input value={accountName} readOnly placeholder="เลือกจากบัญชีที่บันทึกไว้" style={inputStyle} /></label>
+        <label style={labelStyle}>เลขบัญชี<input value={accountNumber} readOnly placeholder="เลือกจากบัญชีที่บันทึกไว้" style={inputStyle} /></label>
+        <label style={labelStyle}>ธนาคาร<input value={bankName} readOnly placeholder="เลือกจากบัญชีที่บันทึกไว้" style={inputStyle} /></label>
         <label style={labelStyle}>หมายเหตุ<textarea value={note} onChange={(e) => setNote(e.target.value)} placeholder="รายละเอียดเพิ่มเติม ถ้ามี" style={{ ...inputStyle, minHeight: 92 }} /></label>
-        <button type="submit" disabled={isSubmitting} style={buttonStyle}>{isSubmitting ? 'กำลังส่ง...' : 'ส่งคำขอถอน'}</button>{message && <div style={noticeStyle}>{message}</div>}
+        <button type="submit" disabled={isSubmitting || activeBanks.length === 0} style={buttonStyle}>{isSubmitting ? 'กำลังส่ง...' : 'ส่งคำขอถอน'}</button>{message && <div style={noticeStyle}>{message}</div>}
       </form>
       <h2 style={sectionTitleStyle}>ประวัติถอนเงิน</h2><div style={{ display: 'grid', gap: 12 }}>{items.map((item) => <section key={item.id} style={cardStyle}><strong>{item.currency} {Number(item.amount).toLocaleString('th-TH', { minimumFractionDigits: 2 })}</strong><p style={mutedStyle}>Status: {item.status}</p><p style={mutedStyle}>บัญชี: {item.bankName || '-'} / {item.accountNumber || '-'}</p>{item.adminNote && <p style={mutedStyle}>Admin note: {item.adminNote}</p>}</section>)}{items.length === 0 && <div style={noticeStyle}>ยังไม่มีรายการ</div>}</div>
     </main>
