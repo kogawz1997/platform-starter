@@ -26,21 +26,24 @@ async function main() {
     });
   }
 
-  const superAdmin = await prisma.role.findFirst({ where: { code: { in: ['super_admin', 'SUPER_ADMIN', 'owner', 'OWNER'] } } });
-  if (superAdmin) {
-    const savedPermissions = await prisma.permission.findMany({ where: { code: { in: PERMISSIONS.map((item) => item.code) } } });
+  const savedPermissions = await prisma.permission.findMany({ where: { code: { in: PERMISSIONS.map((item) => item.code) } } });
+  const explicitAdminRole = await prisma.role.findFirst({ where: { code: { in: ['super_admin', 'SUPER_ADMIN', 'owner', 'OWNER'] } } });
+  const wildcardRole = await prisma.role.findFirst({ where: { permissions: { some: { permission: { code: '*' } } } } });
+  const targetRole = explicitAdminRole ?? wildcardRole;
+
+  if (targetRole) {
     for (const permission of savedPermissions) {
       await prisma.rolePermission.upsert({
-        where: { roleId_permissionId: { roleId: superAdmin.id, permissionId: permission.id } },
+        where: { roleId_permissionId: { roleId: targetRole.id, permissionId: permission.id } },
         update: {},
-        create: { roleId: superAdmin.id, permissionId: permission.id },
+        create: { roleId: targetRole.id, permissionId: permission.id },
       });
     }
-    console.log(`Seeded admin access permissions and attached them to role ${superAdmin.code}`);
+    console.log(`Seeded admin access permissions and attached them to role ${targetRole.code}`);
     return;
   }
 
-  console.log('Seeded admin access permissions. No default super admin role was found, so no role permissions were attached.');
+  console.log('Seeded admin access permissions. No default admin or wildcard role was found, so no role permissions were attached.');
 }
 
 main()
