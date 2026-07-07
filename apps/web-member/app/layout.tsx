@@ -1,5 +1,6 @@
 import type { Viewport } from 'next';
 import './globals.css';
+import MemberChrome from './member-chrome';
 
 export const viewport: Viewport = {
   width: 'device-width',
@@ -40,7 +41,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             line-height: 1 !important;
           }
         `}</style>
-        {children}
+        <MemberChrome>{children}</MemberChrome>
       </body>
     </html>
   );
