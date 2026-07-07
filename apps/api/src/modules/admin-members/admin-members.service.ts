@@ -7,44 +7,37 @@ const MEMBER_STATUSES = ['ACTIVE', 'SUSPENDED', 'LOCKED', 'CLOSED'] as const;
 export class AdminMembersService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async getMemberDetail(id: string) {
-    const user = await this.prisma.user.findUnique({
-      where: { id },
-      include: { profile: true, wallet: true },
-    });
-    if (!user) throw new NotFoundException('Member not found');
+  async listMembers(search?: string, status?: string) {
+    const q = search?.trim();
+    const where: any = {};
+    if (status && status !== 'ALL') {
+      if (!MEMBER_STATUSES.includes(status as any)) throw new BadRequestException('Invalid member status');
+      where.status = status;
+    }
+    if (q) {
+      where.OR = [
+        { username: { contains: q, mode: 'insensitive' } },
+        { phone: { contains: q, mode: 'insensitive' } },
+        { email: { contains: q, mode: 'insensitive' } },
+        ...(q.length >= 8 ? [{ id: { startsWith: q } }] : []),
+      ];
+    }
+    const items = await this.prisma.user.findMany({ where, include: { profile: true, wallet: true }, orderBy: { createdAt: 'desc' }, take: 200 });
+    return { items: items.map((user) => ({ id: user.id, shortId: user.id.slice(0, 8), username: user.username, phone: user.phone, email: user.email, status: user.status, displayName: user.profile?.displayName ?? null, balance: user.wallet?.balance?.toString?.() ?? '0', lockedBalance: user.wallet?.lockedBalance?.toString?.() ?? '0', availableBalance: user.wallet ? user.wallet.balance.minus(user.wallet.lockedBalance).toString() : '0', createdAt: user.createdAt, lastLoginAt: user.lastLoginAt })) };
+  }
 
+  async getMemberDetail(id: string) {
+    const user = await this.prisma.user.findUnique({ where: { id }, include: { profile: true, wallet: true } });
+    if (!user) throw new NotFoundException('Member not found');
     const [topUps, withdrawals, ledgers, activity] = await Promise.all([
       this.prisma.topUpRequest.findMany({ where: { userId: id }, orderBy: { createdAt: 'desc' }, take: 20 }),
       this.prisma.withdrawalRequest.findMany({ where: { userId: id }, orderBy: { createdAt: 'desc' }, take: 20 }),
       this.prisma.walletLedger.findMany({ where: { userId: id }, orderBy: { createdAt: 'desc' }, take: 50, include: { createdByAdmin: { select: { id: true, username: true, email: true } } } }),
       this.prisma.adminAuditLog.findMany({ where: { targetId: id }, orderBy: { createdAt: 'desc' }, take: 20, include: { adminUser: { select: { id: true, username: true, email: true } } } }),
     ]);
-
     return {
-      user: {
-        id: user.id,
-        shortId: user.id.slice(0, 8),
-        username: user.username,
-        phone: user.phone,
-        email: user.email,
-        status: user.status,
-        phoneVerifiedAt: user.phoneVerifiedAt,
-        emailVerifiedAt: user.emailVerifiedAt,
-        lastLoginAt: user.lastLoginAt,
-        createdAt: user.createdAt,
-        updatedAt: user.updatedAt,
-        profile: user.profile,
-      },
-      wallet: user.wallet ? {
-        id: user.wallet.id,
-        currency: user.wallet.currency,
-        balance: user.wallet.balance.toString(),
-        lockedBalance: user.wallet.lockedBalance.toString(),
-        availableBalance: user.wallet.balance.minus(user.wallet.lockedBalance).toString(),
-        status: user.wallet.status,
-        updatedAt: user.wallet.updatedAt,
-      } : null,
+      user: { id: user.id, shortId: user.id.slice(0, 8), username: user.username, phone: user.phone, email: user.email, status: user.status, phoneVerifiedAt: user.phoneVerifiedAt, emailVerifiedAt: user.emailVerifiedAt, lastLoginAt: user.lastLoginAt, createdAt: user.createdAt, updatedAt: user.updatedAt, profile: user.profile },
+      wallet: user.wallet ? { id: user.wallet.id, currency: user.wallet.currency, balance: user.wallet.balance.toString(), lockedBalance: user.wallet.lockedBalance.toString(), availableBalance: user.wallet.balance.minus(user.wallet.lockedBalance).toString(), status: user.wallet.status, updatedAt: user.wallet.updatedAt } : null,
       topUps: topUps.map((item) => ({ id: item.id, amount: item.amount.toString(), currency: item.currency, status: item.status, method: item.method, referenceCode: item.referenceCode, adminNote: item.adminNote, reviewedAt: item.reviewedAt, createdAt: item.createdAt })),
       withdrawals: withdrawals.map((item) => ({ id: item.id, amount: item.amount.toString(), currency: item.currency, status: item.status, method: item.method, bankName: item.bankName, accountName: item.accountName, accountNumber: item.accountNumber, adminNote: item.adminNote, reviewedAt: item.reviewedAt, createdAt: item.createdAt })),
       ledgers: ledgers.map((item) => ({ id: item.id, type: item.type, direction: item.direction, amount: item.amount.toString(), balanceBefore: item.balanceBefore.toString(), balanceAfter: item.balanceAfter.toString(), referenceType: item.referenceType, referenceId: item.referenceId, createdAt: item.createdAt, createdByAdmin: item.createdByAdmin })),
@@ -58,18 +51,7 @@ export class AdminMembersService {
     const existing = await this.prisma.user.findUnique({ where: { id }, select: { id: true, username: true, status: true } });
     if (!existing) throw new NotFoundException('Member not found');
     const updated = await this.prisma.user.update({ where: { id }, data: { status: status as any } });
-    await this.prisma.adminAuditLog.create({
-      data: {
-        adminUserId: admin?.id,
-        module: 'members',
-        action: 'UPDATE_MEMBER_STATUS',
-        targetId: id,
-        oldData: { status: existing.status },
-        newData: { status: updated.status, reason: reason ?? null },
-        ipAddress: meta?.ipAddress,
-        userAgent: meta?.userAgent,
-      },
-    });
+    await this.prisma.adminAuditLog.create({ data: { adminUserId: admin?.id, module: 'members', action: 'UPDATE_MEMBER_STATUS', targetId: id, oldData: { status: existing.status }, newData: { status: updated.status, reason: reason ?? null }, ipAddress: meta?.ipAddress, userAgent: meta?.userAgent } });
     return { user: { id: updated.id, username: updated.username, status: updated.status, updatedAt: updated.updatedAt } };
   }
 }
