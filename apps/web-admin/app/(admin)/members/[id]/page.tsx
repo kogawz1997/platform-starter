@@ -18,11 +18,13 @@ type MemberDetail = {
 type MoneyItem = { id: string; amount: string; currency: string; status: string; method?: string | null; createdAt: string; reviewedAt?: string | null };
 type LedgerItem = { id: string; type: string; direction: string; amount: string; balanceBefore: string; balanceAfter: string; referenceType?: string | null; referenceId?: string | null; createdAt: string; createdByAdmin?: { username?: string | null } | null };
 type ActivityItem = { id: string; action: string; module: string; targetId?: string | null; createdAt: string; adminUser?: { username?: string | null } | null };
+type RiskAlert = { id: string; type: string; severity: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL'; status: string; title: string; createdAt: string };
 
 export default function MemberDetailPage() {
   const params = useParams<{ id: string }>();
   const id = params?.id;
   const [data, setData] = useState<MemberDetail | null>(null);
+  const [riskAlerts, setRiskAlerts] = useState<RiskAlert[]>([]);
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState('');
 
@@ -30,14 +32,19 @@ export default function MemberDetailPage() {
 
   async function load() {
     setLoading(true);
-    const res = await adminApiFetch(`/admin/members/${id}`);
-    const payload = await res.json().catch(() => null);
-    if (res.ok) {
+    const [memberRes, riskRes] = await Promise.all([
+      adminApiFetch(`/admin/members/${id}`),
+      adminApiFetch('/admin/risk-alerts?status=OPEN'),
+    ]);
+    const payload = await memberRes.json().catch(() => null);
+    const riskPayload = await riskRes.json().catch(() => null);
+    if (memberRes.ok) {
       setData(payload);
       setMessage('');
     } else {
       setMessage(payload?.message ?? 'โหลดข้อมูลสมาชิกไม่สำเร็จ');
     }
+    if (riskRes.ok) setRiskAlerts((riskPayload.items ?? []).filter((item: any) => item.memberId === id));
     setLoading(false);
   }
 
@@ -57,7 +64,7 @@ export default function MemberDetailPage() {
         <AdminMetric title="Status" value={data.user.status} helper={data.user.shortId} />
         <AdminMetric title="Available" value={formatMoney(data.wallet?.availableBalance ?? '0')} helper={data.wallet?.currency ?? 'THB'} />
         <AdminMetric title="Locked" value={formatMoney(data.wallet?.lockedBalance ?? '0')} helper={data.wallet?.status ?? 'No wallet'} />
-        <AdminMetric title="Ledgers" value={String(data.ledgers.length)} helper="latest loaded" />
+        <AdminMetric title="Risk alerts" value={String(riskAlerts.length)} helper="OPEN alerts" />
       </AdminMetricGrid>
 
       <AdminGrid>
@@ -89,6 +96,10 @@ export default function MemberDetailPage() {
         </div>
       </AdminCard>
 
+      <AdminCard title="Risk alerts" description="OPEN alerts ที่เกี่ยวกับสมาชิกนี้" action={<AdminLinkButton href="/risk-alerts">Risk queue</AdminLinkButton>}>
+        <AdminStack>{riskAlerts.map((item) => <AdminRow key={item.id}><div><div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}><AdminBadge tone={riskTone(item.severity)}>{item.severity}</AdminBadge><AdminBadge>{item.type}</AdminBadge></div><strong>{item.title}</strong><p>{new Date(item.createdAt).toLocaleString('th-TH')}</p></div><AdminLinkButton href={`/risk-alerts/${item.id}`}>Detail</AdminLinkButton></AdminRow>)}{riskAlerts.length === 0 && <AdminEmpty>ไม่มี OPEN risk alert ของสมาชิกนี้</AdminEmpty>}</AdminStack>
+      </AdminCard>
+
       <AdminGrid>
         <MoneyCard title="Top-ups" items={data.topUps} />
         <MoneyCard title="Withdrawals" items={data.withdrawals} />
@@ -112,6 +123,12 @@ function MoneyCard({ title, items }: { title: string; items: MoneyItem[] }) {
 function statusTone(status: string) {
   if (status === 'ACTIVE') return 'success';
   if (status === 'SUSPENDED' || status === 'LOCKED') return 'danger';
+  return 'neutral';
+}
+
+function riskTone(severity: RiskAlert['severity']) {
+  if (severity === 'CRITICAL' || severity === 'HIGH') return 'danger';
+  if (severity === 'MEDIUM') return 'warning';
   return 'neutral';
 }
 
