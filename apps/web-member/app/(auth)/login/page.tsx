@@ -13,7 +13,7 @@ export default function MemberSignInPage() {
   const [showSecret, setShowSecret] = useState(false);
 
   useEffect(() => {
-    if (window.localStorage.getItem('member_access_token')) { window.location.replace('/'); return; }
+    if (window.localStorage.getItem('member_access_token') || window.localStorage.getItem('member_refresh_token')) { window.location.replace('/'); return; }
     fetch(`${API_URL}/public/site-settings`).then((res) => res.json()).then((data) => setSettings({ ...defaultSettings, ...data })).catch(() => setSettings(defaultSettings));
   }, []);
 
@@ -36,16 +36,46 @@ export default function MemberSignInPage() {
     window.location.replace('/');
   }
 
-  return <main style={{ ...pageStyle, background: backgroundColor, color: textColor }}><form onSubmit={onSubmit} style={{ ...cardStyle, background: cardColor }}><div><p style={eyebrowStyle}>Member Center</p><h1 style={titleStyle}>{siteName}</h1></div><label style={labelStyle}>Username / Phone / Email<input value={identifier} onChange={(e) => setIdentifier(e.target.value)} disabled={loading} autoComplete="username" style={inputStyle} /></label><label style={labelStyle}>Password<div style={passwordWrapStyle}><input value={secret} onChange={(e) => setSecret(e.target.value)} type={showSecret ? 'text' : 'password'} disabled={loading} autoComplete="current-password" style={{ ...inputStyle, paddingRight: 78 }} /><button type="button" onClick={() => setShowSecret((v) => !v)} style={ghostButtonStyle} disabled={loading}>{showSecret ? 'ซ่อน' : 'แสดง'}</button></div></label><button type="submit" disabled={loading} style={{ ...submitStyle, background: primaryColor, color: '#111' }}>{loading ? 'กำลังเข้าสู่ระบบ...' : 'เข้าสู่ระบบ'}</button>{message && <div style={alertStyle(status)}>{message}</div>}<p style={{ textAlign: 'center', margin: 0, color: 'rgba(255,255,255,.72)' }}>ยังไม่มีบัญชี? <a href="/register" style={{ color: primaryColor, fontWeight: 900 }}>สมัครสมาชิก</a></p></form></main>;
+  return <main style={{ ...pageStyle, background: backgroundColor, color: textColor }}>
+    <section style={shellStyle}>
+      <form onSubmit={onSubmit} style={{ ...cardStyle, background: cardColor }}>
+        <div style={brandRowStyle}>
+          <div style={{ ...logoStyle, background: primaryColor, color: '#111' }}>{siteName.slice(0, 1).toUpperCase()}</div>
+          <div>
+            <p style={eyebrowStyle}>Member Center</p>
+            <h1 style={titleStyle}>{siteName}</h1>
+          </div>
+        </div>
+
+        <div style={headlineStyle}>
+          <h2 style={formTitleStyle}>เข้าสู่ระบบ</h2>
+          <p style={mutedStyle}>เข้าสู่ระบบเพื่อเข้าแดชบอร์ดสมาชิก ฝาก ถอน และดูประวัติธุรกรรม</p>
+        </div>
+
+        <label style={labelStyle}>Username / Phone / Email<input value={identifier} onChange={(e) => setIdentifier(e.target.value)} disabled={loading} autoComplete="username" placeholder="กรอกชื่อผู้ใช้ เบอร์ หรืออีเมล" style={inputStyle} /></label>
+        <label style={labelStyle}>Password<div style={passwordWrapStyle}><input value={secret} onChange={(e) => setSecret(e.target.value)} type={showSecret ? 'text' : 'password'} disabled={loading} autoComplete="current-password" placeholder="กรอกรหัสผ่าน" style={{ ...inputStyle, paddingRight: 58 }} /><button type="button" onClick={() => setShowSecret((v) => !v)} style={eyeButtonStyle} disabled={loading} aria-label={showSecret ? 'ซ่อนรหัสผ่าน' : 'แสดงรหัสผ่าน'} title={showSecret ? 'ซ่อนรหัสผ่าน' : 'แสดงรหัสผ่าน'}>{showSecret ? '🙈' : '👁️'}</button></div></label>
+        <button type="submit" disabled={loading} style={{ ...submitStyle, background: primaryColor, color: '#111' }}>{loading ? 'กำลังเข้าสู่ระบบ...' : 'เข้าสู่ระบบ'}</button>
+        {message && <div style={alertStyle(status)}>{message}</div>}
+        <p style={footerTextStyle}>ยังไม่มีบัญชี? <a href="/register" style={{ color: primaryColor, fontWeight: 900 }}>สมัครสมาชิก</a></p>
+      </form>
+    </section>
+  </main>;
 }
 
-const pageStyle = { minHeight: '100vh', padding: 24, display: 'grid', placeItems: 'center' } as const;
-const cardStyle = { width: '100%', maxWidth: 440, border: '1px solid rgba(255,255,255,0.12)', borderRadius: 24, padding: 24, display: 'grid', gap: 16, boxShadow: '0 24px 80px rgba(0,0,0,0.28)' } as const;
-const eyebrowStyle = { margin: 0, opacity: 0.68, fontSize: 13, fontWeight: 900 } as const;
-const titleStyle = { margin: '6px 0 0', fontSize: 34, lineHeight: 1.05 } as const;
+const pageStyle = { minHeight: '100dvh', padding: 16, display: 'grid', placeItems: 'center' } as const;
+const shellStyle = { width: '100%', maxWidth: 460, margin: '0 auto', display: 'grid', placeItems: 'center' } as const;
+const cardStyle = { width: '100%', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 28, padding: 24, display: 'grid', gap: 16, boxShadow: '0 28px 90px rgba(0,0,0,0.34)', boxSizing: 'border-box' } as const;
+const brandRowStyle = { display: 'flex', alignItems: 'center', gap: 12 } as const;
+const logoStyle = { width: 52, height: 52, borderRadius: 18, display: 'grid', placeItems: 'center', fontWeight: 900, fontSize: 22, flex: '0 0 52px' } as const;
+const eyebrowStyle = { margin: 0, opacity: 0.68, fontSize: 12, fontWeight: 900, letterSpacing: '.08em', textTransform: 'uppercase' as const };
+const titleStyle = { margin: '4px 0 0', fontSize: 28, lineHeight: 1.05 } as const;
+const headlineStyle = { display: 'grid', gap: 6 } as const;
+const formTitleStyle = { margin: 0, fontSize: 30, lineHeight: 1.05 } as const;
+const mutedStyle = { margin: 0, color: 'rgba(255,255,255,.68)', lineHeight: 1.5 } as const;
 const labelStyle = { display: 'grid', gap: 8, fontWeight: 800 } as const;
-const inputStyle = { width: '100%', padding: '13px 14px', borderRadius: 14, border: '1px solid rgba(255,255,255,0.18)', background: 'rgba(255,255,255,0.08)', color: 'inherit', boxSizing: 'border-box' } as const;
+const inputStyle = { width: '100%', padding: '13px 14px', borderRadius: 14, border: '1px solid rgba(255,255,255,0.18)', background: 'rgba(255,255,255,0.08)', color: 'inherit', boxSizing: 'border-box', outline: 'none' } as const;
 const passwordWrapStyle = { position: 'relative' } as const;
-const ghostButtonStyle = { position: 'absolute', right: 8, top: 7, padding: '7px 10px', borderRadius: 10, border: 0, cursor: 'pointer' } as const;
+const eyeButtonStyle = { position: 'absolute', right: 8, top: 7, width: 38, height: 34, borderRadius: 12, border: '1px solid rgba(255,255,255,.14)', background: 'rgba(255,255,255,.10)', color: 'inherit', cursor: 'pointer', display: 'grid', placeItems: 'center', fontSize: 16 } as const;
 const submitStyle = { border: 0, borderRadius: 14, padding: '14px 16px', fontWeight: 900, cursor: 'pointer' } as const;
+const footerTextStyle = { textAlign: 'center' as const, margin: 0, color: 'rgba(255,255,255,.72)' };
 function alertStyle(status: 'idle' | 'success' | 'error' | 'info') { return { border: '1px solid rgba(255,255,255,0.14)', borderRadius: 14, padding: 12, background: status === 'error' ? 'rgba(255,80,80,0.14)' : status === 'success' ? 'rgba(80,255,140,0.14)' : 'rgba(255,255,255,0.08)' } as const; }
