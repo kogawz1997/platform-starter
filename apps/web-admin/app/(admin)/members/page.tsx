@@ -1,6 +1,6 @@
 'use client';
 
-import { FormEvent, useEffect, useState } from 'react';
+import { FormEvent, useEffect, useMemo, useState } from 'react';
 import { adminApiFetch } from '../../admin-api';
 import { AdminBadge, AdminButton, AdminCard, AdminEmpty, AdminMetric, AdminMetricGrid, AdminNotice, AdminPage, AdminRow, AdminStack, AdminToolbar, formatMoney } from '../_components/admin-ui';
 
@@ -12,35 +12,96 @@ export default function MembersPage() {
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState('ALL');
   const [message, setMessage] = useState('');
+  const [loading, setLoading] = useState(true);
   const [busyId, setBusyId] = useState('');
 
   useEffect(() => { loadItems(); }, []);
 
   async function loadItems(event?: FormEvent<HTMLFormElement>) {
     event?.preventDefault();
+    setLoading(true);
     setMessage('กำลังโหลดสมาชิก...');
     const params = new URLSearchParams();
     if (search.trim()) params.set('search', search.trim());
     if (status !== 'ALL') params.set('status', status);
     const res = await adminApiFetch(`/admin/members?${params.toString()}`);
     const data = await res.json().catch(() => null);
-    if (!res.ok) { setMessage(data?.message ?? 'โหลดสมาชิกไม่สำเร็จ'); return; }
-    setItems(data.items ?? []); setMessage('');
+    if (!res.ok) { setMessage(data?.message ?? 'โหลดสมาชิกไม่สำเร็จ'); setLoading(false); return; }
+    setItems(data.items ?? []);
+    setMessage('');
+    setLoading(false);
   }
 
   async function updateStatus(id: string, nextStatus: string) {
-    setBusyId(id); setMessage('กำลังอัปเดตสถานะ...');
+    setBusyId(id);
+    setMessage('กำลังอัปเดตสถานะ...');
     const res = await adminApiFetch(`/admin/members/${id}/status`, { method: 'PATCH', body: JSON.stringify({ status: nextStatus, reason: 'quick action from members page' }) });
-    const data = await res.json().catch(() => null); setBusyId('');
+    const data = await res.json().catch(() => null);
+    setBusyId('');
     if (!res.ok) { setMessage(data?.message ?? 'อัปเดตสถานะไม่สำเร็จ'); return; }
     setItems((current) => current.map((item) => item.id === id ? { ...item, status: data.user.status } : item));
     setMessage('อัปเดตสถานะแล้ว');
   }
 
-  const activeCount = items.filter((item) => item.status === 'ACTIVE').length;
-  const restrictedCount = items.filter((item) => item.status !== 'ACTIVE').length;
+  const totals = useMemo(() => {
+    const activeCount = items.filter((item) => item.status === 'ACTIVE').length;
+    const restrictedCount = items.filter((item) => item.status !== 'ACTIVE').length;
+    const available = items.reduce((sum, item) => sum + Number(item.availableBalance ?? 0), 0);
+    return { activeCount, restrictedCount, available };
+  }, [items]);
 
-  return <AdminPage eyebrow="Operations" title="Members" description="ค้นหา ตรวจสถานะ และจัดการสมาชิกจากหน้าเดียว" actions={<AdminButton onClick={() => loadItems()}>Refresh</AdminButton>}><form onSubmit={loadItems}><AdminToolbar><input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="username / phone / email / shortId" /><select value={status} onChange={(e) => setStatus(e.target.value)}>{STATUSES.map((item) => <option key={item} value={item}>{item}</option>)}</select><AdminButton type="submit">Search</AdminButton></AdminToolbar></form>{message && <AdminNotice>{message}</AdminNotice>}<AdminMetricGrid><AdminMetric title="Loaded" value={`${items.length}`} /><AdminMetric title="Active" value={`${activeCount}`} /><AdminMetric title="Restricted" value={`${restrictedCount}`} /></AdminMetricGrid><AdminStack>{items.map((item) => <AdminCard key={item.id}><AdminRow><div><AdminBadge tone={item.status === 'ACTIVE' ? 'success' : 'danger'}>{item.status}</AdminBadge><h2 style={{ margin: '10px 0 4px', fontSize: 28 }}>{item.username}</h2><p>{item.displayName || 'No display name'} · {item.shortId}</p><p>{item.phone || '-'} · {item.email || '-'}</p><p>Joined {new Date(item.createdAt).toLocaleDateString('th-TH')}</p></div><div style={{ textAlign: 'right', display: 'grid', gap: 10, minWidth: 220 }}><div><span style={{ opacity: 0.66 }}>Available</span><strong style={{ display: 'block', fontSize: 22 }}>{formatMoney(item.availableBalance)}</strong></div><a href={`/member-detail?id=${item.id}`} style={linkStyle}>View profile</a><div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'flex-end' }}><AdminButton disabled={busyId === item.id || item.status === 'ACTIVE'} tone="success" onClick={() => updateStatus(item.id, 'ACTIVE')}>Active</AdminButton><AdminButton disabled={busyId === item.id || item.status === 'SUSPENDED'} tone="danger" onClick={() => updateStatus(item.id, 'SUSPENDED')}>Suspend</AdminButton><AdminButton disabled={busyId === item.id || item.status === 'LOCKED'} tone="danger" onClick={() => updateStatus(item.id, 'LOCKED')}>Lock</AdminButton></div></div></AdminRow></AdminCard>)}{items.length === 0 && <AdminEmpty>ไม่พบสมาชิก</AdminEmpty>}</AdminStack></AdminPage>;
+  return <AdminPage eyebrow="Operations" title="Members" description="ค้นหา ตรวจสถานะ และจัดการสมาชิกจากหน้าเดียว" actions={<AdminButton onClick={() => loadItems()}>Refresh</AdminButton>}>
+    <form onSubmit={loadItems}>
+      <AdminToolbar>
+        <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="username / phone / email / shortId" />
+        <select value={status} onChange={(e) => setStatus(e.target.value)}>{STATUSES.map((item) => <option key={item} value={item}>{item}</option>)}</select>
+        <AdminButton type="submit">Search</AdminButton>
+        <AdminButton type="button" tone="secondary" onClick={() => { setSearch(''); setStatus('ALL'); }}>Reset</AdminButton>
+      </AdminToolbar>
+    </form>
+
+    {message && <AdminNotice>{message}</AdminNotice>}
+
+    <AdminMetricGrid>
+      <AdminMetric title="Loaded" value={`${items.length}`} helper={status === 'ALL' ? 'ทุกสถานะ' : status} />
+      <AdminMetric title="Active" value={`${totals.activeCount}`} helper="สมาชิกใช้งานได้" />
+      <AdminMetric title="Restricted" value={`${totals.restrictedCount}`} helper="Suspended / Locked / Closed" />
+      <AdminMetric title="Available" value={formatMoney(String(totals.available))} helper="รวมเฉพาะรายการที่โหลด" />
+    </AdminMetricGrid>
+
+    {loading && items.length === 0 ? <AdminEmpty>กำลังโหลดสมาชิก...</AdminEmpty> : <AdminStack>{items.map((item) => <AdminCard key={item.id} title={item.username} description={`${item.displayName || 'No display name'} · ${item.shortId}`}>
+      <AdminRow>
+        <div style={memberInfoStyle}>
+          <div style={badgeRowStyle}><AdminBadge tone={statusTone(item.status)}>{item.status}</AdminBadge><AdminBadge>{item.shortId}</AdminBadge></div>
+          <p>{item.phone || '-'} · {item.email || '-'}</p>
+          <p>Joined {new Date(item.createdAt).toLocaleDateString('th-TH')} · Last login {item.lastLoginAt ? new Date(item.lastLoginAt).toLocaleString('th-TH') : '-'}</p>
+        </div>
+        <div style={moneyStyle}>
+          <div><span style={mutedStyle}>Available</span><strong style={moneyValueStyle}>{formatMoney(item.availableBalance)}</strong></div>
+          <div style={smallMoneyGridStyle}><span>Balance {formatMoney(item.balance)}</span><span>Locked {formatMoney(item.lockedBalance)}</span></div>
+          <a href={`/members/${item.id}`} style={linkStyle}>View profile</a>
+          <div style={buttonRowStyle}>
+            <AdminButton disabled={busyId === item.id || item.status === 'ACTIVE'} tone="success" onClick={() => updateStatus(item.id, 'ACTIVE')}>Active</AdminButton>
+            <AdminButton disabled={busyId === item.id || item.status === 'SUSPENDED'} tone="danger" onClick={() => updateStatus(item.id, 'SUSPENDED')}>Suspend</AdminButton>
+            <AdminButton disabled={busyId === item.id || item.status === 'LOCKED'} tone="danger" onClick={() => updateStatus(item.id, 'LOCKED')}>Lock</AdminButton>
+          </div>
+        </div>
+      </AdminRow>
+    </AdminCard>)}{items.length === 0 && <AdminEmpty>ไม่พบสมาชิก</AdminEmpty>}</AdminStack>}
+  </AdminPage>;
+}
+
+function statusTone(status: string) {
+  if (status === 'ACTIVE') return 'success';
+  if (status === 'SUSPENDED' || status === 'LOCKED') return 'danger';
+  return 'neutral';
 }
 
 const linkStyle = { color: '#f5c542', fontWeight: 900, textDecoration: 'none' } as const;
+const memberInfoStyle = { display: 'grid', gap: 7, minWidth: 240 } as const;
+const badgeRowStyle = { display: 'flex', gap: 8, flexWrap: 'wrap' as const };
+const moneyStyle = { textAlign: 'right' as const, display: 'grid', gap: 10, minWidth: 240 };
+const mutedStyle = { opacity: 0.66 } as const;
+const moneyValueStyle = { display: 'block', fontSize: 22 } as const;
+const smallMoneyGridStyle = { display: 'grid', gap: 4, color: '#94a3b8', fontSize: 13 };
+const buttonRowStyle = { display: 'flex', gap: 8, flexWrap: 'wrap' as const, justifyContent: 'flex-end' as const };
