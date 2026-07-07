@@ -1,6 +1,6 @@
 'use client';
 
-import { ChangeEvent, FormEvent, useEffect, useState } from 'react';
+import { ChangeEvent, FormEvent, useEffect, useMemo, useState } from 'react';
 import { adminApiFetch } from '../../admin-api';
 import { AdminBadge, AdminButton, AdminCard, AdminEmpty, AdminGrid, AdminNotice, AdminPage, AdminRow, AdminStack, AdminToolbar } from '../_components/admin-ui';
 
@@ -19,6 +19,10 @@ export default function BankAccountsPage() {
   const [form, setForm] = useState(blankReceiving);
   const [message, setMessage] = useState('');
   const [busyId, setBusyId] = useState('');
+
+  const typeLabel = useMemo(() => PAYMENT_TYPES.find((item) => item.value === paymentType)?.label ?? 'บัญชีธนาคาร', [paymentType]);
+  const accountNumberLabel = paymentType === 'bank' ? 'เลขบัญชี' : paymentType === 'promptpay' ? 'เบอร์พร้อมเพย์' : paymentType === 'wallet' ? 'วอเลต' : 'รายละเอียด';
+  const accountNumberPlaceholder = paymentType === 'bank' ? 'เลขบัญชีธนาคาร' : paymentType === 'promptpay' ? 'เบอร์โทร / เลขพร้อมเพย์' : paymentType === 'wallet' ? 'เบอร์วอเลต / เลขวอเลต' : 'รายละเอียดช่องทางรับเงิน';
 
   useEffect(() => { loadAll(); }, []);
 
@@ -43,14 +47,15 @@ export default function BankAccountsPage() {
     if (!res.ok) { setMessage(data?.message ?? 'บันทึกไม่สำเร็จ'); return; }
     setReceiving((current) => [data.item, ...current]);
     setPaymentType('bank'); setForm(blankReceiving);
-    setMessage('เพิ่มบัญชีรับเงินแล้ว ระบบจะนำไปสลับให้ลูกค้าอัตโนมัติ');
+    setMessage('เพิ่มบัญชีรับเงินแล้ว');
   }
 
   function normalizeReceivingPayload() {
-    if (paymentType === 'promptpay') return { ...form, bankName: 'พร้อมเพย์', accountNumber: form.promptPay || form.accountNumber, promptPay: form.promptPay || form.accountNumber, sortOrder: Number(form.sortOrder), minAmount: form.minAmount || null, maxAmount: form.maxAmount || null };
-    if (paymentType === 'wallet') return { ...form, bankName: 'วอเลต', promptPay: '', sortOrder: Number(form.sortOrder), minAmount: form.minAmount || null, maxAmount: form.maxAmount || null };
-    if (paymentType === 'other') return { ...form, bankName: 'อื่น ๆ', promptPay: '', sortOrder: Number(form.sortOrder), minAmount: form.minAmount || null, maxAmount: form.maxAmount || null };
-    return { ...form, promptPay: '', sortOrder: Number(form.sortOrder), minAmount: form.minAmount || null, maxAmount: form.maxAmount || null };
+    const base = { ...form, sortOrder: 100, minAmount: form.minAmount || null, maxAmount: form.maxAmount || null };
+    if (paymentType === 'promptpay') return { ...base, bankName: 'พร้อมเพย์', accountNumber: form.accountNumber || form.promptPay, promptPay: form.accountNumber || form.promptPay };
+    if (paymentType === 'wallet') return { ...base, bankName: 'วอเลต', promptPay: '' };
+    if (paymentType === 'other') return { ...base, bankName: 'อื่น ๆ', promptPay: '' };
+    return { ...base, promptPay: '' };
   }
 
   function changePaymentType(value: PaymentType) {
@@ -86,26 +91,23 @@ export default function BankAccountsPage() {
   }
 
   return (
-    <AdminPage eyebrow="Bank Operations" title="Bank Accounts" description="เพิ่มบัญชีรับเงินหลายช่องทาง และให้ระบบสลับบัญชีตอนลูกค้าเติมเงิน" actions={<AdminButton onClick={loadAll}>Refresh</AdminButton>}>
+    <AdminPage eyebrow="Bank Operations" title="Bank Accounts" description="เพิ่มบัญชีรับเงินหลายช่องทาง ระบบจะสลับบัญชีเองเมื่อมีหลายบัญชี" actions={<AdminButton onClick={loadAll}>Refresh</AdminButton>}>
       {message && <AdminNotice>{message}</AdminNotice>}
       <AdminGrid>
-        <AdminCard title="Add Receiving Account" description="เพิ่มได้หลายบัญชี ระบบจะสลับบัญชีตามช่องทางที่ลูกค้าเลือก">
+        <AdminCard title={`เพิ่ม${typeLabel}`} description={paymentType === 'bank' ? 'กรอกบัญชีธนาคารรับเงิน' : paymentType === 'promptpay' ? 'กรอกเบอร์พร้อมเพย์หรือเลขพร้อมเพย์' : paymentType === 'wallet' ? 'กรอกข้อมูลวอเลต' : 'กรอกช่องทางรับเงินอื่น ๆ'}>
           <form onSubmit={saveReceiving}><AdminToolbar>
             <label style={labelStyle}>ประเภทรับเงิน<select value={paymentType} onChange={(e) => changePaymentType(e.target.value as PaymentType)}>{PAYMENT_TYPES.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}</select></label>
             {paymentType === 'bank' && <label style={labelStyle}>ธนาคาร<select value={form.bankName} onChange={(e) => setForm({ ...form, bankName: e.target.value })}>{THAI_BANKS.map((bank) => <option key={bank} value={bank}>{bank}</option>)}</select></label>}
-            <label style={labelStyle}>ชื่อบัญชี / ชื่อวอเลต<input value={form.accountName} onChange={(e) => setForm({ ...form, accountName: e.target.value })} placeholder="เช่น บริษัท ตัวอย่าง จำกัด" /></label>
-            {paymentType === 'bank' && <label style={labelStyle}>เลขบัญชี<input value={form.accountNumber} onChange={(e) => setForm({ ...form, accountNumber: e.target.value })} placeholder="เลขบัญชีธนาคาร" /></label>}
-            {paymentType === 'promptpay' && <label style={labelStyle}>เบอร์พร้อมเพย์<input value={form.promptPay} onChange={(e) => setForm({ ...form, promptPay: e.target.value, accountNumber: e.target.value })} placeholder="เบอร์โทร / เลขพร้อมเพย์" /></label>}
-            {(paymentType === 'wallet' || paymentType === 'other') && <label style={labelStyle}>{paymentType === 'wallet' ? 'เลขวอเลต / เบอร์วอเลต' : 'รหัสบัญชี / รายละเอียด'}<input value={form.accountNumber} onChange={(e) => setForm({ ...form, accountNumber: e.target.value })} placeholder="รายละเอียดบัญชี" /></label>}
+            <label style={labelStyle}>ชื่อบัญชี<input value={form.accountName} onChange={(e) => setForm({ ...form, accountName: e.target.value })} placeholder="ชื่อบัญชี" /></label>
+            <label style={labelStyle}>{accountNumberLabel}<input value={form.accountNumber} onChange={(e) => setForm({ ...form, accountNumber: e.target.value, promptPay: paymentType === 'promptpay' ? e.target.value : form.promptPay })} placeholder={accountNumberPlaceholder} /></label>
             <label style={labelStyle}>Min amount<input value={form.minAmount} onChange={(e) => setForm({ ...form, minAmount: e.target.value })} placeholder="min amount" /></label>
             <label style={labelStyle}>Max amount<input value={form.maxAmount} onChange={(e) => setForm({ ...form, maxAmount: e.target.value })} placeholder="max amount" /></label>
-            <label style={labelStyle}>ลำดับสลับบัญชี<input value={form.sortOrder} onChange={(e) => setForm({ ...form, sortOrder: Number(e.target.value) })} placeholder="100" /></label>
             <label style={labelStyle}>อัปโหลด QR Code<input type="file" accept="image/*" onChange={handleQrUpload} /></label>
             {form.qrImageUrl && <img src={form.qrImageUrl} alt="QR preview" style={qrPreviewStyle} />}
             <AdminButton type="submit">Add Account</AdminButton>
           </AdminToolbar></form>
         </AdminCard>
-        <AdminCard title="Receiving Accounts"><AdminStack>{receiving.map((item) => <AdminRow key={item.id}><div><AdminBadge tone={item.status === 'ACTIVE' ? 'success' : 'danger'}>{item.status}</AdminBadge><h2 style={{ margin: '10px 0 4px' }}>{labelForAccount(item)}</h2><p>{item.accountName} / {item.accountNumber}</p><p>PromptPay: {item.promptPay ?? '-'}</p><p>Limit: {item.minAmount ?? '-'} - {item.maxAmount ?? '-'}</p><p>Rotation order: {item.sortOrder}</p>{item.qrImageUrl && <img src={item.qrImageUrl} alt="QR" style={qrPreviewStyle} />}</div><div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}><AdminButton tone="success" disabled={busyId === item.id} onClick={() => setReceivingStatus(item, 'ACTIVE')}>Enable</AdminButton><AdminButton tone="danger" disabled={busyId === item.id} onClick={() => setReceivingStatus(item, 'DISABLED')}>Disable</AdminButton></div></AdminRow>)}{receiving.length === 0 && <AdminEmpty>ยังไม่มีบัญชีรับเงิน</AdminEmpty>}</AdminStack></AdminCard>
+        <AdminCard title="Receiving Accounts"><AdminStack>{receiving.map((item) => <AdminRow key={item.id}><div><AdminBadge tone={item.status === 'ACTIVE' ? 'success' : 'danger'}>{item.status}</AdminBadge><h2 style={{ margin: '10px 0 4px' }}>{labelForAccount(item)}</h2><p>ชื่อบัญชี: {item.accountName}</p><p>{numberLabelForAccount(item)}: {item.accountNumber}</p>{item.promptPay && <p>PromptPay: {item.promptPay}</p>}<p>Limit: {item.minAmount ?? '-'} - {item.maxAmount ?? '-'}</p>{item.qrImageUrl && <img src={item.qrImageUrl} alt="QR" style={qrPreviewStyle} />}</div><div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}><AdminButton tone="success" disabled={busyId === item.id} onClick={() => setReceivingStatus(item, 'ACTIVE')}>Enable</AdminButton><AdminButton tone="danger" disabled={busyId === item.id} onClick={() => setReceivingStatus(item, 'DISABLED')}>Disable</AdminButton></div></AdminRow>)}{receiving.length === 0 && <AdminEmpty>ยังไม่มีบัญชีรับเงิน</AdminEmpty>}</AdminStack></AdminCard>
       </AdminGrid>
       <AdminCard title="Member Withdrawal Bank Review" description="สมาชิก 1 คนเพิ่มบัญชีถอนได้ 1 บัญชี และชื่อบัญชีต้องตรงกับชื่อสมาชิก"><AdminStack>{memberBanks.map((item) => <AdminRow key={item.id}><div><AdminBadge tone={item.status === 'ACTIVE' ? 'success' : item.status === 'REJECTED' ? 'danger' : 'warning'}>{item.status}</AdminBadge><h2 style={{ margin: '10px 0 4px' }}>{item.bankName}</h2><p>{item.accountName} / {item.accountNumber}</p><p>Member: {item.user?.username ?? item.userId}</p><p>Primary: {item.isPrimary ? 'YES' : 'NO'}</p></div><div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}><AdminButton tone="success" disabled={busyId === item.id} onClick={() => reviewMemberBank(item, 'ACTIVE')}>Approve</AdminButton><AdminButton tone="danger" disabled={busyId === item.id} onClick={() => reviewMemberBank(item, 'REJECTED')}>Reject</AdminButton></div></AdminRow>)}{memberBanks.length === 0 && <AdminEmpty>ยังไม่มีบัญชีถอนของสมาชิก</AdminEmpty>}</AdminStack></AdminCard>
     </AdminPage>
@@ -113,6 +115,7 @@ export default function BankAccountsPage() {
 }
 
 function labelForAccount(item: ReceivingAccount) { if (item.bankName === 'พร้อมเพย์') return 'พร้อมเพย์'; if (item.bankName === 'วอเลต') return 'วอเลต'; if (item.bankName === 'อื่น ๆ') return 'อื่น ๆ'; return `บัญชีธนาคาร · ${item.bankName}`; }
+function numberLabelForAccount(item: ReceivingAccount) { if (item.bankName === 'พร้อมเพย์') return 'เบอร์พร้อมเพย์'; if (item.bankName === 'วอเลต') return 'วอเลต'; if (item.bankName === 'อื่น ๆ') return 'รายละเอียด'; return 'เลขบัญชี'; }
 function resizeImage(file: File, maxSize: number, quality: number) { return new Promise<string>((resolve, reject) => { const reader = new FileReader(); reader.onload = () => { const img = new Image(); img.onload = () => { const scale = Math.min(1, maxSize / Math.max(img.width, img.height)); const canvas = document.createElement('canvas'); canvas.width = Math.round(img.width * scale); canvas.height = Math.round(img.height * scale); const ctx = canvas.getContext('2d'); if (!ctx) return reject(new Error('อ่านรูปไม่ได้')); ctx.drawImage(img, 0, 0, canvas.width, canvas.height); resolve(canvas.toDataURL('image/jpeg', quality)); }; img.onerror = () => reject(new Error('อ่านรูปไม่ได้')); img.src = String(reader.result); }; reader.onerror = () => reject(new Error('อ่านรูปไม่ได้')); reader.readAsDataURL(file); }); }
 const labelStyle = { display: 'grid', gap: 6, fontWeight: 800 } as const;
 const qrPreviewStyle = { width: 150, height: 150, objectFit: 'cover' as const, borderRadius: 14, border: '1px solid rgba(148,163,184,.18)' } as const;
