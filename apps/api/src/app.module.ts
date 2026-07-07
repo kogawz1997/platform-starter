@@ -12,6 +12,7 @@ import { FinanceModule } from './modules/finance/finance.module';
 import { ReportsModule } from './modules/reports/reports.module';
 import { ExportsModule } from './modules/exports/exports.module';
 import { BankAccountsModule } from './modules/bank-accounts/bank-accounts.module';
+import { RiskAlertsModule } from './modules/risk-alerts/risk-alerts.module';
 
 @Module({
   imports: [
@@ -28,6 +29,7 @@ import { BankAccountsModule } from './modules/bank-accounts/bank-accounts.module
     ReportsModule,
     ExportsModule,
     BankAccountsModule,
+    RiskAlertsModule,
   ],
 })
 export class AppModule {}
