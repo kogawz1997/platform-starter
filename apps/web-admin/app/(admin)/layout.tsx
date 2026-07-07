@@ -10,6 +10,7 @@ const navItems = [
   ['Finance', '/finance'],
   ['Reports', '/reports'],
   ['Exports', '/exports'],
+  ['Activity', '/activity'],
   ['Settings', '/settings'],
   ['Topups', '/topups'],
   ['Withdrawals', '/withdrawals'],
