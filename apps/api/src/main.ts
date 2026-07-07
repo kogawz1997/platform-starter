@@ -1,4 +1,5 @@
 import 'reflect-metadata';
+import { randomUUID } from 'crypto';
 import { ValidationPipe } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { NestFactory } from '@nestjs/core';
@@ -30,6 +31,13 @@ async function bootstrap() {
   });
 
   app.use((req: any, res: any, next: any) => {
+    const requestId = String(req.headers?.['x-request-id'] ?? randomUUID());
+    req.requestId = requestId;
+    res.setHeader('X-Request-Id', requestId);
+    next();
+  });
+
+  app.use((req: any, res: any, next: any) => {
     res.setHeader('X-Content-Type-Options', 'nosniff');
     res.setHeader('X-Frame-Options', 'DENY');
     res.setHeader('Referrer-Policy', 'no-referrer');
@@ -58,14 +66,24 @@ async function bootstrap() {
     if (bucket.count <= limit.max) return next();
 
     res.setHeader('Retry-After', String(Math.ceil((bucket.resetAt - now) / 1000)));
-    return res.status(429).json({ message: 'Too many requests' });
+    return res.status(429).json({ message: 'Too many requests', requestId: req.requestId });
   });
 
   app.use((req: any, res: any, next: any) => {
     const startedAt = Date.now();
     res.on('finish', () => {
       const duration = Date.now() - startedAt;
-      console.log(`${req.method} ${redactUrl(req.originalUrl ?? req.url ?? '')} ${res.statusCode} ${duration}ms`);
+      console.log(JSON.stringify({
+        level: res.statusCode >= 500 ? 'error' : res.statusCode >= 400 ? 'warn' : 'info',
+        event: 'http_request',
+        requestId: req.requestId,
+        method: req.method,
+        path: redactUrl(req.originalUrl ?? req.url ?? ''),
+        statusCode: res.statusCode,
+        durationMs: duration,
+        ip: getClientIp(req),
+        userAgent: req.headers?.['user-agent'] ?? null,
+      }));
     });
     next();
   });
