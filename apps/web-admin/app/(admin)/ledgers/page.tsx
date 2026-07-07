@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { AdminBadge, AdminButton, AdminCard, AdminEmpty, AdminNotice, AdminPage, AdminRow, AdminStack, AdminToolbar, formatMoney } from '../_components/admin-ui';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000';
 
@@ -31,39 +32,12 @@ export default function AdminLedgersPage() {
   }
 
   return (
-    <main style={pageStyle}>
-      <a href="/settings" style={backStyle}>← Settings</a>
-      <p style={eyebrowStyle}>Wallet Operations</p>
-      <h1 style={titleStyle}>Wallet Ledgers</h1>
-      <p style={mutedStyle}>ค้นหาด้วย username, Short ID หรือ userId และกรองประเภทรายการได้</p>
-
-      <section style={toolbarStyle}>
-        <input value={identifier} onChange={(event) => setIdentifier(event.target.value)} placeholder="username / short ID / user ID" style={inputStyle} />
-        <select value={type} onChange={(event) => setType(event.target.value)} style={inputStyle}><option value="">ทุกประเภท</option><option value="DEPOSIT">DEPOSIT</option><option value="WITHDRAWAL">WITHDRAWAL</option><option value="ADJUSTMENT">ADJUSTMENT</option><option value="BONUS">BONUS</option><option value="REVERSAL">REVERSAL</option></select>
-        <select value={direction} onChange={(event) => setDirection(event.target.value)} style={inputStyle}><option value="">ทุกทิศทาง</option><option value="CREDIT">CREDIT</option><option value="DEBIT">DEBIT</option></select>
-        <button type="button" onClick={() => loadItems()} style={buttonStyle}>Apply</button>
-      </section>
-
-      {message && <div style={noticeStyle}>{message}</div>}
-      <div style={{ display: 'grid', gap: 12 }}>
-        {items.map((item) => <section key={item.id} style={cardStyle}><div style={rowTopStyle}><div><span style={badgeStyle}>{item.type}</span><h2 style={{ margin: '10px 0 4px' }}>{item.direction}</h2><p style={mutedStyle}>Member: {item.user?.username ?? item.userId}</p><p style={mutedStyle}>Short ID: {item.user?.shortId ?? item.shortUserId ?? '-'}</p><p style={mutedStyle}>Ref: {item.referenceType || '-'} {item.referenceId ? `#${item.referenceId.slice(0, 8)}` : ''}</p><p style={mutedStyle}>Admin: {item.createdByAdmin?.username ?? '-'}</p><p style={mutedStyle}>{new Date(item.createdAt).toLocaleString('th-TH')}</p></div><strong style={{ ...amountStyle, color: item.direction === 'CREDIT' ? '#7CFFB2' : '#FF9C9C' }}>{item.direction === 'CREDIT' ? '+' : '-'} THB {Number(item.amount).toLocaleString('th-TH', { minimumFractionDigits: 2 })}</strong></div><div style={balanceGridStyle}><div><span>Before</span><strong>THB {Number(item.balanceBefore).toLocaleString('th-TH', { minimumFractionDigits: 2 })}</strong></div><div><span>After</span><strong>THB {Number(item.balanceAfter).toLocaleString('th-TH', { minimumFractionDigits: 2 })}</strong></div></div></section>)}
-        {items.length === 0 && <div style={noticeStyle}>ยังไม่มีรายการ</div>}
-      </div>
-    </main>
+    <AdminPage eyebrow="Wallet Operations" title="Wallet Ledgers" description="ค้นหาด้วย username, Short ID หรือ userId และกรองประเภทรายการได้" actions={<AdminButton onClick={() => loadItems()}>Apply</AdminButton>}>
+      <AdminToolbar><input value={identifier} onChange={(event) => setIdentifier(event.target.value)} placeholder="username / short ID / user ID" /><select value={type} onChange={(event) => setType(event.target.value)}><option value="">ทุกประเภท</option><option value="DEPOSIT">DEPOSIT</option><option value="WITHDRAWAL">WITHDRAWAL</option><option value="ADJUSTMENT">ADJUSTMENT</option><option value="BONUS">BONUS</option><option value="REVERSAL">REVERSAL</option></select><select value={direction} onChange={(event) => setDirection(event.target.value)}><option value="">ทุกทิศทาง</option><option value="CREDIT">CREDIT</option><option value="DEBIT">DEBIT</option></select></AdminToolbar>
+      {message && <AdminNotice>{message}</AdminNotice>}
+      <AdminStack>{items.map((item) => <AdminCard key={item.id}><AdminRow><div><AdminBadge tone={item.direction === 'CREDIT' ? 'success' : 'danger'}>{item.type}</AdminBadge><h2 style={{ margin: '10px 0 4px' }}>{item.direction}</h2><p>Member: {item.user?.username ?? item.userId}</p><p>Short ID: {item.user?.shortId ?? item.shortUserId ?? '-'}</p><p>Ref: {item.referenceType || '-'} {item.referenceId ? `#${item.referenceId.slice(0, 8)}` : ''}</p><p>Admin: {item.createdByAdmin?.username ?? '-'}</p><p>{new Date(item.createdAt).toLocaleString('th-TH')}</p></div><strong style={{ fontSize: 'clamp(22px, 6vw, 32px)', textAlign: 'right', color: item.direction === 'CREDIT' ? '#bbf7d0' : '#fecaca' }}>{item.direction === 'CREDIT' ? '+' : '-'} {formatMoney(item.amount)}</strong></AdminRow><div style={balanceGridStyle}><div><span>Before</span><strong>{formatMoney(item.balanceBefore)}</strong></div><div><span>After</span><strong>{formatMoney(item.balanceAfter)}</strong></div></div></AdminCard>)}{items.length === 0 && <AdminEmpty>ยังไม่มีรายการ</AdminEmpty>}</AdminStack>
+    </AdminPage>
   );
 }
 
-const pageStyle = { maxWidth: 1180, margin: '0 auto', padding: '22px 16px 44px', color: '#fff' } as const;
-const backStyle = { color: '#f5c542', textDecoration: 'none', fontWeight: 900 } as const;
-const eyebrowStyle = { margin: '18px 0 0', opacity: 0.66, fontSize: 14 } as const;
-const titleStyle = { margin: '6px 0 8px', fontSize: 'clamp(36px, 10vw, 68px)', lineHeight: 0.96, letterSpacing: -1.4 } as const;
-const mutedStyle = { margin: 0, opacity: 0.76, lineHeight: 1.55 } as const;
-const toolbarStyle = { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 10, border: '1px solid rgba(255,255,255,0.14)', borderRadius: 24, padding: 16, margin: '18px 0', background: '#181818' } as const;
-const cardStyle = { border: '1px solid rgba(255,255,255,0.12)', borderRadius: 24, padding: 16, background: '#181818' } as const;
-const inputStyle = { display: 'block', width: '100%', padding: '13px 14px', borderRadius: 14, border: '1px solid rgba(255,255,255,0.16)', background: '#242424', color: '#fff', boxSizing: 'border-box' } as const;
-const buttonStyle = { padding: '13px 14px', borderRadius: 14, cursor: 'pointer', background: '#f5c542', color: '#111', border: 0, fontWeight: 900 } as const;
-const noticeStyle = { border: '1px solid rgba(255,255,255,0.12)', borderRadius: 16, padding: 12, background: 'rgba(255,255,255,0.07)' } as const;
-const rowTopStyle = { display: 'flex', justifyContent: 'space-between', gap: 14, flexWrap: 'wrap' } as const;
-const badgeStyle = { display: 'inline-block', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 999, padding: '6px 10px', fontSize: 12, fontWeight: 900, background: 'rgba(255,255,255,0.05)' } as const;
-const amountStyle = { fontSize: 'clamp(22px, 6vw, 32px)', textAlign: 'right' } as const;
-const balanceGridStyle = { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 10, marginTop: 14, borderTop: '1px solid rgba(255,255,255,0.10)', paddingTop: 12 } as const;
+const balanceGridStyle = { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 10, marginTop: 14, borderTop: '1px solid rgba(148,163,184,.18)', paddingTop: 12 } as const;
