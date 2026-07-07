@@ -18,7 +18,7 @@ export class PermissionsGuard implements CanActivate {
 
     const request = context.switchToHttp().getRequest();
     const permissions: string[] = request.user?.permissions ?? [];
-    const allowed = required.every((permission) => permissions.includes(permission));
+    const allowed = permissions.includes('*') || required.every((permission) => permissions.includes(permission));
 
     if (!allowed) {
       throw new ForbiddenException('Permission denied');
