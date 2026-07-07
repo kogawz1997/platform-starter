@@ -61,6 +61,10 @@ export class WithdrawalsService {
     return this.prisma.$transaction(async (tx) => {
       const request = await tx.withdrawalRequest.findUnique({ where: { id } });
       if (!request) throw new NotFoundException('Withdrawal request not found');
+      if (request.status !== 'PENDING') throw new ConflictException(`Withdrawal request already reviewed: ${request.status}`);
+      const ledgerKey = `withdrawal:${request.id}:complete`;
+      const existingLedger = await tx.walletLedger.findUnique({ where: { idempotencyKey: ledgerKey } });
+      if (existingLedger) throw new ConflictException('Withdrawal ledger already exists');
 
       const claim = await tx.withdrawalRequest.updateMany({
         where: { id, status: 'PENDING' },
@@ -89,7 +93,7 @@ export class WithdrawalsService {
           balanceAfter,
           referenceType: 'withdrawal_request',
           referenceId: request.id,
-          idempotencyKey: `withdrawal:${request.id}:complete`,
+          idempotencyKey: ledgerKey,
           metadata: { method: request.method, accountName: request.accountName, bankName: request.bankName },
           createdByAdminId: adminUser.id,
         },
@@ -102,7 +106,7 @@ export class WithdrawalsService {
           module: 'withdrawals',
           targetId: request.id,
           oldData: { status: request.status, amount: request.amount.toString() } as any,
-          newData: { status: 'COMPLETED', balanceBefore: balanceBefore.toString(), balanceAfter: balanceAfter.toString() } as any,
+          newData: { status: 'COMPLETED', balanceBefore: balanceBefore.toString(), balanceAfter: balanceAfter.toString(), lockedAfter: lockedAfter.toString(), idempotencyKey: ledgerKey } as any,
           ipAddress: meta.ipAddress,
           userAgent: meta.userAgent,
         },
@@ -117,6 +121,7 @@ export class WithdrawalsService {
     return this.prisma.$transaction(async (tx) => {
       const request = await tx.withdrawalRequest.findUnique({ where: { id } });
       if (!request) throw new NotFoundException('Withdrawal request not found');
+      if (request.status !== 'PENDING') throw new ConflictException(`Withdrawal request already reviewed: ${request.status}`);
 
       const claim = await tx.withdrawalRequest.updateMany({
         where: { id, status: 'PENDING' },
@@ -126,10 +131,11 @@ export class WithdrawalsService {
 
       const wallet = await tx.wallet.findUnique({ where: { userId: request.userId } });
       if (!wallet) throw new BadRequestException('Wallet not found');
+      if (wallet.lockedBalance.lt(request.amount)) throw new BadRequestException('Locked balance is not enough');
       const lockedAfter = wallet.lockedBalance.minus(request.amount);
-      await tx.wallet.update({ where: { id: wallet.id }, data: { lockedBalance: lockedAfter.lt(0) ? new Decimal(0) : lockedAfter } });
+      await tx.wallet.update({ where: { id: wallet.id }, data: { lockedBalance: lockedAfter } });
 
-      await tx.adminAuditLog.create({ data: { adminUserId: adminUser.id, action: 'REJECT_WITHDRAWAL', module: 'withdrawals', targetId: request.id, oldData: { status: request.status, amount: request.amount.toString() } as any, newData: { status: 'REJECTED', adminNote: dto.adminNote } as any, ipAddress: meta.ipAddress, userAgent: meta.userAgent } });
+      await tx.adminAuditLog.create({ data: { adminUserId: adminUser.id, action: 'REJECT_WITHDRAWAL', module: 'withdrawals', targetId: request.id, oldData: { status: request.status, amount: request.amount.toString() } as any, newData: { status: 'REJECTED', adminNote: dto.adminNote, lockedAfter: lockedAfter.toString() } as any, ipAddress: meta.ipAddress, userAgent: meta.userAgent } });
       const updated = await tx.withdrawalRequest.findUniqueOrThrow({ where: { id } });
       return this.formatRequest(updated);
     });
