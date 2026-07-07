@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException, TooManyRequestsException } from '@nestjs/common';
 import { Decimal } from '@prisma/client/runtime/library';
 import { PrismaService } from '../../database/prisma.service';
 
@@ -14,6 +14,8 @@ const VALID_TYPES: RiskType[] = ['REPEATED_TOPUPS', 'RAPID_DEPOSIT_WITHDRAWAL', 
 
 @Injectable()
 export class RiskAlertsService {
+  private lastScanAt = 0;
+
   constructor(private readonly prisma: PrismaService) {}
 
   async list(filter: RiskFilter = {}) {
@@ -50,8 +52,15 @@ export class RiskAlertsService {
   }
 
   async scan(admin?: any) {
-    const created: any[] = [];
     const now = Date.now();
+    const cooldownMs = Number(process.env.RISK_SCAN_COOLDOWN_SECONDS ?? 45) * 1000;
+    const retryAfterMs = this.lastScanAt + cooldownMs - now;
+    if (retryAfterMs > 0) {
+      throw new TooManyRequestsException({ message: 'Risk scan is cooling down', retryAfter: Math.ceil(retryAfterMs / 1000) });
+    }
+    this.lastScanAt = now;
+
+    const created: any[] = [];
     created.push(...await this.scanMultiplePendingTopUps(now));
     created.push(...await this.scanRepeatedTopUps(now));
     created.push(...await this.scanRapidDepositWithdrawals(now));
