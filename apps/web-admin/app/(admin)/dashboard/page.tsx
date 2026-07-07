@@ -1,9 +1,8 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { adminApiFetch } from '../../admin-api';
 import { AdminButton, AdminCard, AdminEmpty, AdminGrid, AdminLinkButton, AdminMetric, AdminMetricGrid, AdminNotice, AdminPage, AdminRow, AdminStack, formatMoney } from '../_components/admin-ui';
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000';
 
 type FinanceSummary = {
   totals: { walletCount: number; totalBalance: string; totalLockedBalance: string; totalAvailableBalance: string; pendingTopUps: number; pendingWithdrawals: number };
@@ -23,12 +22,10 @@ export default function OperationDashboardPage() {
   useEffect(() => { loadSummary(); }, []);
 
   async function loadSummary() {
-    const token = window.localStorage.getItem('admin_access_token');
-    if (!token) { setMessage('กรุณา login admin ก่อน'); return; }
     setMessage('กำลังโหลด Operation Center...');
     const [financeRes, riskRes] = await Promise.all([
-      fetch(`${API_URL}/admin/finance/summary`, { headers: { Authorization: `Bearer ${token}` } }),
-      fetch(`${API_URL}/admin/risk/summary`, { headers: { Authorization: `Bearer ${token}` } }),
+      adminApiFetch('/admin/finance/summary'),
+      adminApiFetch('/admin/risk/summary'),
     ]);
     const financeData = await financeRes.json().catch(() => null);
     const riskData = await riskRes.json().catch(() => null);
