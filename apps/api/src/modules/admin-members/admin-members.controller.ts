@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Patch, Req, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, Query, Req, UseGuards } from '@nestjs/common';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { AdminAuthGuard } from '../../common/guards/admin-auth.guard';
 import { AdminMembersService } from './admin-members.service';
@@ -7,6 +7,11 @@ import { AdminMembersService } from './admin-members.service';
 @Controller('admin/members')
 export class AdminMembersController {
   constructor(private readonly adminMembersService: AdminMembersService) {}
+
+  @Get()
+  listMembers(@Query('search') search?: string, @Query('status') status?: string) {
+    return this.adminMembersService.listMembers(search, status);
+  }
 
   @Get(':id')
   getMemberDetail(@Param('id') id: string) {
