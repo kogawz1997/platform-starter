@@ -11,9 +11,12 @@ type FinanceSummary = {
   generatedAt: string;
 };
 type QueueItem = { id: string; shortUserId: string; amount: string; currency: string; status: string; method?: string | null; createdAt: string; user?: { username?: string | null; shortId?: string | null } | null };
+type RiskSummary = { counts: { high: number; medium: number; low: number; total: number }; alerts: RiskAlert[]; checkedWallets: number; generatedAt: string };
+type RiskAlert = { type: string; severity: string; message: string; userId?: string; username?: string | null; targetId?: string; amount?: string; walletId?: string; createdAt?: string };
 
 export default function OperationDashboardPage() {
   const [summary, setSummary] = useState<FinanceSummary | null>(null);
+  const [risk, setRisk] = useState<RiskSummary | null>(null);
   const [message, setMessage] = useState('');
 
   useEffect(() => { loadSummary(); }, []);
@@ -22,18 +25,25 @@ export default function OperationDashboardPage() {
     const token = window.localStorage.getItem('admin_access_token');
     if (!token) { setMessage('กรุณา login admin ก่อน'); return; }
     setMessage('กำลังโหลด Operation Center...');
-    const res = await fetch(`${API_URL}/admin/finance/summary`, { headers: { Authorization: `Bearer ${token}` } });
-    const data = await res.json().catch(() => null);
-    if (!res.ok) { setMessage(data?.message ?? 'โหลด dashboard ไม่สำเร็จ'); return; }
-    setSummary(data); setMessage('');
+    const [financeRes, riskRes] = await Promise.all([
+      fetch(`${API_URL}/admin/finance/summary`, { headers: { Authorization: `Bearer ${token}` } }),
+      fetch(`${API_URL}/admin/risk/summary`, { headers: { Authorization: `Bearer ${token}` } }),
+    ]);
+    const financeData = await financeRes.json().catch(() => null);
+    const riskData = await riskRes.json().catch(() => null);
+    if (!financeRes.ok) { setMessage(financeData?.message ?? 'โหลด dashboard ไม่สำเร็จ'); return; }
+    setSummary(financeData);
+    if (riskRes.ok) setRisk(riskData);
+    setMessage('');
   }
 
   return (
     <main style={pageStyle}>
       <p style={eyebrowStyle}>Operation Center</p>
-      <div style={headerRowStyle}><div><h1 style={titleStyle}>Dashboard</h1><p style={mutedStyle}>ศูนย์รวมคิวการเงิน ยอด wallet และรายการล่าสุด</p></div><button type="button" onClick={loadSummary} style={buttonStyle}>Refresh</button></div>
+      <div style={headerRowStyle}><div><h1 style={titleStyle}>Dashboard</h1><p style={mutedStyle}>ศูนย์รวมคิวการเงิน ยอด wallet ความเสี่ยง และรายการล่าสุด</p></div><button type="button" onClick={loadSummary} style={buttonStyle}>Refresh</button></div>
       {message && <div style={noticeStyle}>{message}</div>}
-      {summary && <section style={metricGridStyle}><Metric title="Wallets" value={summary.totals.walletCount.toLocaleString('th-TH')} /><Metric title="Available" value={money(summary.totals.totalAvailableBalance)} /><Metric title="Locked" value={money(summary.totals.totalLockedBalance)} /><Metric title="Pending" value={`${summary.totals.pendingTopUps + summary.totals.pendingWithdrawals}`} /></section>}
+      {summary && <section style={metricGridStyle}><Metric title="Wallets" value={summary.totals.walletCount.toLocaleString('th-TH')} /><Metric title="Available" value={money(summary.totals.totalAvailableBalance)} /><Metric title="Locked" value={money(summary.totals.totalLockedBalance)} /><Metric title="Pending" value={`${summary.totals.pendingTopUps + summary.totals.pendingWithdrawals}`} />{risk && <Metric title="Risk Alerts" value={`${risk.counts.total}`} />}</section>}
+      {risk && <section style={cardStyle}><div style={sectionHeadStyle}><div><h2 style={sectionTitleStyle}>Risk Alerts</h2><p style={mutedStyle}>High {risk.counts.high} · Medium {risk.counts.medium} · Low {risk.counts.low}</p></div><a href="/reports" style={linkStyle}>ดู Reports</a></div><div style={{ display: 'grid', gap: 10 }}>{risk.alerts.slice(0, 8).map((item, index) => <div key={`${item.type}-${item.userId ?? item.targetId ?? index}`} style={rowStyle}><div><strong>{item.severity} · {item.type}</strong><p style={mutedStyle}>{item.message}</p><p style={mutedStyle}>{item.username ?? item.userId ?? item.targetId ?? '-'}</p></div>{item.userId && <a href={`/members/${item.userId}`} style={linkStyle}>Member</a>}</div>)}{risk.alerts.length === 0 && <p style={mutedStyle}>ยังไม่พบ alert สำคัญ</p>}</div></section>}
       {summary && <section style={queueGridStyle}><QueueCard title="Top-up Queue" href="/topups" count={summary.totals.pendingTopUps} items={summary.queues.topUps} /><QueueCard title="Withdrawal Queue" href="/withdrawals" count={summary.totals.pendingWithdrawals} items={summary.queues.withdrawals} /></section>}
       {summary && <section style={cardStyle}><div style={sectionHeadStyle}><h2 style={sectionTitleStyle}>Recent Ledger</h2><a href="/ledgers" style={linkStyle}>ดูทั้งหมด</a></div><div style={{ display: 'grid', gap: 10 }}>{summary.recentLedgers.map((item) => <div key={item.id} style={rowStyle}><div><strong>{item.type} / {item.direction}</strong><p style={mutedStyle}>{item.user?.username ?? item.user?.shortId ?? '-'}</p></div><div style={{ textAlign: 'right' }}><strong>{money(item.amount)}</strong><p style={mutedStyle}>{new Date(item.createdAt).toLocaleString('th-TH')}</p></div></div>)}</div></section>}
     </main>
