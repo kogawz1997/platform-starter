@@ -11,6 +11,7 @@ import { WithdrawalsModule } from './modules/withdrawals/withdrawals.module';
 import { FinanceModule } from './modules/finance/finance.module';
 import { ReportsModule } from './modules/reports/reports.module';
 import { ExportsModule } from './modules/exports/exports.module';
+import { BankAccountsModule } from './modules/bank-accounts/bank-accounts.module';
 
 @Module({
   imports: [
@@ -26,6 +27,7 @@ import { ExportsModule } from './modules/exports/exports.module';
     FinanceModule,
     ReportsModule,
     ExportsModule,
+    BankAccountsModule,
   ],
 })
 export class AppModule {}
