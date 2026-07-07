@@ -78,9 +78,18 @@ export class BankAccountsService {
 
   async createMemberBankAccount(userId: string, body: BankBody) {
     this.requireBankFields(body);
-    const count = await this.prisma.memberBankAccount.count({ where: { userId } });
+
+    const existing = await this.prisma.memberBankAccount.findFirst({ where: { userId } });
+    if (existing) throw new BadRequestException('สมาชิก 1 คนเพิ่มบัญชีถอนได้ 1 บัญชีเท่านั้น');
+
+    const user = await this.prisma.user.findUnique({ where: { id: userId }, include: { profile: true } });
+    if (!user) throw new NotFoundException('Member not found');
+    const allowedNames = [user.profile?.displayName, user.username].filter(Boolean).map((value) => this.normalizeName(String(value)));
+    const submittedName = this.normalizeName(body.accountName!);
+    if (!allowedNames.includes(submittedName)) throw new BadRequestException('ชื่อบัญชีต้องตรงกับชื่อบัญชีสมาชิก');
+
     const item = await this.prisma.memberBankAccount.create({
-      data: { userId, bankName: body.bankName!.trim(), accountName: body.accountName!.trim(), accountNumber: body.accountNumber!.trim(), isPrimary: count === 0, status: 'PENDING_REVIEW' },
+      data: { userId, bankName: body.bankName!.trim(), accountName: body.accountName!.trim(), accountNumber: body.accountNumber!.trim(), isPrimary: true, status: 'PENDING_REVIEW' },
     });
     return { item: this.mapMemberBank(item) };
   }
@@ -119,6 +128,10 @@ export class BankAccountsService {
     const next = Number(value);
     if (!Number.isFinite(next) || next < 0) throw new BadRequestException('Invalid amount limit');
     return next;
+  }
+
+  private normalizeName(value: string) {
+    return value.replace(/\s+/g, '').trim().toLowerCase();
   }
 
   private mapReceiving(item: any) {
