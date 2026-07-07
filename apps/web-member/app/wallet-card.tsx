@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { API_URL } from './site-settings';
+import { memberApiFetch } from './member-api';
 
 type WalletResponse = {
   currency: string;
@@ -16,13 +16,7 @@ export default function WalletCard({ primaryColor, cardColor, showButtons }: { p
   const [message, setMessage] = useState('กำลังโหลดกระเป๋าเงิน...');
 
   useEffect(() => {
-    const token = window.localStorage.getItem('member_access_token');
-    if (!token) {
-      setMessage('ยังไม่ได้เข้าสู่ระบบ');
-      return;
-    }
-
-    fetch(`${API_URL}/member/wallet`, { headers: { Authorization: `Bearer ${token}` } })
+    memberApiFetch('/member/wallet')
       .then(async (res) => {
         const data = await res.json().catch(() => null);
         if (!res.ok) throw new Error(data?.message ?? 'โหลดกระเป๋าเงินไม่สำเร็จ');
@@ -38,9 +32,9 @@ export default function WalletCard({ primaryColor, cardColor, showButtons }: { p
   const balance = wallet ? Number(wallet.balance) : 0;
 
   return (
-    <section style={{ ...cardStyle, background: cardColor }}>
+    <section style={{ ...cardStyle, background: `linear-gradient(150deg, ${cardColor}, rgba(255,255,255,.045))` }}>
       <div style={topRowStyle}>
-        <div>
+        <div style={{ minWidth: 0 }}>
           <p style={mutedStyle}>ยอดเงินที่ใช้ได้</p>
           <h2 style={amountStyle}>{currency} {available.toLocaleString('th-TH', { minimumFractionDigits: 2 })}</h2>
         </div>
@@ -56,22 +50,23 @@ export default function WalletCard({ primaryColor, cardColor, showButtons }: { p
 
       {showButtons && (
         <div style={actionRowStyle}>
-          <a href="/deposit" style={{ ...actionStyle, background: primaryColor, color: '#111' }}>ฝากเงิน</a>
+          <a href="/deposit" style={{ ...actionStyle, background: primaryColor, color: '#111', borderColor: primaryColor }}>ฝากเงิน</a>
           <a href="/withdraw" style={actionStyle}>ถอนเงิน</a>
           <a href="/transactions" style={actionStyle}>ประวัติ</a>
+          <a href="/bank-accounts" style={actionStyle}>บัญชีถอน</a>
         </div>
       )}
     </section>
   );
 }
 
-const cardStyle = { border: '1px solid rgba(255,255,255,0.10)', borderRadius: 30, padding: 20, display: 'grid', gap: 16, boxShadow: '0 22px 70px rgba(0,0,0,0.22)', overflow: 'hidden' } as const;
-const topRowStyle = { display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'flex-start' } as const;
+const cardStyle = { border: '1px solid rgba(255,255,255,0.10)', borderRadius: 30, padding: 20, display: 'grid', gap: 16, boxShadow: '0 22px 70px rgba(0,0,0,0.22)', overflow: 'hidden', minWidth: 0 } as const;
+const topRowStyle = { display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'flex-start', flexWrap: 'wrap' as const, minWidth: 0 };
 const mutedStyle = { margin: 0, opacity: 0.72, fontSize: 14 } as const;
-const amountStyle = { margin: '6px 0 0', fontSize: 'clamp(30px, 9vw, 48px)', lineHeight: 1, letterSpacing: -0.8 } as const;
-const statusStyle = { border: '1px solid rgba(255,255,255,0.12)', borderRadius: 999, padding: '7px 10px', fontSize: 12, fontWeight: 800 } as const;
+const amountStyle = { margin: '6px 0 0', fontSize: 'clamp(30px, 9vw, 48px)', lineHeight: 1, letterSpacing: -0.8, overflowWrap: 'anywhere' as const };
+const statusStyle = { border: '1px solid rgba(255,255,255,0.12)', borderRadius: 999, padding: '7px 10px', fontSize: 12, fontWeight: 800, flex: '0 0 auto' } as const;
 const miniGridStyle = { display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 10 } as const;
-const miniBoxStyle = { border: '1px solid rgba(255,255,255,0.10)', borderRadius: 18, padding: 12, display: 'grid', gap: 4, background: 'rgba(255,255,255,0.05)' } as const;
+const miniBoxStyle = { border: '1px solid rgba(255,255,255,0.10)', borderRadius: 18, padding: 12, display: 'grid', gap: 4, background: 'rgba(255,255,255,0.05)', minWidth: 0, overflow: 'hidden' as const };
 const noticeStyle = { border: '1px solid rgba(255,255,255,0.12)', borderRadius: 16, padding: 12, background: 'rgba(255,255,255,0.06)' } as const;
-const actionRowStyle = { display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 10 } as const;
-const actionStyle = { border: '1px solid rgba(255,255,255,0.12)', borderRadius: 16, padding: '13px 10px', textAlign: 'center', textDecoration: 'none', color: 'inherit', fontWeight: 900, background: 'rgba(255,255,255,0.10)' } as const;
+const actionRowStyle = { display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 10 } as const;
+const actionStyle = { border: '1px solid rgba(255,255,255,0.12)', borderRadius: 16, minHeight: 48, padding: '13px 10px', textAlign: 'center' as const, textDecoration: 'none', color: 'inherit', fontWeight: 900, background: 'rgba(255,255,255,0.10)', display: 'grid', placeItems: 'center' };
