@@ -2,7 +2,7 @@
 
 import { ReactNode, useEffect, useState } from 'react';
 import { usePathname } from 'next/navigation';
-import { clearMemberSession, refreshMemberToken } from './member-api';
+import { API_URL, clearMemberSession, refreshMemberToken } from './member-api';
 
 const menuItems = [
   ['หน้าหลัก', '/'],
@@ -23,9 +23,7 @@ export default function MemberChrome({ children }: { children: ReactNode }) {
   useEffect(() => {
     let cancelled = false;
     async function checkAuth() {
-      const hasToken = Boolean(window.localStorage.getItem('member_access_token'));
-      let ok = hasToken;
-      if (!ok && window.localStorage.getItem('member_refresh_token')) ok = Boolean(await refreshMemberToken());
+      const ok = await verifyMemberSession();
       if (cancelled) return;
       setIsLoggedIn(ok);
       setReady(true);
@@ -35,6 +33,7 @@ export default function MemberChrome({ children }: { children: ReactNode }) {
       }
       if (isAuthPage && ok) window.location.replace('/');
     }
+    setReady(false);
     checkAuth();
     return () => { cancelled = true; };
   }, [pathname, isAuthPage]);
@@ -62,4 +61,26 @@ export default function MemberChrome({ children }: { children: ReactNode }) {
       {children}
     </>
   );
+}
+
+async function verifyMemberSession() {
+  const token = window.localStorage.getItem('member_access_token');
+  if (!token && !window.localStorage.getItem('member_refresh_token')) return false;
+
+  if (token) {
+    const res = await fetch(`${API_URL}/member/wallet`, { headers: { Authorization: `Bearer ${token}` } });
+    if (res.ok) return true;
+    if (res.status !== 401) return true;
+  }
+
+  const refreshed = await refreshMemberToken();
+  if (!refreshed) {
+    clearMemberSession();
+    return false;
+  }
+
+  const retry = await fetch(`${API_URL}/member/wallet`, { headers: { Authorization: `Bearer ${refreshed}` } });
+  if (retry.ok) return true;
+  if (retry.status === 401) clearMemberSession();
+  return false;
 }
