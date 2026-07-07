@@ -23,7 +23,6 @@ type LedgerItem = { id: string; type: string; direction: string; amount: string;
 
 export default function MemberHome(props: MemberHomeProps) {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [ready, setReady] = useState(false);
   const [topups, setTopups] = useState<MoneyRequest[]>([]);
   const [withdrawals, setWithdrawals] = useState<MoneyRequest[]>([]);
   const [ledgers, setLedgers] = useState<LedgerItem[]>([]);
@@ -32,7 +31,6 @@ export default function MemberHome(props: MemberHomeProps) {
   useEffect(() => {
     const ok = Boolean(window.localStorage.getItem('member_access_token') || window.localStorage.getItem('member_refresh_token'));
     setIsLoggedIn(ok);
-    setReady(true);
     if (ok) loadActivity();
   }, []);
 
@@ -59,15 +57,6 @@ export default function MemberHome(props: MemberHomeProps) {
 
   return (
     <section className="member-shell member-home-shell">
-      <section className="member-hero-card" style={{ background: props.cardColor, color: props.textColor }}>
-        <div>
-          <p className="member-eyebrow">{props.siteName}</p>
-          <h1>Member Dashboard</h1>
-          <p>{props.description || 'จัดการยอดเงิน ฝาก ถอน และบัญชีสมาชิกได้จากที่เดียว'}</p>
-        </div>
-        {!ready ? null : isLoggedIn ? <span className="member-status-pill">Online</span> : <span className="member-status-pill muted">Guest</span>}
-      </section>
-
       {props.showBalanceHeader && <WalletCard primaryColor={props.primaryColor} cardColor={props.cardColor} showButtons={props.showButtons && isLoggedIn} />}
 
       {isLoggedIn && pendingCount > 0 && <section className="member-info-card" style={alertCardStyle}>
