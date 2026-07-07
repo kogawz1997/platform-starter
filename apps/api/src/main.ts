@@ -16,6 +16,24 @@ async function bootstrap() {
     credentials: true,
   });
 
+  app.use((req: any, res: any, next: any) => {
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.setHeader('X-Frame-Options', 'DENY');
+    res.setHeader('Referrer-Policy', 'no-referrer');
+    res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
+    next();
+  });
+
+  app.use((req: any, res: any, next: any) => {
+    const startedAt = Date.now();
+    res.on('finish', () => {
+      const duration = Date.now() - startedAt;
+      const path = String(req.originalUrl ?? req.url ?? '').replace(/token=[^&]+/gi, 'token=[redacted]');
+      console.log(`${req.method} ${path} ${res.statusCode} ${duration}ms`);
+    });
+    next();
+  });
+
   app.useGlobalPipes(
     new ValidationPipe({
       whitelist: true,
