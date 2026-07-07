@@ -12,6 +12,19 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="th">
       <body style={{ margin: 0, minWidth: 0, fontFamily: 'system-ui, sans-serif' }}>
         <style>{`
+          .global-member-topbar {
+            margin: 0 !important;
+            padding-left: 14px !important;
+            padding-right: 14px !important;
+          }
+          .member-drawer-nav a.active {
+            background: var(--brand) !important;
+            color: #111 !important;
+            border-color: var(--brand) !important;
+          }
+          .member-home-shell {
+            padding-top: 14px !important;
+          }
           main[style*="place-items"] {
             width: 100% !important;
             min-height: 100dvh !important;
