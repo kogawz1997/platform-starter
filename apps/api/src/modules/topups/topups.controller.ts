@@ -11,6 +11,12 @@ export class TopUpsController {
   constructor(private readonly topUpsService: TopUpsService) {}
 
   @UseGuards(MemberAuthGuard)
+  @Post('member/topups/slip')
+  saveSlip(@CurrentUser() user: any, @Body() body: { slipImageData?: string; slipImageName?: string }) {
+    return this.topUpsService.saveMemberSlip(user.id, body);
+  }
+
+  @UseGuards(MemberAuthGuard)
   @Post('member/topups')
   createMemberRequest(@CurrentUser() user: any, @Body() body: CreateTopUpRequestDto) {
     return this.topUpsService.createMemberRequest(user.id, body);
@@ -35,6 +41,12 @@ export class TopUpsController {
   }
 
   @UseGuards(AdminAuthGuard)
+  @Get('admin/topups/:id/slip')
+  getAdminSlip(@Param('id') id: string) {
+    return this.topUpsService.getAdminSlip(id);
+  }
+
+  @UseGuards(AdminAuthGuard)
   @Get('admin/topups/:id')
   getAdminRequest(@Param('id') id: string) {
     return this.topUpsService.getAdminRequest(id);
@@ -42,30 +54,17 @@ export class TopUpsController {
 
   @UseGuards(AdminAuthGuard)
   @Post('admin/topups/:id/confirm')
-  confirmRequest(
-    @Param('id') id: string,
-    @CurrentUser() user: any,
-    @Body() body: ReviewTopUpRequestDto,
-    @Req() req: any,
-  ) {
+  confirmRequest(@Param('id') id: string, @CurrentUser() user: any, @Body() body: ReviewTopUpRequestDto, @Req() req: any) {
     return this.topUpsService.approveRequest(id, user, body, this.meta(req));
   }
 
   @UseGuards(AdminAuthGuard)
   @Post('admin/topups/:id/decline')
-  declineRequest(
-    @Param('id') id: string,
-    @CurrentUser() user: any,
-    @Body() body: ReviewTopUpRequestDto,
-    @Req() req: any,
-  ) {
+  declineRequest(@Param('id') id: string, @CurrentUser() user: any, @Body() body: ReviewTopUpRequestDto, @Req() req: any) {
     return this.topUpsService.rejectRequest(id, user, body, this.meta(req));
   }
 
   private meta(req: any) {
-    return {
-      ipAddress: req.ip,
-      userAgent: req.headers?.['user-agent'],
-    };
+    return { ipAddress: req.ip, userAgent: req.headers?.['user-agent'] };
   }
 }
