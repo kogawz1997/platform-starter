@@ -114,20 +114,26 @@ Backend requirements:
 
 ## Phase 3: Wallet Hardening and Operation Center
 
-Status: in progress, ABC hardening pass completed
+Status: in progress, parallel work started
 
 - Finance dashboard summary: completed
 - Reconciliation reports: completed first pass
 - Export finance records: completed first pass
 - Job lock for high-risk operations: completed first pass
-- Private media storage for slips: next
-- Notification for review queues: next
+- Private media storage for slips: first pass completed
+- Notification for review queues: first pass completed
 
 ### ABC hardening pass
 
 - A: top-up review guards, withdrawal review guards, and manual adjustment idempotency from admin UI completed
 - B: reports include queue counters, reconciliation checked count, and exports shortcut completed
 - C: top-up and withdrawal review UX now removes reviewed pending items and hides duplicate action buttons completed
+
+### Parallel operation pass
+
+- Private Slip Storage: member uploads slips to a private server path and admin loads slips through a guarded endpoint completed first pass
+- Queue Badge: admin drawer/topbar show pending top-up and withdrawal counts completed first pass
+- Operation Dashboard: /dashboard aggregates wallet totals, finance queues, and recent ledgers completed first pass
 
 ## Phase 3.5: UX/UI Polish
 
@@ -163,6 +169,7 @@ Status: completed after production mobile regression test
 ### Admin UX/UI
 
 - Admin layout/sidebar: completed
+- Operation dashboard first pass: completed
 - Finance dashboard polish: completed
 - Top-up review page polish: completed
 - Withdrawal review page polish: completed
@@ -187,13 +194,13 @@ Status: completed after production mobile regression test
 
 ## Phase 4: Admin Operation Center
 
-Status: next
+Status: started
 
-- Dashboard
-- Finance queues
+- Dashboard: first pass completed
+- Finance queues: first pass completed
 - Member detail
 - Risk alert
-- Reports
+- Reports: first pass completed
 - Audit log viewer
 - Admin activity history
 
