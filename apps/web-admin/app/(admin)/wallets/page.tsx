@@ -34,14 +34,16 @@ export default function AdminWalletsPage() {
 
   async function adjustWallet(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (busy) return;
     const token = window.localStorage.getItem('admin_access_token');
     if (!token) { setMessage('กรุณา login admin ก่อน'); return; }
     if (!adjustUserId) { setMessage('เลือก member ก่อน'); return; }
     const parsedAmount = Number(amount.replace(/,/g, '').trim());
     if (!Number.isFinite(parsedAmount) || parsedAmount <= 0) { setMessage('จำนวนเงินต้องมากกว่า 0'); return; }
     if (!reason.trim()) { setMessage('ต้องใส่เหตุผล'); return; }
+    const idempotencyKey = `wallet-adjust-${adjustUserId}-${direction}-${parsedAmount}-${Date.now()}`;
     setBusy(true); setMessage('กำลังปรับยอด...');
-    const res = await fetch(`${API_URL}/admin/wallets/${adjustUserId}/adjust`, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }, body: JSON.stringify({ direction, amount: parsedAmount, reason }) });
+    const res = await fetch(`${API_URL}/admin/wallets/${adjustUserId}/adjust`, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }, body: JSON.stringify({ direction, amount: parsedAmount, reason, idempotencyKey }) });
     const data = await res.json().catch(() => null); setBusy(false);
     if (!res.ok) { setMessage(data?.message ?? 'ปรับยอดไม่สำเร็จ'); return; }
     setItems((current) => current.map((item) => (item.userId === adjustUserId ? { ...item, ...data.wallet } : item)));
