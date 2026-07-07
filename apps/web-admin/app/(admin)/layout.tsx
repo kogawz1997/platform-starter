@@ -2,14 +2,13 @@
 
 import { ReactNode, useEffect, useState } from 'react';
 import { usePathname } from 'next/navigation';
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000';
+import { adminApiFetch, clearAdminSession } from '../admin-api';
 
 const navGroups = [
   { title: 'Overview', items: [['Dashboard', '/dashboard'], ['Finance', '/finance']] },
   { title: 'Queues', items: [['Top-ups', '/topups'], ['Withdrawals', '/withdrawals']] },
   { title: 'Money', items: [['Wallets', '/wallets'], ['Ledgers', '/ledgers'], ['Reports', '/reports'], ['Exports', '/exports']] },
-  { title: 'Admin', items: [['Activity', '/activity'], ['Member Detail', '/member-detail'], ['Settings', '/settings']] },
+  { title: 'Admin', items: [['Activity', '/activity'], ['Member Detail', '/member-detail'], ['Bank Accounts', '/bank-accounts'], ['Settings', '/settings']] },
 ];
 
 export default function AdminProtectedLayout({ children }: { children: ReactNode }) {
@@ -31,20 +30,19 @@ export default function AdminProtectedLayout({ children }: { children: ReactNode
       return;
     }
 
-    loadQueueCount(token);
-    const interval = window.setInterval(() => loadQueueCount(token), 60000);
+    loadQueueCount();
+    const interval = window.setInterval(loadQueueCount, 60000);
     return () => window.clearInterval(interval);
   }, [pathname]);
 
-  async function loadQueueCount(token: string) {
-    const res = await fetch(`${API_URL}/admin/queues/summary`, { headers: { Authorization: `Bearer ${token}` } });
+  async function loadQueueCount() {
+    const res = await adminApiFetch('/admin/queues/summary');
     const data = await res.json().catch(() => null);
     if (res.ok && data) setQueueCount({ topups: Number(data.topUps?.count ?? 0), withdrawals: Number(data.withdrawals?.count ?? 0) });
   }
 
   function logout() {
-    window.localStorage.removeItem('admin_access_token');
-    window.localStorage.removeItem('admin_refresh_token');
+    clearAdminSession();
     window.location.href = '/login';
   }
 
@@ -55,9 +53,7 @@ export default function AdminProtectedLayout({ children }: { children: ReactNode
     return 0;
   }
 
-  if (!ready || !isLoggedIn) {
-    return <main className="admin-shell" style={{ minHeight: '100dvh', display: 'grid', placeItems: 'center', color: '#fff' }}>กำลังตรวจสอบสิทธิ์...</main>;
-  }
+  if (!ready || !isLoggedIn) return <main className="admin-shell" style={{ minHeight: '100dvh', display: 'grid', placeItems: 'center', color: '#fff' }}>กำลังตรวจสอบสิทธิ์...</main>;
 
   return (
     <main className="admin-shell admin-shell-drawer-mode">
