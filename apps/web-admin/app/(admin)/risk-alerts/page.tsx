@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { adminApiFetch } from '../../admin-api';
-import { AdminBadge, AdminButton, AdminCard, AdminEmpty, AdminMetric, AdminMetricGrid, AdminNotice, AdminPage, AdminRow, AdminStack, AdminToolbar } from '../_components/admin-ui';
+import { AdminBadge, AdminButton, AdminCard, AdminEmpty, AdminLinkButton, AdminMetric, AdminMetricGrid, AdminNotice, AdminPage, AdminRow, AdminStack, AdminToolbar } from '../_components/admin-ui';
 
 type RiskAlert = {
   id: string;
@@ -51,7 +51,7 @@ export default function RiskAlertsPage() {
     if (createdTo) query.set('createdTo', createdTo);
 
     const res = await adminApiFetch(`/admin/risk-alerts?${query.toString()}`);
-    const data = (await res.json().catch(() => null)) as RiskResponse | { message?: string } | null;
+    const data = (await res.json().catch(() => null)) as RiskResponse | { message?: string; retryAfter?: number } | null;
     if (res.ok && data) {
       const payload = data as RiskResponse;
       setItems(payload.items ?? []);
@@ -70,7 +70,7 @@ export default function RiskAlertsPage() {
     const res = await adminApiFetch('/admin/risk-alerts/scan', { method: 'POST' });
     const data = await res.json().catch(() => null);
     if (res.ok) setMessage(`สแกนเสร็จ สร้าง alert ใหม่ ${Number(data?.created ?? 0)} รายการ`);
-    else setMessage(data?.message ?? 'สแกนความเสี่ยงไม่สำเร็จ');
+    else setMessage(data?.retryAfter ? `สแกนถี่เกินไป ลองใหม่ใน ${data.retryAfter} วินาที` : data?.message ?? 'สแกนความเสี่ยงไม่สำเร็จ');
     setScanning(false);
     await load();
   }
@@ -129,6 +129,7 @@ export default function RiskAlertsPage() {
           {item.metadata && <details style={detailsStyle}><summary>Metadata</summary><pre style={preStyle}>{JSON.stringify(item.metadata, null, 2)}</pre></details>}
         </div>
         <div style={actionStyle}>
+          <AdminLinkButton href={`/risk-alerts/${item.id}`}>Detail</AdminLinkButton>
           <AdminButton tone="secondary" disabled={item.status === 'REVIEWING'} onClick={() => updateStatus(item.id, 'REVIEWING')}>Reviewing</AdminButton>
           <AdminButton tone="success" disabled={item.status === 'RESOLVED'} onClick={() => updateStatus(item.id, 'RESOLVED')}>Resolve</AdminButton>
           <AdminButton tone="danger" disabled={item.status === 'DISMISSED'} onClick={() => updateStatus(item.id, 'DISMISSED')}>Dismiss</AdminButton>
