@@ -31,13 +31,19 @@ export default function AdminTopUpsPage() {
   async function reviewItem(id: string, action: 'confirm' | 'decline') {
     const token = window.localStorage.getItem('admin_access_token');
     if (!token) { setMessage('กรุณา login admin ก่อน'); return; }
+    const nextStatus = action === 'confirm' ? 'APPROVED' : 'REJECTED';
     setBusyId(id); setMessage(action === 'confirm' ? 'กำลังอนุมัติรายการ...' : 'กำลังปฏิเสธรายการ...');
     const res = await fetch(`${API_URL}/admin/topups/${id}/${action}`, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }, body: JSON.stringify({ adminNote: reviewNote }) });
     const data = await res.json().catch(() => null); setBusyId('');
     if (!res.ok) { setMessage(data?.message ?? 'ทำรายการไม่สำเร็จ'); return; }
-    setItems((current) => status === 'PENDING' ? current.filter((item) => item.id !== data.id) : current.map((item) => (item.id === data.id ? { ...item, ...data } : item)));
+    const updated = data?.item ?? data?.topup ?? data;
+    setItems((current) => {
+      const patched = current.map((item) => (item.id === id ? { ...item, ...updated, status: updated?.status ?? nextStatus, adminNote: updated?.adminNote ?? reviewNote } : item));
+      return status === 'PENDING' ? patched.filter((item) => item.id !== id) : patched;
+    });
     setReviewNote('');
     setMessage(action === 'confirm' ? 'อนุมัติสำเร็จ ย้ายรายการออกจากคิว pending แล้ว' : 'ปฏิเสธรายการแล้ว ย้ายออกจากคิว pending แล้ว');
+    window.setTimeout(() => loadItems(status), 400);
   }
 
   return (
@@ -46,7 +52,6 @@ export default function AdminTopUpsPage() {
       <p style={eyebrowStyle}>Finance Queue</p>
       <h1 style={titleStyle}>Top Up Review</h1>
       <p style={mutedStyle}>ตรวจสลิป เติมยอด และจัดการคำขอเติมเงินของสมาชิก</p>
-
       <section style={toolbarStyle}>
         <strong>Pending ในหน้านี้: {counts.pending}</strong>
         <select value={status} onChange={(event) => setStatus(event.target.value)} style={inputStyle}><option value="PENDING">PENDING</option><option value="APPROVED">APPROVED</option><option value="REJECTED">REJECTED</option><option value="ALL">ALL</option></select>
@@ -62,7 +67,6 @@ export default function AdminTopUpsPage() {
 }
 
 function parseProofNote(value?: string | null): Proof { if (!value) return { userNote: '', slipImageData: '', slipImageName: '' }; try { const data = JSON.parse(value); return { userNote: typeof data.userNote === 'string' ? data.userNote : '', slipImageData: typeof data.slipImageData === 'string' ? data.slipImageData : '', slipImageName: typeof data.slipImageName === 'string' ? data.slipImageName : '' }; } catch { return { userNote: value, slipImageData: '', slipImageName: '' }; } }
-
 const pageStyle = { maxWidth: 1160, margin: '0 auto', padding: '22px 16px 44px', color: '#fff' } as const;
 const backStyle = { color: '#f5c542', textDecoration: 'none', fontWeight: 900 } as const;
 const eyebrowStyle = { margin: '18px 0 0', opacity: 0.66, fontSize: 14 } as const;
