@@ -70,12 +70,24 @@ export default function AdminSecurityPage() {
     await loadSessions();
   }
 
+  async function logoutOtherDevices() {
+    if (!window.confirm('ยืนยันออกจากระบบอุปกรณ์อื่นทั้งหมด?')) return;
+    setLoading(true); setMessage('กำลังออกจากระบบอุปกรณ์อื่น...');
+    const res = await adminApiFetch('/admin/auth/sessions/logout-others', { method: 'POST' });
+    const data = await res.json().catch(() => null);
+    setLoading(false);
+    if (!res.ok) { setMessage(data?.message ?? 'ออกจากระบบอุปกรณ์อื่นไม่สำเร็จ'); return; }
+    setMessage(`ออกจากระบบอุปกรณ์อื่นแล้ว ${data?.revoked ?? 0} session`);
+    await loadSessions();
+  }
+
   async function copy(value: string, label: string) {
     try { await navigator.clipboard.writeText(value); setMessage(`คัดลอก${label}แล้ว`); }
     catch { setMessage(`คัดลอก${label}ไม่สำเร็จ`); }
   }
 
   const activeCount = sessions.filter((item) => item.active).length;
+  const otherActiveCount = sessions.filter((item) => item.active && !item.current).length;
 
   return <AdminPage eyebrow="Security" title="Admin Security" description="ตั้งค่า 2FA และดู session ของบัญชีแอดมิน" actions={<AdminButton onClick={loadAll}>Reload</AdminButton>}>
     {message && <AdminNotice>{message}</AdminNotice>}
@@ -111,6 +123,7 @@ export default function AdminSecurityPage() {
     </AdminCard>
 
     <AdminCard title="Admin Sessions" description="รายการ session ล่าสุดของบัญชีแอดมินนี้">
+      <div style={sessionToolbarStyle}><AdminButton disabled={loading || otherActiveCount === 0} onClick={logoutOtherDevices}>Logout other devices</AdminButton></div>
       <AdminStack>{sessions.map((session) => <section key={session.id} style={sessionBoxStyle}><div style={sessionTopStyle}><div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}><AdminBadge tone={session.active ? 'success' : 'neutral'}>{session.active ? 'ACTIVE' : 'ENDED'}</AdminBadge>{session.current && <AdminBadge tone="warning">CURRENT</AdminBadge>}</div>{session.active && <AdminButton disabled={loading} tone="danger" onClick={() => revokeSession(session)}>Revoke</AdminButton>}</div><strong>{session.deviceId || 'Unknown device'}</strong><p>IP: {session.ipAddress || '-'}</p><p style={agentStyle}>UA: {session.userAgent || '-'}</p><p>Created: {new Date(session.createdAt).toLocaleString('th-TH')}</p><p>Expires: {new Date(session.expiresAt).toLocaleString('th-TH')}</p>{session.revokedAt && <p>Ended: {new Date(session.revokedAt).toLocaleString('th-TH')}</p>}</section>)}{sessions.length === 0 && <AdminNotice>ยังไม่มี session ให้แสดง</AdminNotice>}</AdminStack>
     </AdminCard>
   </AdminPage>;
@@ -124,4 +137,5 @@ const inputStyle = { minHeight: 44, borderRadius: 12, border: '1px solid rgba(14
 const copyButtonStyle = { border: '1px solid rgba(245,197,66,.35)', borderRadius: 12, padding: '0 12px', background: 'rgba(245,197,66,.14)', color: '#f5c542', fontWeight: 900, cursor: 'pointer' } as const;
 const sessionBoxStyle = { border: '1px solid rgba(148,163,184,.18)', borderRadius: 16, padding: 12, display: 'grid', gap: 6, minWidth: 0 } as const;
 const sessionTopStyle = { display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'center', flexWrap: 'wrap' as const };
+const sessionToolbarStyle = { display: 'flex', gap: 10, flexWrap: 'wrap' as const, marginBottom: 12 };
 const agentStyle = { overflowWrap: 'anywhere' as const, color: '#94a3b8' };
