@@ -17,12 +17,19 @@ type MemberHomeProps = {
   showRecommended: boolean;
 };
 
+const quickActions = [
+  ['ฝากเงิน', '/deposit', 'เติมยอดเข้ากระเป๋า'],
+  ['ถอนเงิน', '/withdraw', 'ส่งคำขอถอน'],
+  ['ประวัติ', '/transactions', 'ดูรายการล่าสุด'],
+  ['บัญชีถอน', '/bank-accounts', 'จัดการบัญชี'],
+];
+
 export default function MemberHome(props: MemberHomeProps) {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
-    setIsLoggedIn(Boolean(window.localStorage.getItem('member_access_token')));
+    setIsLoggedIn(Boolean(window.localStorage.getItem('member_access_token') || window.localStorage.getItem('member_refresh_token')));
     setReady(true);
   }, []);
 
@@ -30,23 +37,30 @@ export default function MemberHome(props: MemberHomeProps) {
     <section className="member-shell member-home-shell">
       <section className="member-hero-card" style={{ background: props.cardColor, color: props.textColor }}>
         <div>
-          <p className="member-eyebrow">Member Dashboard</p>
-          <h1>จัดการบัญชีของคุณ</h1>
-          <p>{props.description}</p>
+          <p className="member-eyebrow">{props.siteName}</p>
+          <h1>Member Dashboard</h1>
+          <p>{props.description || 'จัดการยอดเงิน ฝาก ถอน และบัญชีสมาชิกได้จากที่เดียว'}</p>
         </div>
         {!ready ? null : isLoggedIn ? <span className="member-status-pill">Online</span> : <span className="member-status-pill muted">Guest</span>}
       </section>
 
       {props.showBalanceHeader && <WalletCard primaryColor={props.primaryColor} cardColor={props.cardColor} showButtons={props.showButtons && isLoggedIn} />}
 
-      {props.showPromotion && <InfoCard title="Promotion" text="พื้นที่แสดงโปรโมชั่นและประกาศสำคัญ" />}
-      {props.showCategories && <InfoCard title="Categories" text="หมวดหมู่บริการจะแสดงตรงนี้" />}
-      {props.showProviders && <InfoCard title="Popular Providers" text="ผู้ให้บริการยอดนิยมจะแสดงตรงนี้" />}
-      {props.showRecommended && <InfoCard title="Recommended" text="รายการแนะนำสำหรับสมาชิก" />}
+      <section className="member-info-card">
+        <p>Quick actions</p>
+        <div className="member-quick-grid">
+          {quickActions.map(([title, href, text]) => <a key={href} href={href} className="member-quick-card"><strong>{title}</strong><span>{text}</span></a>)}
+        </div>
+      </section>
+
+      {props.showPromotion && <InfoCard title="ประกาศ" text="ติดตามสถานะรายการ ฝาก ถอน และข่าวสำคัญจากระบบได้ที่นี่" />}
+      {props.showCategories && <InfoCard title="ขั้นตอนใช้งาน" text="ฝากเงินผ่านบัญชีที่ระบบแสดง แนบสลิป แล้วรอแอดมินตรวจสอบ" />}
+      {props.showProviders && <InfoCard title="ความปลอดภัย" text="ข้อมูลสลิปและธุรกรรมถูกเก็บแบบ private และตรวจสอบผ่านระบบหลังบ้าน" />}
+      {props.showRecommended && <InfoCard title="แนะนำ" text="ตรวจสอบบัญชีถอนให้พร้อมก่อนส่งคำขอถอนเงิน" />}
     </section>
   );
 }
 
 function InfoCard({ title, text }: { title: string; text: string }) {
-  return <section className="member-info-card"><p>Section</p><h2>{title}</h2><span>{text}</span></section>;
+  return <section className="member-info-card"><p>Overview</p><h2>{title}</h2><span>{text}</span></section>;
 }
