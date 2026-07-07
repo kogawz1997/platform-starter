@@ -56,14 +56,14 @@ export default function AdminSecurityPage() {
     <AdminMetricGrid>
       <AdminMetric title="Admin" value={me?.username ?? '-'} helper={me?.id ?? ''} />
       <AdminMetric title="Permissions" value={String(me?.permissions?.length ?? 0)} helper="from current session" />
-      <AdminMetric title="Mode" value="Setup" helper="2FA setup flow" />
+      <AdminMetric title="Mode" value="TOTP" helper="Authenticator app" />
     </AdminMetricGrid>
 
     <AdminCard title="2FA Setup" description="สร้าง secret แล้วเปิดในแอป Authenticator เช่น Google Authenticator, 1Password หรือ Authy">
       <AdminStack>
-        <div style={warningStyle}>
-          <AdminBadge tone="warning">DEV VERIFY</AdminBadge>
-          <p>ตอนนี้ backend verify โค้ดด้วย env <strong>ADMIN_OTP_FOR_DEV</strong> ก่อน ไม่ใช่ TOTP จริงเต็มระบบ ก้อนถัดไปต้องเปลี่ยนเป็น TOTP verification จริง</p>
+        <div style={infoStyle}>
+          <AdminBadge tone="success">TOTP READY</AdminBadge>
+          <p>Backend ตรวจรหัส TOTP จาก secret จริงแล้ว สแกนหรือคัดลอก OTP Auth URL เข้าแอป Authenticator แล้วใส่รหัส 6 หลักเพื่อเปิดใช้งาน</p>
         </div>
 
         {!setup && <AdminButton disabled={loading} onClick={startSetup}>Generate 2FA Secret</AdminButton>}
@@ -76,7 +76,7 @@ export default function AdminSecurityPage() {
             <div style={copyRowStyle}><input value={setup.otpAuthUrl} readOnly style={inputStyle} /><button type="button" onClick={() => copy(setup.otpAuthUrl, ' OTP URL')} style={copyButtonStyle}>Copy</button></div>
           </label>
           <label style={labelStyle}>Verification code
-            <input value={code} onChange={(event) => setCode(event.target.value)} inputMode="numeric" placeholder="ใส่รหัสจาก Authenticator หรือ ADMIN_OTP_FOR_DEV" style={inputStyle} />
+            <input value={code} onChange={(event) => setCode(event.target.value)} inputMode="numeric" placeholder="ใส่รหัส 6 หลักจาก Authenticator" style={inputStyle} />
           </label>
           <AdminButton disabled={loading} onClick={enable2FA}>Enable 2FA</AdminButton>
         </section>}
@@ -85,7 +85,7 @@ export default function AdminSecurityPage() {
   </AdminPage>;
 }
 
-const warningStyle = { border: '1px solid rgba(245,197,66,.28)', borderRadius: 16, padding: 12, background: 'rgba(245,197,66,.08)', display: 'grid', gap: 8 } as const;
+const infoStyle = { border: '1px solid rgba(34,197,94,.28)', borderRadius: 16, padding: 12, background: 'rgba(34,197,94,.08)', display: 'grid', gap: 8 } as const;
 const setupBoxStyle = { display: 'grid', gap: 12, minWidth: 0 } as const;
 const labelStyle = { display: 'grid', gap: 7, fontWeight: 850, minWidth: 0 } as const;
 const copyRowStyle = { display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) auto', gap: 8, minWidth: 0 } as const;
