@@ -1,4 +1,5 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../database/prisma.service';
 
 @Injectable()
@@ -108,7 +109,7 @@ export class AdminAccessService {
     return this.overview();
   }
 
-  private async audit(actorAdminId: string, action: string, targetId: string, newData: Record<string, unknown>) {
+  private async audit(actorAdminId: string, action: string, targetId: string, newData: Prisma.InputJsonObject) {
     await this.prisma.adminAuditLog.create({
       data: {
         adminUserId: actorAdminId,
