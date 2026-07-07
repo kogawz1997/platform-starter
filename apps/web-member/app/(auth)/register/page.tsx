@@ -46,8 +46,7 @@ export default function MemberRegisterPage() {
   return <main style={{ ...pageStyle, background: backgroundColor, color: textColor }}>
     <section style={shellStyle}>
       <form onSubmit={onSubmit} style={{ ...cardStyle, background: cardColor }}>
-        <div style={brandRowStyle}><div style={{ ...logoStyle, background: primaryColor, color: '#111' }}>{siteName.slice(0, 1).toUpperCase()}</div><div><p style={eyebrowStyle}>Member Center</p><h1 style={titleStyle}>{siteName}</h1></div></div>
-        <div style={headlineStyle}><h2 style={formTitleStyle}>สมัครสมาชิก</h2><p style={mutedStyle}>สร้างบัญชีเพื่อเข้าแดชบอร์ดสมาชิก ฝาก ถอน และดูประวัติธุรกรรม</p></div>
+        <div style={logoOnlyRowStyle}><div style={{ ...logoStyle, background: primaryColor, color: '#111' }}>{siteName.slice(0, 1).toUpperCase()}</div></div>
         {(maintenanceEnabled || !registrationEnabled) && <div style={alertStyle('error')}>{maintenanceEnabled ? 'ระบบกำลังปรับปรุง' : 'ขณะนี้ปิดรับสมัครสมาชิก'}</div>}
         <label style={labelStyle}>Username<input value={username} onChange={(e) => setUsername(e.target.value)} placeholder="ตั้งชื่อผู้ใช้" disabled={disabled} autoComplete="username" style={inputStyle} /></label>
         <label style={labelStyle}>Phone<input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="เบอร์โทรศัพท์" disabled={disabled} autoComplete="tel" inputMode="tel" style={inputStyle} /></label>
@@ -64,13 +63,8 @@ export default function MemberRegisterPage() {
 const pageStyle = { minHeight: '100dvh', padding: 16, display: 'grid', placeItems: 'center' } as const;
 const shellStyle = { width: '100%', maxWidth: 460, margin: '0 auto', display: 'grid', placeItems: 'center' } as const;
 const cardStyle = { width: '100%', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 28, padding: 24, display: 'grid', gap: 14, boxShadow: '0 28px 90px rgba(0,0,0,0.34)', boxSizing: 'border-box' } as const;
-const brandRowStyle = { display: 'flex', alignItems: 'center', gap: 12 } as const;
+const logoOnlyRowStyle = { display: 'flex', justifyContent: 'center', marginBottom: 4 } as const;
 const logoStyle = { width: 52, height: 52, borderRadius: 18, display: 'grid', placeItems: 'center', fontWeight: 900, fontSize: 22, flex: '0 0 52px' } as const;
-const eyebrowStyle = { margin: 0, opacity: 0.68, fontSize: 12, fontWeight: 900, letterSpacing: '.08em', textTransform: 'uppercase' as const };
-const titleStyle = { margin: '4px 0 0', fontSize: 28, lineHeight: 1.05 } as const;
-const headlineStyle = { display: 'grid', gap: 6 } as const;
-const formTitleStyle = { margin: 0, fontSize: 30, lineHeight: 1.05 } as const;
-const mutedStyle = { margin: 0, color: 'rgba(255,255,255,.68)', lineHeight: 1.5 } as const;
 const labelStyle = { display: 'grid', gap: 8, fontWeight: 800 } as const;
 const inputStyle = { width: '100%', padding: '13px 14px', borderRadius: 14, border: '1px solid rgba(255,255,255,0.18)', background: 'rgba(255,255,255,0.08)', color: 'inherit', boxSizing: 'border-box', outline: 'none' } as const;
 const passwordWrapStyle = { position: 'relative' } as const;
