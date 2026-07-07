@@ -339,6 +339,8 @@ model TopUpRequest {
   adminNote     String?            @map("admin_note")
   reviewedBy    String?            @map("reviewed_by") @db.Uuid
   reviewedAt    DateTime?          @map("reviewed_at")
+  claimedBy     String?            @map("claimed_by") @db.Uuid
+  claimedAt     DateTime?          @map("claimed_at")
   createdAt     DateTime           @default(now()) @map("created_at")
   updatedAt     DateTime           @updatedAt @map("updated_at")
 
@@ -348,6 +350,7 @@ model TopUpRequest {
   @@index([userId, createdAt])
   @@index([status])
   @@index([reviewedBy])
+  @@index([claimedBy])
   @@map("top_up_requests")
 }
 
@@ -365,6 +368,8 @@ model WithdrawalRequest {
   adminNote     String?                 @map("admin_note")
   reviewedBy    String?                 @map("reviewed_by") @db.Uuid
   reviewedAt    DateTime?               @map("reviewed_at")
+  claimedBy     String?                 @map("claimed_by") @db.Uuid
+  claimedAt     DateTime?               @map("claimed_at")
   createdAt     DateTime                @default(now()) @map("created_at")
   updatedAt     DateTime                @updatedAt @map("updated_at")
 
@@ -374,6 +379,7 @@ model WithdrawalRequest {
   @@index([userId, createdAt])
   @@index([status])
   @@index([reviewedBy])
+  @@index([claimedBy])
   @@map("withdrawal_requests")
 }
 
