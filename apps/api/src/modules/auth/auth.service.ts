@@ -18,116 +18,56 @@ export class AuthService {
 
   async register(dto: RegisterDto, meta: RequestMeta = {}) {
     const rawSecret = dto.secret ?? dto.password;
-    if (!rawSecret) {
-      throw new BadRequestException('secret is required');
-    }
+    if (!rawSecret) throw new BadRequestException('secret is required');
 
     const exists = await this.prisma.user.findFirst({
-      where: {
-        OR: [
-          { username: dto.username },
-          dto.phone ? { phone: dto.phone } : undefined,
-          dto.email ? { email: dto.email } : undefined,
-        ].filter(Boolean) as any,
-      },
+      where: { OR: [{ username: dto.username }, dto.phone ? { phone: dto.phone } : undefined, dto.email ? { email: dto.email } : undefined].filter(Boolean) as any },
     });
-
-    if (exists) {
-      throw new ConflictException('Member already exists');
-    }
+    if (exists) throw new ConflictException('Member already exists');
 
     const hash = await argon2.hash(rawSecret);
-
     const user = await this.prisma.$transaction(async (tx) => {
-      const createdUser = await tx.user.create({
-        data: {
-          username: dto.username,
-          phone: dto.phone,
-          email: dto.email,
-          passwordHash: hash,
-          profile: {
-            create: {
-              displayName: dto.username,
-            },
-          },
-        },
-      });
-
-      await tx.wallet.create({
-        data: {
-          userId: createdUser.id,
-          currency: 'THB',
-        },
-      });
-
+      const createdUser = await tx.user.create({ data: { username: dto.username, phone: dto.phone, email: dto.email, passwordHash: hash, profile: { create: { displayName: dto.username } } } });
+      await tx.wallet.create({ data: { userId: createdUser.id, currency: 'THB' } });
       return createdUser;
     });
 
-    await this.writeLoginHistory('MEMBER', user.id, true, meta);
+    await this.safeWriteLoginHistory('MEMBER', user.id, true, meta);
     return this.createMemberSession(user.id, meta);
   }
 
   async signIn(dto: MemberSignInDto, meta: RequestMeta = {}) {
     const rawSecret = dto.secret ?? dto.password;
-    if (!rawSecret) {
-      throw new BadRequestException('secret is required');
-    }
+    if (!rawSecret) throw new BadRequestException('secret is required');
 
-    const user = await this.prisma.user.findFirst({
-      where: {
-        OR: [{ username: dto.identifier }, { phone: dto.identifier }, { email: dto.identifier }],
-      },
-    });
-
+    const user = await this.prisma.user.findFirst({ where: { OR: [{ username: dto.identifier }, { phone: dto.identifier }, { email: dto.identifier }] } });
     if (!user || user.status !== 'ACTIVE') {
-      await this.writeLoginHistory('MEMBER', null, false, meta, 'MEMBER_NOT_FOUND_OR_INACTIVE');
+      await this.safeWriteLoginHistory('MEMBER', null, false, meta, 'MEMBER_NOT_FOUND_OR_INACTIVE');
       throw new UnauthorizedException('Invalid credentials');
     }
 
     const valid = await argon2.verify(user.passwordHash, rawSecret);
     if (!valid) {
-      await this.writeLoginHistory('MEMBER', user.id, false, meta, 'INVALID_SECRET');
+      await this.safeWriteLoginHistory('MEMBER', user.id, false, meta, 'INVALID_SECRET');
       throw new UnauthorizedException('Invalid credentials');
     }
 
-    await this.writeLoginHistory('MEMBER', user.id, true, meta);
+    await this.safeWriteLoginHistory('MEMBER', user.id, true, meta);
     return this.createMemberSession(user.id, meta);
   }
 
   async refreshSession(dto: RefreshSessionDto, meta: RequestMeta = {}) {
     const { sessionId, rawToken } = this.readRefreshTokenParts(dto.refreshToken);
-    const session = await this.prisma.authSession.findFirst({
-      where: {
-        id: sessionId,
-        type: 'MEMBER',
-        revokedAt: null,
-        expiresAt: { gt: new Date() },
-      },
-    });
-
-    if (!session?.userId) {
-      throw new UnauthorizedException('Invalid refresh session');
-    }
-
+    const session = await this.prisma.authSession.findFirst({ where: { id: sessionId, type: 'MEMBER', revokedAt: null, expiresAt: { gt: new Date() } } });
+    if (!session?.userId) throw new UnauthorizedException('Invalid refresh session');
     const valid = await argon2.verify(session.refreshTokenHash, rawToken);
-    if (!valid) {
-      throw new UnauthorizedException('Invalid refresh session');
-    }
-
-    await this.prisma.authSession.update({
-      where: { id: session.id },
-      data: { revokedAt: new Date() },
-    });
-
+    if (!valid) throw new UnauthorizedException('Invalid refresh session');
+    await this.prisma.authSession.update({ where: { id: session.id }, data: { revokedAt: new Date() } });
     return this.createMemberSession(session.userId, meta);
   }
 
   async signOut(sessionId: string) {
-    await this.prisma.authSession.updateMany({
-      where: { id: sessionId, type: 'MEMBER', revokedAt: null },
-      data: { revokedAt: new Date() },
-    });
-
+    await this.prisma.authSession.updateMany({ where: { id: sessionId, type: 'MEMBER', revokedAt: null }, data: { revokedAt: new Date() } });
     return { success: true };
   }
 
@@ -135,37 +75,12 @@ export class AuthService {
     const rawToken = this.createRefreshToken();
     const refreshTokenHash = await argon2.hash(rawToken);
     const expiresAt = new Date(Date.now() + this.getRefreshTokenTtlMs());
-
-    const session = await this.prisma.authSession.create({
-      data: {
-        type: 'MEMBER',
-        userId,
-        refreshTokenHash,
-        ipAddress: meta.ipAddress,
-        userAgent: meta.userAgent,
-        deviceId: meta.deviceId,
-        expiresAt,
-      },
-    });
-
-    const accessToken = await this.jwtService.signAsync(
-      { sub: userId, type: 'MEMBER', sessionId: session.id },
-      {
-        secret: this.configService.get<string>('JWT_ACCESS_KEY') ?? 'local_access_key',
-        expiresIn: (this.configService.get<string>('JWT_ACCESS_TTL') ?? '15m') as any,
-      },
-    );
-
-    return {
-      accessToken,
-      refreshToken: `${session.id}.${rawToken}`,
-      expiresAt,
-    };
+    const session = await this.prisma.authSession.create({ data: { type: 'MEMBER', userId, refreshTokenHash, ipAddress: meta.ipAddress, userAgent: meta.userAgent, deviceId: meta.deviceId, expiresAt } });
+    const accessToken = await this.jwtService.signAsync({ sub: userId, type: 'MEMBER', sessionId: session.id }, { secret: this.configService.get<string>('JWT_ACCESS_KEY') ?? 'local_access_key', expiresIn: (this.configService.get<string>('JWT_ACCESS_TTL') ?? '15m') as any });
+    return { accessToken, refreshToken: `${session.id}.${rawToken}`, expiresAt };
   }
 
-  private createRefreshToken() {
-    return randomBytes(48).toString('base64url');
-  }
+  private createRefreshToken() { return randomBytes(48).toString('base64url'); }
 
   private readRefreshTokenParts(value: string) {
     const [sessionId, rawToken] = value.split('.');
@@ -178,28 +93,13 @@ export class AuthService {
     return days * 24 * 60 * 60 * 1000;
   }
 
-  private async writeLoginHistory(
-    type: 'MEMBER',
-    userId: string | null,
-    success: boolean,
-    meta: RequestMeta,
-    reason?: string,
-  ) {
-    await this.prisma.loginHistory.create({
-      data: {
-        type,
-        userId,
-        success,
-        ipAddress: meta.ipAddress,
-        userAgent: meta.userAgent,
-        reason,
-      },
-    });
+  private async safeWriteLoginHistory(type: 'MEMBER', userId: string | null, success: boolean, meta: RequestMeta, reason?: string) {
+    try {
+      await this.prisma.loginHistory.create({ data: { type, userId, success, ipAddress: meta.ipAddress, userAgent: meta.userAgent, reason } });
+    } catch (error) {
+      console.error('member login history write failed', error);
+    }
   }
 }
 
-export type RequestMeta = {
-  ipAddress?: string;
-  userAgent?: string;
-  deviceId?: string;
-};
+export type RequestMeta = { ipAddress?: string; userAgent?: string; deviceId?: string };
