@@ -1,5 +1,95 @@
 # ROADMAP
 
+## Main System Backlog
+
+This is the master checklist for systems that should exist before expanding to larger provider, promotion, or production-scale work.
+
+### Finance Core
+
+- Deposit request foundation
+- Slip upload and private slip storage
+- Admin deposit queue
+- Deposit claim / release / timeout job lock
+- Deposit approve / reject
+- Wallet credit through ledger only
+- Withdrawal request foundation
+- Withdrawal balance validation
+- Withdrawal locked balance
+- Admin withdrawal queue
+- Withdrawal claim / release / timeout job lock
+- Withdrawal approve / reject / success / failed / cancel
+- Wallet debit through ledger only
+- Refund locked balance on failed or rejected withdrawal
+- Manual wallet adjustment with reason
+- Ledger explorer with filter and pagination
+- Idempotency key for money actions
+- Prisma transaction atomicity for every money action
+
+### Bank Account Management
+
+- Admin receiving bank accounts
+- Admin receiving QR / payment instructions
+- Enable / disable receiving bank accounts
+- Min / max amount per bank account
+- Member withdrawal bank accounts
+- Primary member bank account
+- Bank account verification status
+- Bank account change audit log
+
+### Operation Center
+
+- Admin dashboard summary
+- Deposit queue dashboard
+- Withdrawal queue dashboard
+- Queue badge / notification count
+- Job lock owner display
+- Job timeout and auto release
+- Admin activity history
+- Audit log viewer
+- Finance reports
+- Export CSV
+- Reconciliation report
+
+### Risk and Security
+
+- Risk alert rules
+- Duplicate deposit amount alert
+- Rapid withdrawal alert
+- Bank account changed before withdrawal alert
+- Multiple IP / device login alert
+- High amount transaction alert
+- Rate limit
+- Admin IP allowlist
+- Device session management
+- Session revoke
+- Real TOTP 2FA
+- Sensitive action dual approval
+- Security headers and CSP
+
+### Member and Notification
+
+- Member profile
+- Member status: active / suspended / banned
+- Member login history
+- Member device/session list
+- In-app notification center
+- Deposit success / rejected notification
+- Withdrawal success / rejected notification
+- Maintenance notification
+- Admin queue notification
+
+### Website Control and Content
+
+- Feature flags for register / login / deposit / withdrawal / promotion / provider
+- Maintenance mode by module
+- CMS pages
+- Legal pages from settings
+- Banner management
+- Popup announcement
+- Sitemap
+- Robots.txt
+- Dynamic SEO metadata
+
 ## Phase 0: Project Foundation
 
 Status: completed
@@ -95,6 +185,8 @@ Backend requirements:
 - Public settings APIs for safe frontend values
 - Admin settings APIs
 - Audit log for admin changes
+- Feature flags for register / login / deposit / withdrawal
+- Maintenance mode by module
 
 ### Wallet Foundation
 
@@ -111,6 +203,32 @@ Backend requirements:
 - Short member ID search
 - Manual wallet adjustment
 - Admin audit log for wallet actions
+- Wallet credit / debit / lock / unlock service methods
+- Block direct balance edits outside WalletService
+- Ledger pagination and filters
+
+### Deposit and Withdrawal Foundation
+
+- Deposit request foundation
+- Slip upload
+- Admin deposit queue
+- Deposit approve / reject
+- Credit wallet through ledger on approve
+- Withdrawal request foundation
+- Validate available balance before withdrawal
+- Lock balance on withdrawal request
+- Admin withdrawal queue
+- Withdrawal approve / reject / success / failed / cancel
+- Debit wallet through ledger on withdrawal success
+- Unlock or refund locked balance on failed / rejected withdrawal
+
+### Bank Account Foundation
+
+- Admin receiving bank accounts
+- Member withdrawal bank accounts
+- Primary member bank account
+- Bank account verification status
+- Audit log for bank account changes
 
 ## Phase 3: Wallet Hardening and Operation Center
 
@@ -122,6 +240,11 @@ Status: in progress, operation center first pass expanded
 - Job lock for high-risk operations: completed first pass
 - Private media storage for slips: first pass completed
 - Notification for review queues: queue summary endpoint completed
+- Idempotency key for money actions
+- Prisma transaction atomicity for money actions
+- Queue claim / release / timeout hardening
+- Negative balance prevention
+- Duplicate request prevention
 
 ### ABC hardening pass
 
@@ -201,10 +324,17 @@ Status: started
 - Dashboard: first pass completed
 - Finance queues: first pass completed
 - Member detail
+- Member search and filters
+- Member status management
+- Member bank account review
 - Risk alert
 - Reports: first pass completed
 - Audit log viewer: first pass completed as Activity
 - Admin activity history: first pass completed
+- In-app admin notifications
+- Queue owner / lock status UI
+- Queue timeout / release UI
+- Export CSV shortcuts
 
 ## Phase 5: Provider and Callback
 
@@ -214,6 +344,11 @@ Status: started
 - HMAC signature
 - Idempotency
 - Redis lock
+- Provider maintenance mode
+- Provider balance sync
+- Provider transaction retry queue
+- Game list and category management
+- Provider / game enable-disable controls
 
 ## Phase 6: Promotion, Event, VIP, Referral
 
@@ -222,6 +357,11 @@ Status: started
 - Events
 - VIP levels
 - Referral commission
+- Banner campaigns
+- Popup announcements
+- UTM / tracking source
+- Promotion claim history
+- Promotion turnover rules
 
 ## Phase 7: CMS, SEO, Media
 
@@ -230,7 +370,12 @@ Status: started
 - Banners
 - SEO meta
 - Sitemap
+- Robots.txt
+- Dynamic metadata
+- Legal pages renderer
 - Media library
+- Popup announcement
+- Footer link management
 
 ## Phase 8: Production
 
@@ -240,3 +385,12 @@ Status: started
 - Security review
 - Deployment checklist
 - Runbook
+- Health check endpoint
+- Version endpoint
+- Request logging
+- Rate limit
+- Security headers
+- CSP
+- Database backup policy
+- Staging / production separation
+- Alert webhook
