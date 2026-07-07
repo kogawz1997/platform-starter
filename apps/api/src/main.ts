@@ -5,7 +5,17 @@ import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 
 type RateBucket = { count: number; resetAt: number };
+type RateRule = { method: string; path: string; max: number; env?: string };
+
 const rateBuckets = new Map<string, RateBucket>();
+const RATE_RULES: RateRule[] = [
+  { method: 'POST', path: '/auth/login', max: 10, env: 'RATE_LIMIT_MEMBER_LOGIN_PER_MINUTE' },
+  { method: 'POST', path: '/auth/register', max: 8, env: 'RATE_LIMIT_MEMBER_REGISTER_PER_MINUTE' },
+  { method: 'POST', path: '/admin/auth/login', max: 10, env: 'RATE_LIMIT_ADMIN_LOGIN_PER_MINUTE' },
+  { method: 'POST', path: '/member/topups', max: 20, env: 'RATE_LIMIT_TOPUPS_PER_MINUTE' },
+  { method: 'POST', path: '/member/topups/slip', max: 12, env: 'RATE_LIMIT_SLIP_UPLOAD_PER_MINUTE' },
+  { method: 'POST', path: '/member/withdrawals', max: 12, env: 'RATE_LIMIT_WITHDRAWALS_PER_MINUTE' },
+];
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
@@ -32,8 +42,11 @@ async function bootstrap() {
     if (!limit) return next();
 
     const now = Date.now();
+    cleanupExpiredBuckets(now);
+
     const ip = getClientIp(req);
-    const key = `${req.method}:${req.path ?? req.url}:${ip}`;
+    const path = String(req.path ?? req.url ?? '').split('?')[0];
+    const key = `${req.method}:${path}:${ip}`;
     const bucket = rateBuckets.get(key);
 
     if (!bucket || bucket.resetAt <= now) {
@@ -52,8 +65,7 @@ async function bootstrap() {
     const startedAt = Date.now();
     res.on('finish', () => {
       const duration = Date.now() - startedAt;
-      const path = String(req.originalUrl ?? req.url ?? '').replace(/token=[^&]+/gi, 'token=[redacted]');
-      console.log(`${req.method} ${path} ${res.statusCode} ${duration}ms`);
+      console.log(`${req.method} ${redactUrl(req.originalUrl ?? req.url ?? '')} ${res.statusCode} ${duration}ms`);
     });
     next();
   });
@@ -72,17 +84,27 @@ async function bootstrap() {
 function getRateLimit(method: string, path: string): { max: number; windowMs: number } | null {
   const verb = String(method).toUpperCase();
   const normalizedPath = String(path).split('?')[0];
-  const rules = [
-    { method: 'POST', path: '/auth/login', max: 10 },
-    { method: 'POST', path: '/auth/register', max: 8 },
-    { method: 'POST', path: '/admin/auth/login', max: 10 },
-    { method: 'POST', path: '/member/topups', max: 20 },
-    { method: 'POST', path: '/member/topups/slip', max: 12 },
-    { method: 'POST', path: '/member/withdrawals', max: 12 },
-  ];
-  const matched = rules.find((rule) => verb === rule.method && normalizedPath.startsWith(rule.path));
+  const matched = RATE_RULES.find((rule) => verb === rule.method && normalizedPath.startsWith(rule.path));
   if (!matched) return null;
-  return { max: Number(process.env.RATE_LIMIT_PER_MINUTE ?? matched.max), windowMs: 60_000 };
+  const envValue = matched.env ? process.env[matched.env] : undefined;
+  const max = Number(envValue ?? process.env.RATE_LIMIT_PER_MINUTE ?? matched.max);
+  return { max: Number.isFinite(max) && max > 0 ? max : matched.max, windowMs: 60_000 };
+}
+
+function cleanupExpiredBuckets(now: number) {
+  if (rateBuckets.size < 1000) return;
+  for (const [key, bucket] of rateBuckets.entries()) {
+    if (bucket.resetAt <= now) rateBuckets.delete(key);
+  }
+}
+
+function redactUrl(value: string) {
+  return String(value)
+    .replace(/token=[^&]+/gi, 'token=[redacted]')
+    .replace(/refreshToken=[^&]+/gi, 'refreshToken=[redacted]')
+    .replace(/accessToken=[^&]+/gi, 'accessToken=[redacted]')
+    .replace(/secret=[^&]+/gi, 'secret=[redacted]')
+    .replace(/password=[^&]+/gi, 'password=[redacted]');
 }
 
 function getClientIp(req: any) {
