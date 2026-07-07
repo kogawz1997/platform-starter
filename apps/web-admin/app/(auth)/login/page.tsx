@@ -1,6 +1,6 @@
 'use client';
 
-import { FormEvent, useState } from 'react';
+import { FormEvent, useEffect, useState } from 'react';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000';
 
@@ -12,6 +12,13 @@ export default function AdminLoginPage() {
   const [status, setStatus] = useState<'idle' | 'success' | 'error' | 'info'>('idle');
   const [loading, setLoading] = useState(false);
   const [showSecret, setShowSecret] = useState(false);
+
+  useEffect(() => {
+    if (window.localStorage.getItem('admin_access_token')) {
+      const next = new URLSearchParams(window.location.search).get('next') || '/dashboard';
+      window.location.replace(next.startsWith('/') ? next : '/dashboard');
+    }
+  }, []);
 
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -50,8 +57,9 @@ export default function AdminLoginPage() {
     window.localStorage.setItem('admin_access_token', data.accessToken);
     window.localStorage.setItem('admin_refresh_token', data.refreshToken);
     setStatus('success');
-    setMessage('เข้าสู่ระบบแอดมินสำเร็จ กำลังพาไปหน้า Settings...');
-    window.location.href = '/settings';
+    setMessage('เข้าสู่ระบบแอดมินสำเร็จ กำลังพาไปหน้า Dashboard...');
+    const next = new URLSearchParams(window.location.search).get('next') || '/dashboard';
+    window.location.href = next.startsWith('/') ? next : '/dashboard';
   }
 
   return (
@@ -84,18 +92,8 @@ export default function AdminLoginPage() {
           <label style={labelStyle}>
             รหัสผ่าน
             <div style={passwordWrapStyle}>
-              <input
-                value={secret}
-                onChange={(e) => setSecret(e.target.value)}
-                placeholder="admin password"
-                type={showSecret ? 'text' : 'password'}
-                autoComplete="current-password"
-                disabled={loading}
-                style={{ ...inputStyle, paddingRight: 84 }}
-              />
-              <button type="button" onClick={() => setShowSecret((v) => !v)} style={ghostButtonStyle} disabled={loading}>
-                {showSecret ? 'ซ่อน' : 'แสดง'}
-              </button>
+              <input value={secret} onChange={(e) => setSecret(e.target.value)} placeholder="admin password" type={showSecret ? 'text' : 'password'} autoComplete="current-password" disabled={loading} style={{ ...inputStyle, paddingRight: 84 }} />
+              <button type="button" onClick={() => setShowSecret((v) => !v)} style={ghostButtonStyle} disabled={loading}>{showSecret ? 'ซ่อน' : 'แสดง'}</button>
             </div>
           </label>
 
@@ -118,12 +116,10 @@ const shellStyle = { width: '100%', maxWidth: 1040, display: 'grid', gridTemplat
 const heroStyle = { padding: 24 } as const;
 const logoStyle = { width: 58, height: 58, borderRadius: 18, display: 'grid', placeItems: 'center', fontWeight: 800, fontSize: 24, background: '#f5c542', color: '#111' } as const;
 const featureStyle = { display: 'flex', gap: 10, flexWrap: 'wrap', marginTop: 20 } as const;
-const cardStyle = { border: '1px solid rgba(255,255,255,0.12)', borderRadius: 28, padding: 24, display: 'grid', gap: 16, background: '#181818', boxShadow: '0 24px 80px rgba(0,0,0,0.28)' } as const;
+const cardStyle = { display: 'grid', gap: 16, border: '1px solid rgba(255,255,255,0.12)', borderRadius: 24, padding: 22, background: '#181818', boxShadow: '0 20px 80px rgba(0,0,0,0.32)' } as const;
 const labelStyle = { display: 'grid', gap: 8, fontWeight: 700 } as const;
-const inputStyle = { width: '100%', padding: '13px 14px', borderRadius: 14, border: '1px solid rgba(255,255,255,0.18)', background: 'rgba(255,255,255,0.08)', color: 'inherit', boxSizing: 'border-box', outline: 'none' } as const;
+const inputStyle = { width: '100%', padding: 13, borderRadius: 14, border: '1px solid rgba(255,255,255,0.14)', background: '#242424', color: '#fff', boxSizing: 'border-box' } as const;
 const passwordWrapStyle = { position: 'relative' } as const;
-const ghostButtonStyle = { position: 'absolute', right: 8, top: 7, padding: '7px 10px', borderRadius: 10, border: 0, cursor: 'pointer' } as const;
-const submitStyle = { border: 0, borderRadius: 14, padding: '14px 16px', fontWeight: 800, cursor: 'pointer', background: '#f5c542', color: '#111' } as const;
-function alertStyle(status: 'idle' | 'success' | 'error' | 'info') {
-  return { border: '1px solid rgba(255,255,255,0.14)', borderRadius: 14, padding: 12, background: status === 'error' ? 'rgba(255,80,80,0.14)' : status === 'success' ? 'rgba(80,255,140,0.14)' : 'rgba(255,255,255,0.08)' } as const;
-}
+const ghostButtonStyle = { position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', border: 0, borderRadius: 10, padding: '7px 10px', background: 'rgba(255,255,255,0.08)', color: '#fff', cursor: 'pointer' } as const;
+const submitStyle = { padding: 14, borderRadius: 14, border: 0, background: '#f5c542', color: '#111', fontWeight: 900, cursor: 'pointer' } as const;
+function alertStyle(type: 'idle' | 'success' | 'error' | 'info') { return { border: '1px solid rgba(255,255,255,0.12)', borderRadius: 14, padding: 12, background: type === 'error' ? 'rgba(255,70,70,0.12)' : type === 'success' ? 'rgba(80,255,140,0.12)' : 'rgba(255,255,255,0.06)', color: '#fff' } as const; }
