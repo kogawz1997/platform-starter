@@ -4,6 +4,8 @@ import { useEffect, useState } from 'react';
 import { adminApiFetch } from '../../admin-api';
 import { AdminBadge, AdminButton, AdminCard, AdminEmpty, AdminGrid, AdminLinkButton, AdminMetric, AdminMetricGrid, AdminNotice, AdminPage, AdminRow, AdminStack, formatMoney } from '../_components/admin-ui';
 
+const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000';
+
 type DailyReport = { range: { from: string; to: string }; topUps: Group[]; withdrawals: Group[]; adjustments: { direction: string; count: number; amount: string }[]; wallets: { count: number; totalBalance: string; totalLockedBalance: string }; ledgers: { count: number; amount: string }; pendingQueues?: { topUps: { count: number; amount: string }; withdrawals: { count: number; amount: string } }; generatedAt: string };
 type Group = { status: string; count: number; amount: string };
 type Reconciliation = { checkedCount?: number; mismatchCount: number; items: { walletId: string; shortUserId: string; username?: string | null; actualBalance: string; latestLedgerBalance: string; lockedBalance: string; availableBalance?: string; status: string }[]; generatedAt: string };
@@ -49,6 +51,23 @@ export default function ReportsPage() {
     loadReports(nextDays);
   }
 
+  async function downloadCsv(path: string, filename: string) {
+    const token = window.localStorage.getItem('admin_access_token');
+    if (!token) { setMessage('กรุณา login admin ก่อน'); return; }
+    setMessage('กำลังดาวน์โหลด CSV...');
+    const res = await fetch(`${API_URL}${path}`, { headers: { Authorization: `Bearer ${token}` } });
+    if (!res.ok) { setMessage((await res.json().catch(() => null))?.message ?? 'ดาวน์โหลด CSV ไม่สำเร็จ'); return; }
+    const text = await res.text();
+    const blob = new Blob([text], { type: 'text/csv;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(url);
+    setMessage('ดาวน์โหลด CSV แล้ว');
+  }
+
   return (
     <AdminPage eyebrow="Finance Reports" title="Reports" description="รายงานรายวัน ตรวจยอด wallet แนวโน้มเงินเข้าออก และคิวที่ค้างนาน" actions={<><AdminButton onClick={() => loadReports()}>Refresh</AdminButton><AdminLinkButton href="/exports">Exports</AdminLinkButton></>}>
       {message && <AdminNotice>{message}</AdminNotice>}
@@ -66,7 +85,7 @@ export default function ReportsPage() {
         <AdminStack>{aging.oldest.map((item) => <AdminRow key={`${item.type}-${item.id}`}><div><AdminBadge tone={item.type === 'TOPUP' ? 'warning' : 'danger'}>{item.type}</AdminBadge><strong style={{ display: 'block', marginTop: 8 }}>{item.username}</strong><p>{new Date(item.createdAt).toLocaleString('th-TH')} · age {item.ageLabel}</p></div><div style={{ textAlign: 'right' }}><strong>{formatMoney(item.amount)}</strong><p>{item.currency}</p><AdminLinkButton href={item.type === 'TOPUP' ? '/topups' : '/withdrawals'}>Open queue</AdminLinkButton></div></AdminRow>)}{aging.oldest.length === 0 && <AdminEmpty>ไม่มีคิว pending</AdminEmpty>}</AdminStack>
       </AdminCard>}
 
-      {trends && <AdminCard title="Finance Trend" description={`${trends.range.days} days · ${new Date(trends.range.from).toLocaleDateString('th-TH')} - ${new Date(trends.range.to).toLocaleDateString('th-TH')}`} action={<div style={toolbarStyle}>{[7, 14, 30].map((item) => <AdminButton key={item} tone={trendDays === item ? 'primary' : 'secondary'} disabled={loading} onClick={() => changeTrendDays(item)}>{item}d</AdminButton>)}<AdminLinkButton href={`/admin/exports/report-trends.csv?days=${trendDays}`}>Export CSV</AdminLinkButton></div>}>
+      {trends && <AdminCard title="Finance Trend" description={`${trends.range.days} days · ${new Date(trends.range.from).toLocaleDateString('th-TH')} - ${new Date(trends.range.to).toLocaleDateString('th-TH')}`} action={<div style={toolbarStyle}>{[7, 14, 30].map((item) => <AdminButton key={item} tone={trendDays === item ? 'primary' : 'secondary'} disabled={loading} onClick={() => changeTrendDays(item)}>{item}d</AdminButton>)}<AdminButton tone="secondary" onClick={() => downloadCsv(`/admin/exports/report-trends.csv?days=${trendDays}`, `report-trends-${trendDays}d.csv`)}>Export CSV</AdminButton></div>}>
         <AdminMetricGrid>
           <AdminMetric title="Top-up volume" value={formatMoney(trends.totals.topUpAmount)} helper={`${trends.totals.topUpCount} approved`} />
           <AdminMetric title="Withdrawal volume" value={formatMoney(trends.totals.withdrawalAmount)} helper={`${trends.totals.withdrawalCount} completed`} />
@@ -76,7 +95,7 @@ export default function ReportsPage() {
       </AdminCard>}
 
       {daily && <AdminCard title="Daily Summary" description={`${new Date(daily.range.from).toLocaleDateString('th-TH')} - ${new Date(daily.range.to).toLocaleDateString('th-TH')}`}><AdminGrid><GroupCard title="Top-ups" items={daily.topUps} /><GroupCard title="Withdrawals" items={daily.withdrawals} /><GroupCard title="Adjustments" items={daily.adjustments.map((item) => ({ status: item.direction, count: item.count, amount: item.amount }))} /></AdminGrid></AdminCard>}
-      {recon && <AdminCard title="Reconciliation" description={`Mismatch: ${recon.mismatchCount} · Generated ${new Date(recon.generatedAt).toLocaleString('th-TH')}`} action={<AdminLinkButton href="/admin/exports/reconciliation.csv?limit=1000">Export CSV</AdminLinkButton>}><AdminStack>{recon.items.slice(0, 20).map((item) => <AdminRow key={item.walletId}><div><strong>{item.username ?? item.shortUserId}</strong><p>Wallet: {item.shortUserId}</p></div><div style={{ textAlign: 'right' }}><strong>{item.status}</strong><p>Actual {formatMoney(item.actualBalance)} / Ledger {formatMoney(item.latestLedgerBalance)}</p>{item.availableBalance && <p>Available {formatMoney(item.availableBalance)}</p>}</div></AdminRow>)}{recon.items.length === 0 && <AdminEmpty>ไม่มี mismatch</AdminEmpty>}</AdminStack></AdminCard>}
+      {recon && <AdminCard title="Reconciliation" description={`Mismatch: ${recon.mismatchCount} · Generated ${new Date(recon.generatedAt).toLocaleString('th-TH')}`} action={<AdminButton tone="secondary" onClick={() => downloadCsv('/admin/exports/reconciliation.csv?limit=1000', 'reconciliation.csv')}>Export CSV</AdminButton>}><AdminStack>{recon.items.slice(0, 20).map((item) => <AdminRow key={item.walletId}><div><strong>{item.username ?? item.shortUserId}</strong><p>Wallet: {item.shortUserId}</p></div><div style={{ textAlign: 'right' }}><strong>{item.status}</strong><p>Actual {formatMoney(item.actualBalance)} / Ledger {formatMoney(item.latestLedgerBalance)}</p>{item.availableBalance && <p>Available {formatMoney(item.availableBalance)}</p>}</div></AdminRow>)}{recon.items.length === 0 && <AdminEmpty>ไม่มี mismatch</AdminEmpty>}</AdminStack></AdminCard>}
     </AdminPage>
   );
 }
