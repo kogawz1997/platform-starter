@@ -63,7 +63,7 @@ export default function MemberHome(props: MemberHomeProps) {
         <p>รอดำเนินการ</p>
         <h2>{pendingCount} รายการ</h2>
         <div style={pendingListStyle}>
-          {pendingTopups.map((item) => <ActivityRow key={item.id} title="เติมเงิน" href="/deposit" item={item} />)}
+          {pendingTopups.map((item) => <ActivityRow key={item.id} title="ฝาก" href="/deposit" item={item} />)}
           {pendingWithdrawals.map((item) => <ActivityRow key={item.id} title="ถอนเงิน" href="/withdraw" item={item} />)}
         </div>
       </section>}
@@ -90,7 +90,7 @@ function LedgerRow({ item }: { item: LedgerItem }) {
 
 function ledgerTypeLabel(type: string) {
   const upper = type.toUpperCase();
-  if (upper.includes('DEPOSIT') || upper.includes('TOPUP')) return 'เติมเงิน';
+  if (upper.includes('DEPOSIT') || upper.includes('TOPUP')) return 'ฝาก';
   if (upper.includes('WITHDRAW')) return 'ถอนเงิน';
   if (upper.includes('ADJUST')) return 'ปรับยอด';
   return 'รายการ';
