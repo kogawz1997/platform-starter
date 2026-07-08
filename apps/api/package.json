@@ -20,6 +20,7 @@
     "argon2": "latest",
     "class-transformer": "latest",
     "class-validator": "latest",
+    "ioredis": "latest",
     "passport": "latest",
     "passport-jwt": "latest",
     "reflect-metadata": "latest",
