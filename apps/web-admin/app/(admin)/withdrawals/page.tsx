@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { adminApiFetch } from '../../admin-api';
 import { AdminConfirmDialog, ConfirmDetailRow } from '../_components/admin-confirm-dialog';
-import { AdminBadge, AdminButton, AdminCard, AdminEmpty, AdminMetric, AdminMetricGrid, AdminNotice, AdminPage, AdminRow, AdminStack, AdminToolbar, formatMoney } from '../_components/admin-ui';
+import { AdminBadge, AdminButton, AdminCard, AdminEmpty, AdminMetric, AdminMetricGrid, AdminNotice, AdminPage, AdminSectionRow, AdminStack, AdminToolbar, formatMoney } from '../_components/admin-ui';
 
 type WithdrawalItem = { id: string; userId: string; amount: string; currency: string; status: string; method?: string | null; accountName?: string | null; accountNumber?: string | null; bankName?: string | null; note?: string | null; adminNote?: string | null; claimedBy?: string | null; claimedAt?: string | null; createdAt: string; user?: { id: string; username: string; phone?: string | null; email?: string | null } };
 type PendingAction = { id: string; action: 'complete' | 'reject' } | null;
@@ -86,15 +86,52 @@ export default function AdminWithdrawalsPage() {
   return (
     <AdminPage eyebrow="Finance Queue" title="Withdrawal Review" description="ตรวจคำขอถอนเงิน ปิดรายการ หรือคืนยอดล็อกให้สมาชิก" actions={<AdminButton onClick={() => loadItems()}>Refresh</AdminButton>}>
       <AdminMetricGrid><AdminMetric title="Pending ในหน้านี้" value={`${counts.pending}`} /><AdminMetric title="Claimed" value={`${counts.claimed}`} /><AdminMetric title="Total loaded" value={`${items.length}`} helper={`${total} total`} /><AdminMetric title="Status filter" value={status} /></AdminMetricGrid>
-      <AdminToolbar><select value={status} onChange={(event) => changeStatus(event.target.value)}><option value="PENDING">PENDING</option><option value="COMPLETED">COMPLETED</option><option value="REJECTED">REJECTED</option><option value="ALL">ALL</option></select><div style={pagerStyle}><AdminButton disabled={page <= 1} onClick={() => setPage((value) => Math.max(value - 1, 1))}>Prev</AdminButton><span>Page {page} / {pageCount}</span><AdminButton disabled={page >= pageCount} onClick={() => setPage((value) => Math.min(value + 1, pageCount))}>Next</AdminButton></div></AdminToolbar>
+      <AdminToolbar><select value={status} onChange={(event) => changeStatus(event.target.value)} style={selectStyle}><option value="PENDING">PENDING</option><option value="COMPLETED">COMPLETED</option><option value="REJECTED">REJECTED</option><option value="ALL">ALL</option></select><div style={pagerStyle}><AdminButton disabled={page <= 1} onClick={() => setPage((value) => Math.max(value - 1, 1))}>Prev</AdminButton><span style={pageLabelStyle}>Page {page} / {pageCount}</span><AdminButton disabled={page >= pageCount} onClick={() => setPage((value) => Math.min(value + 1, pageCount))}>Next</AdminButton></div></AdminToolbar>
       {message && <AdminNotice>{message}</AdminNotice>}
-      <AdminStack>{items.map((item) => { const isPending = item.status === 'PENDING'; const itemNote = reviewNotes[item.id] ?? ''; return <AdminCard key={item.id}><AdminRow><div><AdminBadge tone={item.status === 'COMPLETED' ? 'success' : item.status === 'REJECTED' ? 'danger' : 'warning'}>{item.status}</AdminBadge>{item.claimedBy && <AdminBadge tone="neutral">CLAIMED</AdminBadge>}<h2 style={{ margin: '10px 0 4px', fontSize: 34 }}>{formatMoney(item.amount)}</h2><p>Member: {item.user?.username ?? item.userId}</p><p>Method: {item.method ?? '-'}</p><p>Created: {new Date(item.createdAt).toLocaleString('th-TH')}</p>{item.claimedAt && <p>Claimed: {new Date(item.claimedAt).toLocaleString('th-TH')}</p>}</div><div><strong>Account</strong><p>{item.accountName || '-'}</p><p>{item.bankName || '-'} / {item.accountNumber || '-'}</p><p>Note: {item.note || '-'}</p></div></AdminRow>{isPending ? <><div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 10 }}><AdminButton disabled={busyId === item.id} onClick={() => queueAction(item.id, 'claim')}>Claim</AdminButton><AdminButton disabled={busyId === item.id || !item.claimedBy} onClick={() => queueAction(item.id, 'release')}>Release</AdminButton></div><label style={{ display: 'grid', gap: 6, fontWeight: 800 }}>Admin note<textarea value={itemNote} onChange={(event) => setItemNote(item.id, event.target.value)} placeholder="จำเป็นเมื่อไม่อนุมัติ / คืนยอด" style={{ minHeight: 92 }} /></label><div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}><AdminButton disabled={busyId === item.id || !item.claimedBy} onClick={() => requestReview(item.id, 'complete')} tone="success">จ่ายแล้ว / สำเร็จ</AdminButton><AdminButton disabled={busyId === item.id || !item.claimedBy} onClick={() => requestReview(item.id, 'reject')} tone="danger">ไม่อนุมัติ / คืนยอด</AdminButton></div></> : <AdminNotice>รายการนี้ตรวจสอบแล้ว ไม่ต้องกดซ้ำ</AdminNotice>}</AdminCard>; })}{items.length === 0 && <AdminEmpty>ยังไม่มีรายการ</AdminEmpty>}</AdminStack>
+      <AdminStack>{items.map((item) => {
+        const isPending = item.status === 'PENDING';
+        const itemNote = reviewNotes[item.id] ?? '';
+        return <AdminCard key={item.id}>
+          <AdminSectionRow>
+            <div style={summaryStyle}>
+              <div style={badgeRowStyle}><AdminBadge tone={item.status === 'COMPLETED' ? 'success' : item.status === 'REJECTED' ? 'danger' : 'warning'}>{item.status}</AdminBadge>{item.claimedBy && <AdminBadge tone="neutral">CLAIMED</AdminBadge>}</div>
+              <h2 style={amountStyle}>{formatMoney(item.amount)}</h2>
+              <p>Member: {item.user?.username ?? item.userId}</p>
+              <p>Method: {item.method ?? '-'}</p>
+              <p>Created: {new Date(item.createdAt).toLocaleString('th-TH')}</p>
+              {item.claimedAt && <p>Claimed: {new Date(item.claimedAt).toLocaleString('th-TH')}</p>}
+            </div>
+            <section style={bankBoxStyle}>
+              <strong>บัญชีรับเงินปลายทาง</strong>
+              <span>{item.accountName || '-'}</span>
+              <span>{item.bankName || '-'}</span>
+              <span style={accountNumberStyle}>{item.accountNumber || '-'}</span>
+              <span>Note: {item.note || '-'}</span>
+            </section>
+          </AdminSectionRow>
+          {isPending ? <div style={operationBoxStyle}>
+            <div style={actionGridStyle}><AdminButton disabled={busyId === item.id} onClick={() => queueAction(item.id, 'claim')}>Claim</AdminButton><AdminButton disabled={busyId === item.id || !item.claimedBy} onClick={() => queueAction(item.id, 'release')}>Release</AdminButton></div>
+            <label style={noteLabelStyle}>Admin note<textarea value={itemNote} onChange={(event) => setItemNote(item.id, event.target.value)} placeholder="จำเป็นเมื่อไม่อนุมัติ / คืนยอด" style={textareaStyle} /></label>
+            <div style={dangerActionGridStyle}><AdminButton disabled={busyId === item.id || !item.claimedBy} onClick={() => requestReview(item.id, 'complete')} tone="success">จ่ายแล้ว / สำเร็จ</AdminButton><AdminButton disabled={busyId === item.id || !item.claimedBy} onClick={() => requestReview(item.id, 'reject')} tone="danger">ไม่อนุมัติ / คืนยอด</AdminButton></div>
+          </div> : <AdminNotice>รายการนี้ตรวจสอบแล้ว ไม่ต้องกดซ้ำ</AdminNotice>}
+        </AdminCard>;
+      })}{items.length === 0 && <AdminEmpty>ยังไม่มีรายการ</AdminEmpty>}</AdminStack>
       <AdminConfirmDialog open={Boolean(pendingAction && pendingItem)} tone={pendingAction?.action === 'complete' ? 'success' : 'danger'} title={pendingAction?.action === 'complete' ? 'ยืนยันปิดรายการถอน' : 'ยืนยันปฏิเสธรายการถอน'} description={pendingAction?.action === 'complete' ? 'ยืนยันเฉพาะเมื่อจ่ายเงินจริงให้สมาชิกแล้วเท่านั้น' : 'รายการนี้จะถูกปฏิเสธและคืนยอด locked balance ให้สมาชิก'} confirmLabel={pendingAction?.action === 'complete' ? 'ยืนยันว่าจ่ายแล้ว' : 'ยืนยันคืนยอด'} loading={Boolean(busyId)} onCancel={() => setPendingAction(null)} onConfirm={() => pendingAction && reviewItem(pendingAction.id, pendingAction.action)} details={pendingItem && <div style={modalDetailsStyle}><ConfirmDetailRow label="Member" value={pendingItem.user?.username ?? pendingItem.userId} /><ConfirmDetailRow label="Amount" value={formatMoney(pendingItem.amount)} /><section style={bankBoxStyle}><strong>บัญชีรับเงินปลายทาง</strong><span>{pendingItem.accountName ?? '-'}</span><span>{pendingItem.bankName ?? '-'}</span><span style={accountNumberStyle}>{pendingItem.accountNumber ?? '-'}</span></section><ConfirmDetailRow label="Member note" value={pendingItem.note || '-'} /><ConfirmDetailRow label="Admin note" value={pendingNote || '-'} />{pendingAction?.action === 'reject' && <ConfirmDetailRow label="Required" value="Reject ต้องมีเหตุผล" />}</div>} />
     </AdminPage>
   );
 }
 
+const selectStyle = { minHeight: 44, borderRadius: 12, border: '1px solid rgba(148,163,184,.22)', background: '#0b1220', color: '#f8fafc', padding: '0 12px', minWidth: 0, width: '100%' } as const;
+const pagerStyle = { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(120px, 100%), 1fr))', alignItems: 'center', gap: 10 } as const;
+const pageLabelStyle = { display: 'inline-flex', alignItems: 'center', justifyContent: 'center', color: '#94a3b8', fontWeight: 850 } as const;
+const badgeRowStyle = { display: 'flex', gap: 8, flexWrap: 'wrap' as const };
+const summaryStyle = { display: 'grid', gap: 6, minWidth: 0 } as const;
+const amountStyle = { margin: '4px 0', fontSize: 'clamp(28px, 7vw, 34px)', lineHeight: 1.05, overflowWrap: 'anywhere' as const };
+const bankBoxStyle = { border: '1px solid rgba(245,197,66,.28)', borderRadius: 16, padding: 12, display: 'grid', gap: 5, background: 'rgba(245,197,66,.08)', overflowWrap: 'anywhere' as const, minWidth: 0 };
+const accountNumberStyle = { fontSize: 'clamp(18px, 5vw, 22px)', fontWeight: 950, letterSpacing: '.02em', color: '#f5c542', overflowWrap: 'anywhere' as const };
+const operationBoxStyle = { display: 'grid', gap: 12, marginTop: 14, minWidth: 0 } as const;
+const actionGridStyle = { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(130px, 100%), 1fr))', gap: 10, minWidth: 0 } as const;
+const dangerActionGridStyle = { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(170px, 100%), 1fr))', gap: 10, minWidth: 0 } as const;
+const noteLabelStyle = { display: 'grid', gap: 6, fontWeight: 850, minWidth: 0 } as const;
+const textareaStyle = { minHeight: 96, borderRadius: 12, border: '1px solid rgba(148,163,184,.22)', background: '#0b1220', color: '#f8fafc', padding: 12, resize: 'vertical' as const, width: '100%', boxSizing: 'border-box' as const };
 const modalDetailsStyle = { display: 'grid', gap: 10, minWidth: 0 } as const;
-const bankBoxStyle = { border: '1px solid rgba(245,197,66,.28)', borderRadius: 16, padding: 12, display: 'grid', gap: 5, background: 'rgba(245,197,66,.08)', overflowWrap: 'anywhere' as const };
-const accountNumberStyle = { fontSize: 20, fontWeight: 950, letterSpacing: '.02em', color: '#f5c542' } as const;
-const pagerStyle = { display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' as const };
