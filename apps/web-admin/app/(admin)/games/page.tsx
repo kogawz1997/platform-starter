@@ -1,60 +1,80 @@
-import { AdminBadge, AdminCard, AdminGrid, AdminLinkButton, AdminMetric, AdminMetricGrid, AdminPage, AdminRow, AdminStack } from '../_components/admin-ui';
+'use client';
 
-const syncPipeline = [
-  ['Pull game list', 'ดึงรายชื่อเกม รหัสเกม provider code และสถานะจาก API'],
-  ['Pull game images', 'ดึง cover, icon, thumbnail, banner จาก provider payload'],
-  ['Normalize metadata', 'แปลง payload แต่ละค่ายให้เป็น schema กลาง'],
-  ['Cache media', 'เก็บรูปเข้า storage/CDN เมื่อเงื่อนไข provider อนุญาต'],
-  ['Preserve overrides', 'ไม่ทับชื่อ รูป หมวด และ sort order ที่แอดมินแก้เอง'],
-  ['Detect changes', 'แยกเกมใหม่ เกมถูกลบ เกมเปลี่ยนรูป หรือ provider ปิดเกม'],
-];
+import { FormEvent, useEffect, useMemo, useState } from 'react';
+import { adminApiFetch } from '../../admin-api';
+import { AdminBadge, AdminButton, AdminCard, AdminEmpty, AdminMetric, AdminMetricGrid, AdminNotice, AdminPage, AdminRow, AdminStack, AdminToolbar } from '../_components/admin-ui';
 
-const mediaChecks = [
-  'Broken URL check',
-  'Content type check',
-  'Image size check',
-  'Fallback cover/icon/banner',
-  'Manual image override',
-  'Mobile lazy loading / skeleton',
-];
+type GameStatus = 'ACTIVE' | 'INACTIVE' | 'MAINTENANCE' | 'REMOVED';
+type Provider = { id: string; name: string; code: string };
+type Game = { id: string; providerId: string; providerGameCode: string; name: string; category: string; status: GameStatus; sortOrder: number; isFeatured: boolean; isNew: boolean; isPopular: boolean; provider?: Provider; updatedAt: string };
+type GameForm = { id?: string; providerId: string; providerGameCode: string; name: string; category: string; status: GameStatus; sortOrder: string; isFeatured: boolean; isNew: boolean; isPopular: boolean };
 
-const catalogControls = [
-  'Filter by provider / category / status / tag',
-  'Search by game name / game code / provider code',
-  'Enable / disable selected game',
-  'Featured / new / popular / recommended flags',
-  'Bulk category / tag assignment',
-  'Member visibility and maintenance status',
-];
+const emptyForm: GameForm = { providerId: '', providerGameCode: '', name: '', category: 'slot', status: 'INACTIVE', sortOrder: '100', isFeatured: false, isNew: false, isPopular: false };
+const statuses: GameStatus[] = ['ACTIVE', 'INACTIVE', 'MAINTENANCE', 'REMOVED'];
 
 export default function GameCatalogPage() {
-  return (
-    <AdminPage eyebrow="Game Platform" title="Game Catalog" description="โครง sync รายชื่อเกม รูปเกม หมวดหมู่ tag และการแสดงผลฝั่ง member">
-      <AdminMetricGrid>
-        <AdminMetric title="Sync pipeline" value={String(syncPipeline.length)} helper="list, images, metadata, cache, override" />
-        <AdminMetric title="Media checks" value={String(mediaChecks.length)} helper="broken image, fallback, validation" />
-        <AdminMetric title="Admin controls" value={String(catalogControls.length)} helper="filter, search, flags, visibility" />
-      </AdminMetricGrid>
+  const [games, setGames] = useState<Game[]>([]);
+  const [providers, setProviders] = useState<Provider[]>([]);
+  const [form, setForm] = useState<GameForm>(emptyForm);
+  const [message, setMessage] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
 
-      <AdminCard title="Catalog sync pipeline" description="ลำดับงานที่ต้องทำเมื่อ sync เกมจากค่ายเกม">
-        <AdminStack>{syncPipeline.map(([title, description]) => <AdminRow key={title}><div><strong>{title}</strong><p>{description}</p></div><AdminBadge tone="warning">Sync</AdminBadge></AdminRow>)}</AdminStack>
-      </AdminCard>
+  useEffect(() => { loadAll(); }, []);
+  const metrics = useMemo(() => ({ total: games.length, active: games.filter((item) => item.status === 'ACTIVE').length, featured: games.filter((item) => item.isFeatured).length, popular: games.filter((item) => item.isPopular).length }), [games]);
 
-      <AdminGrid>
-        <AdminCard title="Image / media handling" description="กันรูปเกมหาย รูปแตก หรือ provider ส่ง URL แปลก ๆ มาให้ frontend ร้องไห้">
-          <AdminStack>{mediaChecks.map((item) => <AdminRow key={item}><strong>{item}</strong><AdminBadge>Media</AdminBadge></AdminRow>)}</AdminStack>
-        </AdminCard>
+  async function loadAll() {
+    setLoading(true); setMessage('กำลังโหลด catalog...');
+    const [gamesRes, providersRes] = await Promise.all([adminApiFetch('/admin/games'), adminApiFetch('/admin/game-providers')]);
+    const gamesData = await gamesRes.json().catch(() => null);
+    const providersData = await providersRes.json().catch(() => null);
+    setLoading(false);
+    if (!gamesRes.ok) { setMessage(gamesData?.message ?? 'โหลดเกมไม่สำเร็จ'); return; }
+    if (!providersRes.ok) { setMessage(providersData?.message ?? 'โหลด provider ไม่สำเร็จ'); return; }
+    const providerItems = providersData.items ?? [];
+    setGames(gamesData.items ?? []); setProviders(providerItems);
+    setForm((current) => ({ ...current, providerId: current.providerId || providerItems[0]?.id || '' })); setMessage('');
+  }
 
-        <AdminCard title="Catalog management" description="เครื่องมือที่แอดมินต้องใช้จัดหน้าเกมจริง">
-          <AdminStack>{catalogControls.map((item) => <AdminRow key={item}><strong>{item}</strong><AdminBadge tone="neutral">Admin</AdminBadge></AdminRow>)}</AdminStack>
-        </AdminCard>
-      </AdminGrid>
+  function updateField<K extends keyof GameForm>(key: K, value: GameForm[K]) { setForm((current) => ({ ...current, [key]: value })); }
+  function editGame(item: Game) { setForm({ id: item.id, providerId: item.providerId, providerGameCode: item.providerGameCode, name: item.name, category: item.category, status: item.status, sortOrder: String(item.sortOrder), isFeatured: item.isFeatured, isNew: item.isNew, isPopular: item.isPopular }); setMessage(`กำลังแก้ไข ${item.name}`); }
+  function resetForm() { setForm({ ...emptyForm, providerId: providers[0]?.id || '' }); setMessage(''); }
 
-      <AdminCard title="Next dependency" description="ต้องมี provider + adapter ก่อน sync จริง" action={<AdminLinkButton href="/provider-adapters">Provider adapters</AdminLinkButton>}>
-        <p style={mutedStyle}>หน้านี้เป็นโครง UI และ checklist ก่อนต่อ API จริง รอบถัดไปค่อยผูกกับ backend service/queue/cron ไม่ใช่เอาทุกอย่างยัดใน client component เหมือนประกอบเรือด้วยเทปใส</p>
-      </AdminCard>
-    </AdminPage>
-  );
+  async function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const payload = { providerId: form.providerId, providerGameCode: form.providerGameCode.trim(), name: form.name.trim(), category: form.category.trim(), status: form.status, sortOrder: Number(form.sortOrder || 100), isFeatured: form.isFeatured, isNew: form.isNew, isPopular: form.isPopular };
+    if (!payload.providerId || !payload.providerGameCode || !payload.name || !payload.category) { setMessage('กรุณากรอก provider, game code, name และ category'); return; }
+    setSaving(true); setMessage(form.id ? 'กำลังบันทึกเกม...' : 'กำลังสร้างเกม...');
+    const res = await adminApiFetch(form.id ? `/admin/games/${form.id}` : '/admin/games', { method: form.id ? 'PATCH' : 'POST', body: JSON.stringify(payload) });
+    const data = await res.json().catch(() => null); setSaving(false);
+    if (!res.ok) { setMessage(data?.message ?? 'บันทึกเกมไม่สำเร็จ'); return; }
+    setMessage(form.id ? 'บันทึกเกมแล้ว' : 'สร้างเกมแล้ว'); setForm({ ...emptyForm, providerId: providers[0]?.id || '' }); await loadAll();
+  }
+
+  async function patchGame(item: Game, patch: Partial<Game>) {
+    setMessage(`กำลังอัปเดต ${item.name}...`);
+    const res = await adminApiFetch(`/admin/games/${item.id}`, { method: 'PATCH', body: JSON.stringify(patch) });
+    const data = await res.json().catch(() => null);
+    if (!res.ok) { setMessage(data?.message ?? 'อัปเดตเกมไม่สำเร็จ'); return; }
+    setGames((current) => current.map((game) => game.id === item.id ? { ...game, ...data } : game)); setMessage('อัปเดตเกมแล้ว');
+  }
+
+  return <AdminPage eyebrow="Game Platform" title="Game Catalog" description="จัดการรายชื่อเกม หมวดหมู่ สถานะ และ flag สำหรับหน้า member" actions={<AdminButton onClick={loadAll} disabled={loading}>Refresh</AdminButton>}>
+    <AdminMetricGrid><AdminMetric title="Games" value={String(metrics.total)} helper="all catalog games" /><AdminMetric title="Active" value={String(metrics.active)} helper="เปิดใช้งานอยู่" /><AdminMetric title="Featured" value={String(metrics.featured)} helper="แนะนำ" /><AdminMetric title="Popular" value={String(metrics.popular)} helper="ยอดนิยม" /></AdminMetricGrid>
+    {message && <AdminNotice>{message}</AdminNotice>}
+    <AdminCard title={form.id ? 'Edit game' : 'Create game'} description="เพิ่มเกมเข้าคลังแบบ manual ก่อน sync จาก provider จริง"><form onSubmit={submit} style={formStyle}><label style={labelStyle}>Provider<select value={form.providerId} onChange={(event) => updateField('providerId', event.target.value)} style={inputStyle}>{providers.map((provider) => <option key={provider.id} value={provider.id}>{provider.name} ({provider.code})</option>)}</select></label><label style={labelStyle}>Provider game code<input value={form.providerGameCode} onChange={(event) => updateField('providerGameCode', event.target.value)} style={inputStyle} placeholder="demo-slot-001" /></label><label style={labelStyle}>Game name<input value={form.name} onChange={(event) => updateField('name', event.target.value)} style={inputStyle} placeholder="Demo Fortune Slot" /></label><label style={labelStyle}>Category<input value={form.category} onChange={(event) => updateField('category', event.target.value)} style={inputStyle} placeholder="slot" /></label><label style={labelStyle}>Status<select value={form.status} onChange={(event) => updateField('status', event.target.value as GameStatus)} style={inputStyle}>{statuses.map((status) => <option key={status}>{status}</option>)}</select></label><label style={labelStyle}>Sort order<input value={form.sortOrder} onChange={(event) => updateField('sortOrder', event.target.value)} inputMode="numeric" style={inputStyle} /></label><label style={checkStyle}><input type="checkbox" checked={form.isFeatured} onChange={(event) => updateField('isFeatured', event.target.checked)} /> Featured</label><label style={checkStyle}><input type="checkbox" checked={form.isNew} onChange={(event) => updateField('isNew', event.target.checked)} /> New</label><label style={checkStyle}><input type="checkbox" checked={form.isPopular} onChange={(event) => updateField('isPopular', event.target.checked)} /> Popular</label><div style={actionRowStyle}><AdminButton type="submit" disabled={saving}>{saving ? 'Saving...' : form.id ? 'Save game' : 'Create game'}</AdminButton>{form.id && <AdminButton type="button" tone="secondary" onClick={resetForm}>Cancel edit</AdminButton>}</div></form></AdminCard>
+    <AdminToolbar><strong>Game list</strong><span style={mutedStyle}>{loading ? 'Loading...' : `${games.length} games loaded`}</span></AdminToolbar>
+    <AdminStack>{games.map((item) => <AdminCard key={item.id}><AdminRow><div><h2 style={gameNameStyle}>{item.name}</h2><p style={mutedStyle}>{item.provider?.name ?? item.providerId} · {item.providerGameCode} · {item.category}</p></div><div style={badgeStackStyle}><AdminBadge tone={statusTone(item.status)}>{item.status}</AdminBadge>{item.isFeatured && <AdminBadge>FEATURED</AdminBadge>}{item.isNew && <AdminBadge>NEW</AdminBadge>}{item.isPopular && <AdminBadge>POPULAR</AdminBadge>}</div></AdminRow><div style={actionRowStyle}><AdminButton tone="secondary" onClick={() => editGame(item)}>Edit</AdminButton><AdminButton tone={item.status === 'ACTIVE' ? 'danger' : 'success'} onClick={() => patchGame(item, { status: item.status === 'ACTIVE' ? 'MAINTENANCE' : 'ACTIVE' } as Partial<Game>)}>{item.status === 'ACTIVE' ? 'Maintenance' : 'Activate'}</AdminButton><AdminButton tone="secondary" onClick={() => patchGame(item, { isFeatured: !item.isFeatured } as Partial<Game>)}>Featured</AdminButton><AdminButton tone="secondary" onClick={() => patchGame(item, { isNew: !item.isNew } as Partial<Game>)}>New</AdminButton><AdminButton tone="secondary" onClick={() => patchGame(item, { isPopular: !item.isPopular } as Partial<Game>)}>Popular</AdminButton></div><p style={smallMutedStyle}>Sort {item.sortOrder} · Updated {new Date(item.updatedAt).toLocaleString('th-TH')}</p></AdminCard>)}{!loading && games.length === 0 && <AdminEmpty>ยังไม่มีเกม เพิ่มเกมแรกจากฟอร์มด้านบน</AdminEmpty>}</AdminStack>
+  </AdminPage>;
 }
 
+function statusTone(status: GameStatus) { if (status === 'ACTIVE') return 'success'; if (status === 'MAINTENANCE') return 'warning'; if (status === 'REMOVED') return 'danger'; return 'neutral'; }
+const formStyle = { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(230px, 100%), 1fr))', gap: 12, minWidth: 0 } as const;
+const labelStyle = { display: 'grid', gap: 6, color: '#cbd5e1', fontWeight: 900, minWidth: 0 } as const;
+const inputStyle = { width: '100%', minHeight: 44, borderRadius: 12, border: '1px solid rgba(148,163,184,.22)', background: '#0b1220', color: '#f8fafc', padding: '0 12px', boxSizing: 'border-box' as const, fontSize: 15 };
+const checkStyle = { display: 'flex', gap: 8, alignItems: 'center', color: '#cbd5e1', fontWeight: 900 } as const;
+const actionRowStyle = { display: 'flex', gap: 10, flexWrap: 'wrap' as const, alignItems: 'center' } as const;
 const mutedStyle = { margin: 0, color: '#94a3b8', lineHeight: 1.55 } as const;
+const smallMutedStyle = { margin: 0, color: '#64748b', fontSize: 12 } as const;
+const badgeStackStyle = { display: 'flex', gap: 8, flexWrap: 'wrap' as const, justifyContent: 'flex-end' as const };
+const gameNameStyle = { margin: 0, fontSize: 22, lineHeight: 1.12 } as const;
