@@ -2,9 +2,37 @@
 
 Workflow: `.github/workflows/smoke.yml`
 
-ใช้สำหรับกดรัน smoke test หลัง deploy API หรือหลังแก้ production environment
+ใช้สำหรับกดรัน smoke test หลัง deploy API หรือหลังแก้ production environment และมี scheduled smoke สำหรับเฝ้า API อัตโนมัติ
 
-## How to run
+## Scheduled smoke
+
+Workflow รันอัตโนมัติทุกวัน:
+
+```txt
+01:00 UTC
+```
+
+Scheduled run จะทำ quick smoke เท่านั้น:
+
+- anonymous smoke checks
+- admin token checks ถ้ามี `PROD_ADMIN_TOKEN`
+- ไม่รัน full production env verification
+- ไม่รัน member token checks อัตโนมัติ
+
+API URL สำหรับ scheduled run resolve ตามลำดับนี้:
+
+```txt
+1. PROD_API_URL secret
+2. https://api-service.up.railway.app fallback
+```
+
+แนะนำให้ตั้ง secret นี้ใน GitHub:
+
+```txt
+PROD_API_URL=https://api-service.up.railway.app
+```
+
+## How to run manually
 
 1. Open GitHub repository
 2. Go to Actions
@@ -91,6 +119,12 @@ If the token secret is set but expired or invalid, the smoke check runs and shou
 
 ใช้ได้ทั้งแบบครบ production verification หรือใส่เฉพาะ token สำหรับ smoke check
 
+### Base URL secret
+
+```txt
+PROD_API_URL
+```
+
 ### Production env verification secrets
 
 ```txt
@@ -145,7 +179,7 @@ scripts/verify-production-env.sh
 scripts/smoke-api.sh
 ```
 
-`verify-production-env.sh` only runs when `run_env_verification` is enabled.
+`verify-production-env.sh` only runs when `run_env_verification` is enabled manually.
 
 Smoke checks cover:
 
