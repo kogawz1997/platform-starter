@@ -9,6 +9,7 @@
     "test": "jest"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "latest",
     "@nestjs/common": "latest",
     "@nestjs/core": "latest",
     "@nestjs/config": "latest",
