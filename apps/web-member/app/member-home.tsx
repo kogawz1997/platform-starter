@@ -27,6 +27,7 @@ export default function MemberHome(props: MemberHomeProps) {
   const [withdrawals, setWithdrawals] = useState<MoneyRequest[]>([]);
   const [ledgers, setLedgers] = useState<LedgerItem[]>([]);
   const [activityMessage, setActivityMessage] = useState('');
+  const [isActivityLoading, setIsActivityLoading] = useState(false);
 
   useEffect(() => {
     const ok = Boolean(window.localStorage.getItem('member_access_token') || window.localStorage.getItem('member_refresh_token'));
@@ -35,20 +36,26 @@ export default function MemberHome(props: MemberHomeProps) {
   }, []);
 
   async function loadActivity() {
-    setActivityMessage('กำลังโหลด...');
-    const [topupRes, withdrawalRes, ledgerRes] = await Promise.all([
-      memberApiFetch('/member/topups'),
-      memberApiFetch('/member/withdrawals'),
-      memberApiFetch('/member/wallet/ledger?limit=5'),
-    ]);
-    const topupData = await topupRes.json().catch(() => null);
-    const withdrawalData = await withdrawalRes.json().catch(() => null);
-    const ledgerData = await ledgerRes.json().catch(() => null);
-    if (topupRes.ok) setTopups(topupData.items ?? []);
-    if (withdrawalRes.ok) setWithdrawals(withdrawalData.items ?? []);
-    if (ledgerRes.ok) setLedgers(ledgerData.items ?? []);
-    if (!topupRes.ok || !withdrawalRes.ok || !ledgerRes.ok) setActivityMessage(topupData?.message ?? withdrawalData?.message ?? ledgerData?.message ?? 'โหลดข้อมูลไม่สำเร็จ');
-    else setActivityMessage('');
+    setIsActivityLoading(true);
+    setActivityMessage('');
+    try {
+      const [topupRes, withdrawalRes, ledgerRes] = await Promise.all([
+        memberApiFetch('/member/topups'),
+        memberApiFetch('/member/withdrawals'),
+        memberApiFetch('/member/wallet/ledger?limit=5'),
+      ]);
+      const topupData = await topupRes.json().catch(() => null);
+      const withdrawalData = await withdrawalRes.json().catch(() => null);
+      const ledgerData = await ledgerRes.json().catch(() => null);
+      if (topupRes.ok) setTopups(topupData.items ?? []);
+      if (withdrawalRes.ok) setWithdrawals(withdrawalData.items ?? []);
+      if (ledgerRes.ok) setLedgers(ledgerData.items ?? []);
+      if (!topupRes.ok || !withdrawalRes.ok || !ledgerRes.ok) setActivityMessage(topupData?.message ?? withdrawalData?.message ?? ledgerData?.message ?? 'โหลดข้อมูลไม่สำเร็จ');
+    } catch (error) {
+      setActivityMessage(error instanceof Error ? error.message : 'โหลดข้อมูลไม่สำเร็จ');
+    } finally {
+      setIsActivityLoading(false);
+    }
   }
 
   const pendingTopups = useMemo(() => topups.filter((item) => item.status === 'PENDING').slice(0, 3), [topups]);
@@ -82,7 +89,7 @@ export default function MemberHome(props: MemberHomeProps) {
         <SummaryCard label="รอดำเนินการ" value={`${pendingCount} รายการ`} tone={pendingCount > 0 ? 'hot' : 'calm'} />
         <SummaryCard label="ฝากสำเร็จ" value={`${completedTopups} รายการ`} />
         <SummaryCard label="ถอนสำเร็จ" value={`${completedWithdrawals} รายการ`} />
-        <SummaryCard label="รายการล่าสุด" value={latestLedger ? ledgerTypeLabel(latestLedger.type) : 'ยังไม่มี'} />
+        <SummaryCard label="รายการล่าสุด" value={latestLedger ? ledgerTypeLabel(latestLedger.type) : 'ยังไม่มี'} tone={latestLedger ? 'normal' : 'calm'} />
       </section>}
 
       {props.showPromotion && <section className="member-promo-strip">
@@ -98,12 +105,15 @@ export default function MemberHome(props: MemberHomeProps) {
         </div>
       </section>}
 
+      {isLoggedIn && pendingCount === 0 && !isActivityLoading && !activityMessage && <EmptyState title="ไม่มีรายการรอตรวจสอบ" description="ฝาก ถอน และประวัติอยู่ในเมนูล่างแล้ว เริ่มทำรายการได้ทันที" actionHref="/deposit" actionLabel="ฝาก" />}
+
       {isLoggedIn && <section className="member-info-card">
         <div style={sectionHeadStyle}><h2>ล่าสุด</h2><a href="/transactions" style={{ color: props.primaryColor, fontWeight: 900, textDecoration: 'none' }}>ทั้งหมด</a></div>
-        {activityMessage && <div style={noticeStyle}>{activityMessage}</div>}
+        {isActivityLoading && <div style={noticeStyle}>กำลังโหลด...</div>}
+        {activityMessage && <div style={noticeStyle}><strong>โหลดข้อมูลไม่สำเร็จ</strong><span>{activityMessage}</span><button type="button" onClick={loadActivity} style={retryButtonStyle}>ลองใหม่</button></div>}
         <div style={pendingListStyle}>
           {ledgers.slice(0, 5).map((item) => <LedgerRow key={item.id} item={item} />)}
-          {ledgers.length === 0 && !activityMessage && <span>ยังไม่มีรายการ</span>}
+          {ledgers.length === 0 && !activityMessage && !isActivityLoading && <EmptyState compact title="ยังไม่มีประวัติ" description="เมื่อมีรายการฝาก ถอน หรือปรับยอด รายการล่าสุดจะแสดงตรงนี้" actionHref="/deposit" actionLabel="ฝาก" />}
         </div>
       </section>}
     </section>
@@ -112,6 +122,10 @@ export default function MemberHome(props: MemberHomeProps) {
 
 function SummaryCard({ label, value, tone = 'normal' }: { label: string; value: string; tone?: 'normal' | 'hot' | 'calm' }) {
   return <div className={`member-summary-card ${tone}`}><span>{label}</span><strong>{value}</strong></div>;
+}
+
+function EmptyState({ title, description, actionHref, actionLabel, compact = false }: { title: string; description: string; actionHref: string; actionLabel: string; compact?: boolean }) {
+  return <div style={compact ? compactEmptyStyle : emptyStyle}><div><strong>{title}</strong><span>{description}</span></div><a href={actionHref}>{actionLabel}</a></div>;
 }
 
 function ActivityRow({ title, href, item }: { title: string; href: string; item: MoneyRequest }) {
@@ -148,4 +162,7 @@ const sectionHeadStyle = { display: 'flex', justifyContent: 'space-between', ali
 const rowStyle = { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(190px, 100%), 1fr))', gap: 12, border: '1px solid rgba(255,255,255,.10)', borderRadius: 16, padding: 12, background: 'rgba(255,255,255,.045)', minWidth: 0 };
 const rowLinkStyle = { ...rowStyle, color: 'inherit', textDecoration: 'none' } as const;
 const rightStyle = { textAlign: 'left' as const, display: 'grid', gap: 4, minWidth: 0 };
-const noticeStyle = { border: '1px solid rgba(255,255,255,.12)', borderRadius: 16, padding: 12, background: 'rgba(255,255,255,.06)', marginTop: 12 } as const;
+const noticeStyle = { border: '1px solid rgba(255,255,255,.12)', borderRadius: 16, padding: 12, background: 'rgba(255,255,255,.06)', marginTop: 12, display: 'grid', gap: 6 } as const;
+const retryButtonStyle = { justifySelf: 'start', border: '1px solid rgba(255,255,255,.16)', borderRadius: 999, padding: '8px 12px', background: 'rgba(255,255,255,.08)', color: '#fff', cursor: 'pointer' } as const;
+const emptyStyle = { border: '1px dashed rgba(245,197,66,.34)', borderRadius: 24, padding: 16, background: 'rgba(245,197,66,.07)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap' as const } as const;
+const compactEmptyStyle = { ...emptyStyle, borderColor: 'rgba(255,255,255,.16)', background: 'rgba(255,255,255,.04)' } as const;
