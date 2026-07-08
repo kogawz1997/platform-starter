@@ -37,20 +37,21 @@ export default function TransactionsPage() {
         <h1 style={titleStyle}>ประวัติธุรกรรม</h1>
         <p style={mutedStyle}>รายการเคลื่อนไหวของกระเป๋าเงิน ฝาก ถอน และการปรับยอด</p>
         {message && <div style={noticeStyle}>{message}</div>}
-        <div style={{ display: 'grid', gap: 12, minWidth: 0 }}>
+        <div style={listStyle}>
           {items.map((item) => (
             <section key={item.id} style={cardStyle}>
-              <div style={rowStyle}>
+              <div style={topGridStyle}>
                 <div style={infoStyle}>
-                  <strong>{item.type} / {item.direction}</strong>
+                  <span style={badgeStyle(item.direction)}>{item.direction}</span>
+                  <strong>{item.type}</strong>
                   <p style={mutedStyle}>{new Date(item.createdAt).toLocaleString('th-TH')}</p>
                   <p style={mutedStyle}>Ref: {item.referenceType || '-'} {item.referenceId ? `#${item.referenceId.slice(0, 8)}` : ''}</p>
                 </div>
-                <h2 style={amountStyle}>{item.direction === 'CREDIT' ? '+' : '-'} THB {Number(item.amount).toLocaleString('th-TH', { minimumFractionDigits: 2 })}</h2>
+                <h2 style={amountStyle(item.direction)}>{item.direction === 'CREDIT' ? '+' : '-'} THB {Number(item.amount).toLocaleString('th-TH', { minimumFractionDigits: 2 })}</h2>
               </div>
               <div style={balanceStyle}>
-                <p>ก่อน: THB {Number(item.balanceBefore).toLocaleString('th-TH', { minimumFractionDigits: 2 })}</p>
-                <p>หลัง: THB {Number(item.balanceAfter).toLocaleString('th-TH', { minimumFractionDigits: 2 })}</p>
+                <div style={balanceItemStyle}><span>ก่อน</span><strong>THB {Number(item.balanceBefore).toLocaleString('th-TH', { minimumFractionDigits: 2 })}</strong></div>
+                <div style={balanceItemStyle}><span>หลัง</span><strong>THB {Number(item.balanceAfter).toLocaleString('th-TH', { minimumFractionDigits: 2 })}</strong></div>
               </div>
             </section>
           ))}
@@ -66,9 +67,12 @@ const containerStyle = { width: '100%', maxWidth: 920, margin: '0 auto', padding
 const backStyle = { color: '#f5c542', textDecoration: 'none', fontWeight: 800 } as const;
 const titleStyle = { margin: '6px 0 0', fontSize: 'clamp(34px, 10vw, 54px)', lineHeight: 1, overflowWrap: 'anywhere' as const };
 const mutedStyle = { margin: 0, opacity: 0.76, lineHeight: 1.55, overflowWrap: 'anywhere' as const };
+const listStyle = { display: 'grid', gap: 12, minWidth: 0 } as const;
 const cardStyle = { border: '1px solid rgba(255,255,255,0.10)', borderRadius: 24, padding: 16, background: '#181818', display: 'grid', gap: 12, minWidth: 0, overflow: 'hidden' as const };
-const rowStyle = { display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' as const, minWidth: 0 };
-const infoStyle = { minWidth: 0, flex: '1 1 220px' };
-const amountStyle = { margin: 0, fontSize: 'clamp(20px, 6vw, 24px)', lineHeight: 1.15, overflowWrap: 'anywhere' as const, textAlign: 'right' as const, flex: '1 1 180px' };
-const balanceStyle = { borderTop: '1px solid rgba(255,255,255,0.10)', paddingTop: 10, display: 'grid', gap: 6, minWidth: 0 };
+const topGridStyle = { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(230px, 100%), 1fr))', gap: 12, minWidth: 0 } as const;
+const infoStyle = { display: 'grid', gap: 7, minWidth: 0 };
+function amountStyle(direction: string) { return { margin: 0, fontSize: 'clamp(22px, 7vw, 30px)', lineHeight: 1.1, overflowWrap: 'anywhere' as const, color: direction === 'CREDIT' ? '#86efac' : '#fca5a5' }; }
+const balanceStyle = { borderTop: '1px solid rgba(255,255,255,0.10)', paddingTop: 10, display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(180px, 100%), 1fr))', gap: 8, minWidth: 0 } as const;
+const balanceItemStyle = { border: '1px solid rgba(255,255,255,.08)', borderRadius: 14, padding: 10, background: 'rgba(255,255,255,.04)', display: 'grid', gap: 4, minWidth: 0, overflowWrap: 'anywhere' as const };
 const noticeStyle = { border: '1px solid rgba(255,255,255,0.12)', borderRadius: 16, padding: 12, background: 'rgba(255,255,255,0.07)', overflowWrap: 'anywhere' as const };
+function badgeStyle(direction: string) { return { width: 'fit-content', border: '1px solid rgba(255,255,255,.12)', borderRadius: 999, padding: '6px 10px', background: direction === 'CREDIT' ? 'rgba(34,197,94,.14)' : 'rgba(239,68,68,.14)', color: direction === 'CREDIT' ? '#bbf7d0' : '#fecaca', fontSize: 12, fontWeight: 900 }; }
