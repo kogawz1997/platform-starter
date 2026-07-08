@@ -3,25 +3,32 @@ import { randomUUID } from 'crypto';
 import { ValidationPipe } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { NestFactory } from '@nestjs/core';
+import Redis from 'ioredis';
 import { AppModule } from './app.module';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 
 type RateBucket = { count: number; resetAt: number };
 type RateRule = { method: string; path: string; max: number; env?: string };
+type RateDecision = { allowed: boolean; retryAfterSeconds?: number };
 
 const rateBuckets = new Map<string, RateBucket>();
 const RATE_RULES: RateRule[] = [
   { method: 'POST', path: '/auth/login', max: 10, env: 'RATE_LIMIT_MEMBER_LOGIN_PER_MINUTE' },
   { method: 'POST', path: '/auth/register', max: 8, env: 'RATE_LIMIT_MEMBER_REGISTER_PER_MINUTE' },
   { method: 'POST', path: '/admin/auth/login', max: 10, env: 'RATE_LIMIT_ADMIN_LOGIN_PER_MINUTE' },
+  { method: 'POST', path: '/admin/auth/2fa/verify', max: 10, env: 'RATE_LIMIT_ADMIN_2FA_PER_MINUTE' },
+  { method: 'POST', path: '/admin/auth/refresh', max: 30, env: 'RATE_LIMIT_ADMIN_REFRESH_PER_MINUTE' },
   { method: 'POST', path: '/member/topups', max: 20, env: 'RATE_LIMIT_TOPUPS_PER_MINUTE' },
   { method: 'POST', path: '/member/topups/slip', max: 12, env: 'RATE_LIMIT_SLIP_UPLOAD_PER_MINUTE' },
   { method: 'POST', path: '/member/withdrawals', max: 12, env: 'RATE_LIMIT_WITHDRAWALS_PER_MINUTE' },
 ];
 
+let redis: Redis | null = null;
+
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
   const config = app.get(ConfigService);
+  redis = createRedisClient(config.get<string>('REDIS_URL') ?? process.env.REDIS_URL);
 
   app.enableCors({
     origin: [
@@ -48,27 +55,17 @@ async function bootstrap() {
     next();
   });
 
-  app.use((req: any, res: any, next: any) => {
+  app.use(async (req: any, res: any, next: any) => {
     const limit = getRateLimit(req.method, req.path ?? req.url ?? '');
     if (!limit) return next();
-
-    const now = Date.now();
-    cleanupExpiredBuckets(now);
 
     const ip = getClientIp(req);
     const path = String(req.path ?? req.url ?? '').split('?')[0];
     const key = `${req.method}:${path}:${ip}`;
-    const bucket = rateBuckets.get(key);
+    const decision = await checkRateLimit(key, limit.max, limit.windowMs);
+    if (decision.allowed) return next();
 
-    if (!bucket || bucket.resetAt <= now) {
-      rateBuckets.set(key, { count: 1, resetAt: now + limit.windowMs });
-      return next();
-    }
-
-    bucket.count += 1;
-    if (bucket.count <= limit.max) return next();
-
-    res.setHeader('Retry-After', String(Math.ceil((bucket.resetAt - now) / 1000)));
+    res.setHeader('Retry-After', String(decision.retryAfterSeconds ?? 60));
     return res.status(429).json({ message: 'Too many requests', requestId: req.requestId });
   });
 
@@ -110,6 +107,43 @@ function getRateLimit(method: string, path: string): { max: number; windowMs: nu
   const envValue = matched.env ? process.env[matched.env] : undefined;
   const max = Number(envValue ?? process.env.RATE_LIMIT_PER_MINUTE ?? matched.max);
   return { max: Number.isFinite(max) && max > 0 ? max : matched.max, windowMs: 60_000 };
+}
+
+async function checkRateLimit(key: string, max: number, windowMs: number): Promise<RateDecision> {
+  if (redis) {
+    try {
+      const redisKey = `rate:${key}`;
+      const count = await redis.incr(redisKey);
+      if (count === 1) await redis.pexpire(redisKey, windowMs);
+      if (count <= max) return { allowed: true };
+      const ttl = await redis.pttl(redisKey);
+      return { allowed: false, retryAfterSeconds: Math.max(Math.ceil(ttl / 1000), 1) };
+    } catch (error) {
+      console.error('redis rate limit failed, falling back to memory', error);
+    }
+  }
+  return checkMemoryRateLimit(key, max, windowMs);
+}
+
+function checkMemoryRateLimit(key: string, max: number, windowMs: number): RateDecision {
+  const now = Date.now();
+  cleanupExpiredBuckets(now);
+  const bucket = rateBuckets.get(key);
+  if (!bucket || bucket.resetAt <= now) {
+    rateBuckets.set(key, { count: 1, resetAt: now + windowMs });
+    return { allowed: true };
+  }
+  bucket.count += 1;
+  if (bucket.count <= max) return { allowed: true };
+  return { allowed: false, retryAfterSeconds: Math.ceil((bucket.resetAt - now) / 1000) };
+}
+
+function createRedisClient(url?: string | null) {
+  if (!url) return null;
+  const client = new Redis(url, { lazyConnect: true, maxRetriesPerRequest: 1, enableReadyCheck: false });
+  client.on('error', (error) => console.error('redis client error', error));
+  client.connect().catch((error) => console.error('redis connect failed, memory rate limit will be used', error));
+  return client;
 }
 
 function cleanupExpiredBuckets(now: number) {
