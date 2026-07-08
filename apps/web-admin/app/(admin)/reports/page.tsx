@@ -9,11 +9,13 @@ type Group = { status: string; count: number; amount: string };
 type Reconciliation = { checkedCount?: number; mismatchCount: number; items: { walletId: string; shortUserId: string; username?: string | null; actualBalance: string; latestLedgerBalance: string; lockedBalance: string; availableBalance?: string; status: string }[]; generatedAt: string };
 type TrendRow = { date: string; topUpAmount: string; topUpCount: number; withdrawalAmount: string; withdrawalCount: number; netFlow: string };
 type Trends = { range: { days: number; from: string; to: string }; totals: { topUpAmount: string; topUpCount: number; withdrawalAmount: string; withdrawalCount: number; netFlow: string }; daily: TrendRow[]; generatedAt: string };
+type QueueAging = { summary: { pendingTopUps: number; pendingWithdrawals: number; oldestAgeMinutes: number; over15Minutes: number; over60Minutes: number; over24Hours: number }; oldest: { id: string; type: 'TOPUP' | 'WITHDRAWAL'; userId: string; username: string; amount: string; currency: string; createdAt: string; ageMinutes: number; ageLabel: string }[]; generatedAt: string };
 
 export default function ReportsPage() {
   const [daily, setDaily] = useState<DailyReport | null>(null);
   const [recon, setRecon] = useState<Reconciliation | null>(null);
   const [trends, setTrends] = useState<Trends | null>(null);
+  const [aging, setAging] = useState<QueueAging | null>(null);
   const [trendDays, setTrendDays] = useState(7);
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState('');
@@ -23,18 +25,21 @@ export default function ReportsPage() {
   async function loadReports(nextTrendDays = trendDays) {
     setLoading(true);
     setMessage('กำลังโหลดรายงาน...');
-    const [dailyRes, reconRes, trendsRes] = await Promise.all([
+    const [dailyRes, reconRes, trendsRes, agingRes] = await Promise.all([
       adminApiFetch('/admin/reports/daily'),
       adminApiFetch('/admin/reports/reconciliation?limit=100'),
       adminApiFetch(`/admin/reports/trends?days=${nextTrendDays}`),
+      adminApiFetch('/admin/reports/queue-aging'),
     ]);
     const dailyData = await dailyRes.json().catch(() => null);
     const reconData = await reconRes.json().catch(() => null);
     const trendsData = await trendsRes.json().catch(() => null);
-    if (!dailyRes.ok || !reconRes.ok || !trendsRes.ok) { setMessage(dailyData?.message ?? reconData?.message ?? trendsData?.message ?? 'โหลดรายงานไม่สำเร็จ'); setLoading(false); return; }
+    const agingData = await agingRes.json().catch(() => null);
+    if (!dailyRes.ok || !reconRes.ok || !trendsRes.ok || !agingRes.ok) { setMessage(dailyData?.message ?? reconData?.message ?? trendsData?.message ?? agingData?.message ?? 'โหลดรายงานไม่สำเร็จ'); setLoading(false); return; }
     setDaily(dailyData);
     setRecon(reconData);
     setTrends(trendsData);
+    setAging(agingData);
     setMessage('');
     setLoading(false);
   }
@@ -45,12 +50,23 @@ export default function ReportsPage() {
   }
 
   return (
-    <AdminPage eyebrow="Finance Reports" title="Reports" description="รายงานรายวัน ตรวจยอด wallet และแนวโน้มเงินเข้าออก" actions={<><AdminButton onClick={() => loadReports()}>Refresh</AdminButton><AdminLinkButton href="/exports">Exports</AdminLinkButton></>}>
+    <AdminPage eyebrow="Finance Reports" title="Reports" description="รายงานรายวัน ตรวจยอด wallet แนวโน้มเงินเข้าออก และคิวที่ค้างนาน" actions={<><AdminButton onClick={() => loadReports()}>Refresh</AdminButton><AdminLinkButton href="/exports">Exports</AdminLinkButton></>}>
       {message && <AdminNotice>{message}</AdminNotice>}
-      {loading && !daily && !recon && !trends && <AdminEmpty>กำลังโหลดรายงาน...</AdminEmpty>}
+      {loading && !daily && !recon && !trends && !aging && <AdminEmpty>กำลังโหลดรายงาน...</AdminEmpty>}
       {daily && <AdminMetricGrid><AdminMetric title="Wallets" value={daily.wallets.count.toLocaleString('th-TH')} /><AdminMetric title="Total Balance" value={formatMoney(daily.wallets.totalBalance)} /><AdminMetric title="Locked" value={formatMoney(daily.wallets.totalLockedBalance)} /><AdminMetric title="Ledger Items" value={daily.ledgers.count.toLocaleString('th-TH')} />{daily.pendingQueues && <AdminMetric title="Pending Top-ups" value={`${daily.pendingQueues.topUps.count}`} helper={formatMoney(daily.pendingQueues.topUps.amount)} />}{daily.pendingQueues && <AdminMetric title="Pending Withdrawals" value={`${daily.pendingQueues.withdrawals.count}`} helper={formatMoney(daily.pendingQueues.withdrawals.amount)} />}{recon && <AdminMetric title="Recon Checked" value={(recon.checkedCount ?? recon.items.length).toLocaleString('th-TH')} />}{recon && <AdminMetric title="Mismatch" value={recon.mismatchCount.toLocaleString('th-TH')} />}</AdminMetricGrid>}
 
-      {trends && <AdminCard title="Finance Trend" description={`${trends.range.days} days · ${new Date(trends.range.from).toLocaleDateString('th-TH')} - ${new Date(trends.range.to).toLocaleDateString('th-TH')}`} action={<div style={toolbarStyle}>{[7, 14, 30].map((item) => <AdminButton key={item} tone={trendDays === item ? 'primary' : 'secondary'} disabled={loading} onClick={() => changeTrendDays(item)}>{item}d</AdminButton>)}</div>}>
+      {aging && <AdminCard title="Pending Queue Aging" description={`Oldest pending: ${aging.summary.oldestAgeMinutes} minutes · Generated ${new Date(aging.generatedAt).toLocaleString('th-TH')}`}>
+        <AdminMetricGrid>
+          <AdminMetric title="Pending Top-ups" value={aging.summary.pendingTopUps.toLocaleString('th-TH')} />
+          <AdminMetric title="Pending Withdrawals" value={aging.summary.pendingWithdrawals.toLocaleString('th-TH')} />
+          <AdminMetric title="Over 15m" value={aging.summary.over15Minutes.toLocaleString('th-TH')} />
+          <AdminMetric title="Over 60m" value={aging.summary.over60Minutes.toLocaleString('th-TH')} />
+          <AdminMetric title="Over 24h" value={aging.summary.over24Hours.toLocaleString('th-TH')} />
+        </AdminMetricGrid>
+        <AdminStack>{aging.oldest.map((item) => <AdminRow key={`${item.type}-${item.id}`}><div><AdminBadge tone={item.type === 'TOPUP' ? 'warning' : 'danger'}>{item.type}</AdminBadge><strong style={{ display: 'block', marginTop: 8 }}>{item.username}</strong><p>{new Date(item.createdAt).toLocaleString('th-TH')} · age {item.ageLabel}</p></div><div style={{ textAlign: 'right' }}><strong>{formatMoney(item.amount)}</strong><p>{item.currency}</p><AdminLinkButton href={item.type === 'TOPUP' ? '/topups' : '/withdrawals'}>Open queue</AdminLinkButton></div></AdminRow>)}{aging.oldest.length === 0 && <AdminEmpty>ไม่มีคิว pending</AdminEmpty>}</AdminStack>
+      </AdminCard>}
+
+      {trends && <AdminCard title="Finance Trend" description={`${trends.range.days} days · ${new Date(trends.range.from).toLocaleDateString('th-TH')} - ${new Date(trends.range.to).toLocaleDateString('th-TH')}`} action={<div style={toolbarStyle}>{[7, 14, 30].map((item) => <AdminButton key={item} tone={trendDays === item ? 'primary' : 'secondary'} disabled={loading} onClick={() => changeTrendDays(item)}>{item}d</AdminButton>)}<AdminLinkButton href={`/admin/exports/report-trends.csv?days=${trendDays}`}>Export CSV</AdminLinkButton></div>}>
         <AdminMetricGrid>
           <AdminMetric title="Top-up volume" value={formatMoney(trends.totals.topUpAmount)} helper={`${trends.totals.topUpCount} approved`} />
           <AdminMetric title="Withdrawal volume" value={formatMoney(trends.totals.withdrawalAmount)} helper={`${trends.totals.withdrawalCount} completed`} />
@@ -60,7 +76,7 @@ export default function ReportsPage() {
       </AdminCard>}
 
       {daily && <AdminCard title="Daily Summary" description={`${new Date(daily.range.from).toLocaleDateString('th-TH')} - ${new Date(daily.range.to).toLocaleDateString('th-TH')}`}><AdminGrid><GroupCard title="Top-ups" items={daily.topUps} /><GroupCard title="Withdrawals" items={daily.withdrawals} /><GroupCard title="Adjustments" items={daily.adjustments.map((item) => ({ status: item.direction, count: item.count, amount: item.amount }))} /></AdminGrid></AdminCard>}
-      {recon && <AdminCard title="Reconciliation" description={`Mismatch: ${recon.mismatchCount} · Generated ${new Date(recon.generatedAt).toLocaleString('th-TH')}`}><AdminStack>{recon.items.slice(0, 20).map((item) => <AdminRow key={item.walletId}><div><strong>{item.username ?? item.shortUserId}</strong><p>Wallet: {item.shortUserId}</p></div><div style={{ textAlign: 'right' }}><strong>{item.status}</strong><p>Actual {formatMoney(item.actualBalance)} / Ledger {formatMoney(item.latestLedgerBalance)}</p>{item.availableBalance && <p>Available {formatMoney(item.availableBalance)}</p>}</div></AdminRow>)}{recon.items.length === 0 && <AdminEmpty>ไม่มี mismatch</AdminEmpty>}</AdminStack></AdminCard>}
+      {recon && <AdminCard title="Reconciliation" description={`Mismatch: ${recon.mismatchCount} · Generated ${new Date(recon.generatedAt).toLocaleString('th-TH')}`} action={<AdminLinkButton href="/admin/exports/reconciliation.csv?limit=1000">Export CSV</AdminLinkButton>}><AdminStack>{recon.items.slice(0, 20).map((item) => <AdminRow key={item.walletId}><div><strong>{item.username ?? item.shortUserId}</strong><p>Wallet: {item.shortUserId}</p></div><div style={{ textAlign: 'right' }}><strong>{item.status}</strong><p>Actual {formatMoney(item.actualBalance)} / Ledger {formatMoney(item.latestLedgerBalance)}</p>{item.availableBalance && <p>Available {formatMoney(item.availableBalance)}</p>}</div></AdminRow>)}{recon.items.length === 0 && <AdminEmpty>ไม่มี mismatch</AdminEmpty>}</AdminStack></AdminCard>}
     </AdminPage>
   );
 }
