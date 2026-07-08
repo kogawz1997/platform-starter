@@ -6,10 +6,10 @@ import { API_URL, clearMemberSession, refreshMemberToken } from './member-api';
 
 const menuItems = [
   ['หน้าหลัก', '/'],
-  ['เติมเงิน', '/deposit'],
+  ['ฝาก', '/deposit'],
   ['ถอนเงิน', '/withdraw'],
-  ['เงินเข้า-ออก', '/transactions'],
-  ['บัญชีรับเงิน', '/bank-accounts'],
+  ['ประวัติ', '/transactions'],
+  ['การจัดการบัญชีธนาคาร', '/bank-accounts'],
 ];
 
 export default function MemberChrome({ children }: { children: ReactNode }) {
