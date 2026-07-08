@@ -2,7 +2,7 @@ import { BadRequestException, HttpException, HttpStatus, Injectable, NotFoundExc
 import { Decimal } from '@prisma/client/runtime/library';
 import { PrismaService } from '../../database/prisma.service';
 
-type RiskFilter = { status?: string; severity?: string; type?: string; createdFrom?: string; createdTo?: string };
+type RiskFilter = { status?: string; severity?: string; type?: string; createdFrom?: string; createdTo?: string; page?: string; take?: string };
 type RiskStatus = 'OPEN' | 'REVIEWING' | 'RESOLVED' | 'DISMISSED';
 type RiskSeverity = 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
 type RiskType = 'REPEATED_TOPUPS' | 'RAPID_DEPOSIT_WITHDRAWAL' | 'HIGH_WITHDRAWAL' | 'BANK_CHANGE_WITHDRAWAL' | 'MULTIPLE_PENDING_TOPUPS' | 'WALLET_LEDGER_MISMATCH';
@@ -19,6 +19,8 @@ export class RiskAlertsService {
   constructor(private readonly prisma: PrismaService) {}
 
   async list(filter: RiskFilter = {}) {
+    const page = Math.max(Number(filter.page ?? 1) || 1, 1);
+    const take = Math.min(Math.max(Number(filter.take ?? 50) || 50, 1), 100);
     const where: any = {};
     if (filter.status && VALID_STATUSES.includes(filter.status as RiskStatus)) where.status = filter.status;
     if (filter.severity && VALID_SEVERITIES.includes(filter.severity as RiskSeverity)) where.severity = filter.severity;
@@ -26,13 +28,14 @@ export class RiskAlertsService {
     const createdAt = this.buildDateRange(filter.createdFrom, filter.createdTo);
     if (createdAt) where.createdAt = createdAt;
 
-    const [items, openCount, criticalCount] = await Promise.all([
-      this.prisma.riskAlert.findMany({ where, orderBy: [{ status: 'asc' }, { createdAt: 'desc' }], take: 200 }),
+    const [items, total, openCount, criticalCount] = await Promise.all([
+      this.prisma.riskAlert.findMany({ where, orderBy: [{ status: 'asc' }, { createdAt: 'desc' }], skip: (page - 1) * take, take }),
+      this.prisma.riskAlert.count({ where }),
       this.prisma.riskAlert.count({ where: { status: { in: ACTIVE_ALERT_STATUSES } as any } }),
       this.prisma.riskAlert.count({ where: { status: { in: ACTIVE_ALERT_STATUSES } as any, severity: { in: ['HIGH', 'CRITICAL'] as any } } }),
     ]);
 
-    return { items: items.map((item) => this.formatAlert(item)), summary: { openCount, criticalCount } };
+    return { items: items.map((item) => this.formatAlert(item)), total, page, take, pageCount: Math.max(Math.ceil(total / take), 1), summary: { openCount, criticalCount } };
   }
 
   async get(id: string) {
@@ -180,6 +183,6 @@ export class RiskAlertsService {
   }
 
   private formatAlert(item: any) {
-    return { id: item.id, type: item.type, severity: item.severity, status: item.status, memberId: item.memberId, shortMemberId: item.memberId?.slice?.(0, 8) ?? null, refType: item.refType, refId: item.refId, title: item.title, description: item.description, metadata: item.metadata, createdAt: item.createdAt, updatedAt: item.updatedAt, resolvedAt: item.resolvedAt, resolvedBy: item.resolvedBy };
+    return { id: item.id, type: item.type, severity: item.severity, status: item.status, memberId: item.memberId, refType: item.refType, refId: item.refId, title: item.title, description: item.description, metadata: item.metadata, resolvedBy: item.resolvedBy, resolvedAt: item.resolvedAt, createdAt: item.createdAt, updatedAt: item.updatedAt };
   }
 }
