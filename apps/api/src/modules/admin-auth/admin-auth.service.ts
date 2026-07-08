@@ -67,6 +67,18 @@ export class AdminAuthService {
     return { success: true, recoveryCodes };
   }
 
+  async disableTwoFactor(adminUserId: string, code: string, meta: RequestMeta = {}) {
+    const admin = await this.prisma.adminUser.findUnique({ where: { id: adminUserId } });
+    if (!admin || admin.status !== 'ACTIVE' || !admin.twoFactorEnabled) throw new UnauthorizedException('Two factor is not enabled');
+    await this.assertTwoFactorOrRecovery(admin.id, admin.twoFactorSecret, code, meta);
+    await this.prisma.$transaction([
+      this.prisma.adminUser.update({ where: { id: admin.id }, data: { twoFactorEnabled: false, twoFactorSecret: null } }),
+      this.prisma.adminRecoveryCode.deleteMany({ where: { adminUserId: admin.id } }),
+    ]);
+    await this.safeWriteAudit(admin.id, 'admin.otp.disable', 'auth', admin.id, meta);
+    return { success: true };
+  }
+
   async regenerateRecoveryCodes(adminUserId: string, code: string, meta: RequestMeta = {}) {
     const admin = await this.prisma.adminUser.findUnique({ where: { id: adminUserId } });
     if (!admin || admin.status !== 'ACTIVE' || !admin.twoFactorEnabled) throw new UnauthorizedException('Two factor is not enabled');
