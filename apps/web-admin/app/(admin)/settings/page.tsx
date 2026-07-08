@@ -1,6 +1,6 @@
 import { AdminBadge, AdminCard, AdminGrid, AdminLinkButton, AdminMetric, AdminMetricGrid, AdminPage } from '../_components/admin-ui';
 
-const settingsItems = [
+const websiteItems = [
   ['Website', '/settings/website', 'ข้อมูลเว็บหลัก ภาษา โดเมน และสถานะ login/register', 'Core'],
   ['Branding', '/settings/branding', 'โลโก้ สีหลัก ไอคอน และตัวอย่างหน้าตาแบรนด์', 'Brand'],
   ['Theme', '/settings/theme', 'Layout ผู้เล่น มือถือ เดสก์ท็อป และเกม', 'UI'],
@@ -14,40 +14,60 @@ const settingsItems = [
 
 const moneyItems = [
   ['Finance Summary', '/finance', 'ภาพรวมยอดเงินรวม คิว pending และรายการล่าสุด', 'Money'],
-  ['Top Up Review', '/topups', 'ตรวจสลิปและอนุมัติรายการฝากเงิน', 'Queue'],
+  ['Top Up Review', '/topups', 'ตรวจสลิปและอนุมัติรายการฝาก', 'Queue'],
   ['Withdrawal Review', '/withdrawals', 'ตรวจและปิดรายการถอนเงิน', 'Queue'],
   ['Wallet Ledgers', '/ledgers', 'ดูประวัติเงินทั้งหมด ฝาก ถอน และยอดก่อน/หลัง', 'Audit'],
   ['Member Wallets', '/wallets', 'ค้นหา wallet สมาชิกและดูยอดคงเหลือ', 'Wallet'],
   ['Risk Alerts', '/risk-alerts', 'ตรวจพฤติกรรมเสี่ยงและรายการผิดปกติจากระบบเงิน', 'Risk'],
 ];
 
+const gameItems = [
+  ['Game Providers', '/game-providers', 'จัดการค่ายเกม สถานะ โลโก้ ประเภทเกม และ maintenance mode', 'Provider'],
+  ['Game API Settings', '/game-api-settings', 'ตั้งค่า endpoint, credential, webhook, timeout, retry และ health check', 'API'],
+  ['Game Catalog', '/games', 'sync รายชื่อเกม รูปเกม หมวดหมู่ tag และ member visibility', 'Catalog'],
+  ['Provider Adapters', '/provider-adapters', 'สัญญากลางของ adapter: launch, balance, transfer, sync, webhook', 'Adapter'],
+];
+
+const safetyItems = [
+  ['Access Control', '/access', 'จัด role/permission สำหรับ finance, support, game operator และ auditor', 'Access'],
+  ['Admin 2FA', '/security', 'ความปลอดภัยแอดมิน session และ 2FA', 'Security'],
+  ['Audit Logs', '/audit', 'ตรวจประวัติ action สำคัญ การเงิน config และ permission', 'Audit'],
+  ['Activity', '/activity', 'timeline การกระทำในระบบและ filter สำหรับตรวจสอบย้อนหลัง', 'Activity'],
+];
+
 export default function SettingsPage() {
   return (
-    <AdminPage eyebrow="Admin Console" title="Settings" description="ตั้งค่าเว็บไซต์ แบรนด์ SEO ฟีเจอร์ และทางลัดระบบเงิน">
+    <AdminPage eyebrow="Admin Console" title="Settings" description="ศูนย์รวมโครงตั้งค่าเว็บ ระบบเงิน เกม API ค่ายเกม ความปลอดภัย และ operation">
       <AdminMetricGrid>
-        <AdminMetric title="Config modules" value={String(settingsItems.length)} helper="Website, branding, SEO และ feature flags" />
-        <AdminMetric title="Money shortcuts" value={String(moneyItems.length)} helper="คิวเงิน, wallet, ledger และ risk" />
-        <AdminMetric title="Deploy safety" value="Runbook" helper="มี docs/production-runbook.md แล้ว" />
+        <AdminMetric title="Website modules" value={String(websiteItems.length)} helper="แบรนด์, SEO, contact, feature flags" />
+        <AdminMetric title="Money modules" value={String(moneyItems.length)} helper="คิวเงิน, wallet, ledger, risk" />
+        <AdminMetric title="Game modules" value={String(gameItems.length)} helper="providers, API, catalog, adapters" />
+        <AdminMetric title="Safety modules" value={String(safetyItems.length)} helper="access, audit, activity" />
       </AdminMetricGrid>
 
       <section style={quickPanelStyle}>
         <div>
           <h2 style={{ margin: 0 }}>Quick actions</h2>
-          <p style={mutedStyle}>ทางลัดที่ใช้บ่อยตอนดู production ไม่ต้องกดหลงเหมือนเดินห้างแล้วหาทางออกไม่เจอ</p>
+          <p style={mutedStyle}>ทางลัดสำหรับ setting ที่แตะ production, เงิน, provider และ API key โดยตรง</p>
         </div>
         <div style={quickActionsStyle}>
-          <AdminLinkButton href="/settings/features">Feature Flags</AdminLinkButton>
+          <AdminLinkButton href="/game-providers">Game Providers</AdminLinkButton>
+          <AdminLinkButton href="/game-api-settings">Game API</AdminLinkButton>
+          <AdminLinkButton href="/games">Game Catalog</AdminLinkButton>
           <AdminLinkButton href="/settings/maintenance">Maintenance</AdminLinkButton>
-          <AdminLinkButton href="/risk-alerts">Risk Alerts</AdminLinkButton>
         </div>
       </section>
 
-      <h2 style={sectionTitleStyle}>Website Settings</h2>
-      <AdminGrid>{settingsItems.map(([title, href, description, badge]) => <HubCard key={href} title={title} href={href} description={description} badge={badge} />)}</AdminGrid>
-      <h2 style={sectionTitleStyle}>Money Operations</h2>
-      <AdminGrid>{moneyItems.map(([title, href, description, badge]) => <HubCard key={href} title={title} href={href} description={description} badge={badge} accent />)}</AdminGrid>
+      <SettingsSection title="Website Settings" items={websiteItems} />
+      <SettingsSection title="Money Operations" items={moneyItems} accent />
+      <SettingsSection title="Game Platform Settings" items={gameItems} accent />
+      <SettingsSection title="Security / Governance" items={safetyItems} />
     </AdminPage>
   );
+}
+
+function SettingsSection({ title, items, accent }: { title: string; items: string[][]; accent?: boolean }) {
+  return <><h2 style={sectionTitleStyle}>{title}</h2><AdminGrid>{items.map(([cardTitle, href, description, badge]) => <HubCard key={href} title={cardTitle} href={href} description={description} badge={badge} accent={accent} />)}</AdminGrid></>;
 }
 
 function HubCard({ title, href, description, badge, accent }: { title: string; href: string; description: string; badge: string; accent?: boolean }) {
