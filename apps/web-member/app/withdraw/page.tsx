@@ -8,13 +8,6 @@ type WithdrawalItem = { id: string; amount: string; currency: string; status: st
 type BankItem = { id: string; bankName: string; accountName: string; accountNumber: string; isPrimary: boolean; status: string };
 type WithdrawStep = 'account' | 'amount' | 'confirm' | 'waiting';
 
-const STEP_ITEMS: { key: WithdrawStep; title: string; caption: string }[] = [
-  { key: 'account', title: 'เลือกบัญชี', caption: 'บัญชีปลายทาง' },
-  { key: 'amount', title: 'ใส่ยอด', caption: 'ยอดที่ต้องการถอน' },
-  { key: 'confirm', title: 'ยืนยัน', caption: 'ตรวจสอบข้อมูล' },
-  { key: 'waiting', title: 'รอดำเนินการ', caption: 'ติดตามสถานะ' },
-];
-
 export default function WithdrawPage() {
   const [step, setStep] = useState<WithdrawStep>('account');
   const [wallet, setWallet] = useState<WalletResponse | null>(null);
@@ -113,48 +106,44 @@ export default function WithdrawPage() {
       <a href="/" style={backStyle}>← หน้าแรก</a>
       <section style={heroCardStyle}><p style={mutedStyle}>ยอดที่ถอนได้</p><h1 style={amountTitleStyle}>{availableText}</h1>{wallet && <div style={walletMetaStyle}><span>รอดำเนินการ: {Number(wallet.lockedBalance).toLocaleString('th-TH', { minimumFractionDigits: 2 })}</span><span>{wallet.status === 'ACTIVE' ? 'ใช้งานได้' : wallet.status}</span></div>}</section>
       <h1 style={titleStyle}>ถอนเงิน</h1>
-      <StepProgress current={step} />
       {isLoading && <div style={noticeStyle}>กำลังโหลด...</div>}
       {message && <div style={noticeStyle}>{message}</div>}
 
       {step === 'account' && (
         <form onSubmit={goAmount} style={cardStyle}>
-          <div style={cardHeaderStyle}><span>ขั้นตอนที่ 1</span><h2 style={sectionTitleStyle}>เลือกบัญชี</h2><p style={mutedStyle}>เลือกบัญชีธนาคารปลายทางที่อนุมัติแล้วสำหรับรับเงินถอน</p></div>
+          <div style={cardHeaderStyle}><h2 style={sectionTitleStyle}>เลือกบัญชี</h2><p style={mutedStyle}>เลือกบัญชีธนาคารปลายทางที่อนุมัติแล้วสำหรับรับเงินถอน</p></div>
           <label style={labelStyle}>ช่องทาง<select value={method} onChange={(e) => setMethod(e.target.value)} style={inputStyle}><option value="bank_transfer">โอนธนาคาร</option></select></label>
           <label style={labelStyle}>บัญชีธนาคาร<select value={bankAccountId} onChange={(e) => chooseBank(e.target.value)} style={inputStyle}><option value="">เลือกบัญชี</option>{banks.map((item) => <option key={item.id} value={item.id} disabled={item.status !== 'ACTIVE'}>{item.bankName} / {item.accountNumber} {item.isPrimary ? '(หลัก)' : ''} {item.status !== 'ACTIVE' ? `- ${item.status}` : ''}</option>)}</select></label>
           {!isLoading && activeBanks.length === 0 && <EmptyAction title="ยังไม่มีบัญชีธนาคารที่ใช้ถอนได้" description="เพิ่มบัญชีธนาคารแล้วรออนุมัติก่อนส่งคำขอถอน" actionHref="/bank-accounts" actionLabel="การจัดการบัญชีธนาคาร" />}
           {activeBanks.length > 0 && <a href="/bank-accounts" style={bankLinkStyle}>การจัดการบัญชีธนาคาร</a>}
           {hasSelectedBank && <BankPreview bankName={bankName} accountName={accountName} accountNumber={accountNumber} onCopy={copyText} />}
-          <WarningBox text="ตรวจสอบชื่อบัญชี เลขบัญชี และธนาคารให้ถูกต้องก่อนถอน เพราะแอดมินจะใช้ข้อมูลนี้เป็นปลายทางการโอน" />
           <button type="submit" disabled={activeBanks.length === 0} style={buttonStyle}>ถัดไป</button>
         </form>
       )}
 
       {step === 'amount' && (
         <form onSubmit={goConfirm} style={cardStyle}>
-          <div style={cardHeaderStyle}><span>ขั้นตอนที่ 2</span><h2 style={sectionTitleStyle}>ใส่ยอดถอน</h2><p style={mutedStyle}>ยอดถอนต้องไม่เกินยอดที่ถอนได้</p></div>
+          <div style={cardHeaderStyle}><h2 style={sectionTitleStyle}>ใส่ยอดถอน</h2><p style={mutedStyle}>ยอดถอนต้องไม่เกินยอดที่ถอนได้</p></div>
           {hasSelectedBank && <BankPreview bankName={bankName} accountName={accountName} accountNumber={accountNumber} onCopy={copyText} compact />}
           <label style={labelStyle}>จำนวนเงิน<input value={amount} onChange={(e) => setAmount(e.target.value)} inputMode="decimal" placeholder="เช่น 100" style={inputStyle} /></label>
           <label style={labelStyle}>หมายเหตุ<textarea value={note} onChange={(e) => setNote(e.target.value)} placeholder="รายละเอียดเพิ่มเติม ถ้ามี" style={textareaStyle} /></label>
-          <WarningBox text="ยอดถอนจะถูกส่งเป็นคำขอให้แอดมินดำเนินการ ไม่ใช่โอนออกทันที" />
           <div style={actionRowStyle}><button type="button" onClick={() => setStep('account')} style={secondaryButtonStyle}>ย้อนกลับ</button><button type="submit" style={buttonStyle}>ถัดไป</button></div>
         </form>
       )}
 
       {step === 'confirm' && (
         <section style={cardStyle}>
-          <div style={cardHeaderStyle}><span>ขั้นตอนที่ 3</span><h2 style={sectionTitleStyle}>ยืนยันคำขอถอน</h2><p style={mutedStyle}>ตรวจสอบข้อมูลให้ถูกต้องก่อนส่งคำขอ</p></div>
+          <div style={cardHeaderStyle}><h2 style={sectionTitleStyle}>ยืนยันคำขอถอน</h2><p style={mutedStyle}>ตรวจสอบข้อมูลให้ถูกต้องก่อนส่งคำขอ</p></div>
           <section style={confirmBoxStyle}><span>ยอดถอน</span><strong>THB {Number.isFinite(parsedAmount) ? parsedAmount.toLocaleString('th-TH', { minimumFractionDigits: 2 }) : '0.00'}</strong></section>
           {hasSelectedBank && <BankPreview bankName={bankName} accountName={accountName} accountNumber={accountNumber} onCopy={copyText} compact />}
           {note && <div style={noticeStyle}>หมายเหตุ: {note}</div>}
-          <WarningBox text="กดยืนยันเฉพาะเมื่อข้อมูลบัญชีปลายทางถูกต้องแล้ว รายการนี้จะเข้าสู่คิวตรวจสอบของแอดมิน" />
           <div style={actionRowStyle}><button type="button" onClick={() => setStep('amount')} style={secondaryButtonStyle}>แก้ไข</button><button type="button" onClick={openConfirmModal} disabled={isSubmitting} style={buttonStyle}>{isSubmitting ? 'กำลังส่ง...' : 'ตรวจสอบก่อนส่ง'}</button></div>
         </section>
       )}
 
       {step === 'waiting' && (
         <section style={cardStyle}>
-          <div style={cardHeaderStyle}><span>ขั้นตอนที่ 4</span><h2 style={sectionTitleStyle}>รอดำเนินการ</h2><p style={mutedStyle}>ระบบรับคำขอถอนแล้ว รอแอดมินตรวจสอบและดำเนินการ</p></div>
+          <div style={cardHeaderStyle}><h2 style={sectionTitleStyle}>รอดำเนินการ</h2><p style={mutedStyle}>ระบบรับคำขอถอนแล้ว รอแอดมินตรวจสอบและดำเนินการ</p></div>
           <div style={successBoxStyle}>คำขอถอนถูกส่งแล้ว</div>
           <div style={actionRowStyle}><a href="/transactions" style={secondaryLinkStyle}>ดูประวัติ</a><button type="button" onClick={() => setStep('account')} style={buttonStyle}>ถอนอีกครั้ง</button></div>
         </section>
@@ -165,7 +154,6 @@ export default function WithdrawPage() {
         <InfoRow label="ช่องทาง" value="โอนธนาคาร" />
         <InfoRow label="บัญชีธนาคาร" value={`${bankName} / ${accountName} / ${accountNumber}`} />
         {note && <InfoRow label="หมายเหตุ" value={note} />}
-        <WarningBox text="หลังยืนยัน ระบบจะส่งคำขอถอนให้แอดมิน กรุณาตรวจบัญชีปลายทางให้ถูกต้องก่อนส่ง" />
       </SummaryModal>}
 
       <section style={historySectionStyle}>
@@ -176,15 +164,10 @@ export default function WithdrawPage() {
   );
 }
 
-function StepProgress({ current }: { current: WithdrawStep }) {
-  const currentIndex = STEP_ITEMS.findIndex((item) => item.key === current);
-  return <section style={stepperStyle}>{STEP_ITEMS.map((item, index) => <div key={item.key} style={stepItemStyle(index <= currentIndex)}><strong>{index + 1}</strong><div><span>{item.title}</span><small>{item.caption}</small></div></div>)}</section>;
-}
 function BankPreview({ bankName, accountName, accountNumber, onCopy, compact = false }: { bankName: string; accountName: string; accountNumber: string; onCopy: (value: string, label: string) => void; compact?: boolean }) {
   return <section style={compact ? compactAccountBoxStyle : accountBoxStyle}><InfoRow label="ชื่อบัญชี" value={accountName} /><InfoRow label="เลขบัญชี" value={accountNumber} action={<button type="button" onClick={() => onCopy(accountNumber, 'เลขบัญชี')} style={copyButtonStyle}>คัดลอก</button>} /><InfoRow label="ธนาคาร" value={bankName} action={<button type="button" onClick={() => onCopy(bankName, 'ชื่อธนาคาร')} style={copyButtonStyle}>คัดลอก</button>} /></section>;
 }
 function InfoRow({ label, value, action }: { label: string; value: string; action?: React.ReactNode }) { return <div style={infoRowStyle}><div style={{ minWidth: 0 }}><span>{label}</span><strong>{value}</strong></div>{action}</div>; }
-function WarningBox({ text }: { text: string }) { return <div style={warningStyle}>⚠️ {text}</div>; }
 function EmptyAction({ title, description, actionHref, actionLabel }: { title: string; description: string; actionHref: string; actionLabel: string }) { return <div style={emptyStyle}><div><strong>{title}</strong><span>{description}</span></div><a href={actionHref}>{actionLabel}</a></div>; }
 function SummaryModal({ title, children, onClose, onConfirm, loading, confirmLabel }: { title: string; children: React.ReactNode; onClose: () => void; onConfirm: () => void; loading: boolean; confirmLabel: string }) { return <div style={modalBackdropStyle}><section style={modalStyle}><div style={modalHeadStyle}><h2 style={sectionTitleStyle}>{title}</h2><button type="button" onClick={onClose} style={closeButtonStyle}>×</button></div>{children}<div style={actionRowStyle}><button type="button" onClick={onClose} style={secondaryButtonStyle}>แก้ไข</button><button type="button" onClick={onConfirm} disabled={loading} style={buttonStyle}>{loading ? 'กำลังส่ง...' : confirmLabel}</button></div></section></div>; }
 function statusLabel(status: string) { if (status === 'PENDING') return 'รอดำเนินการ'; if (status === 'APPROVED' || status === 'COMPLETED') return 'สำเร็จ'; if (status === 'REJECTED') return 'ไม่อนุมัติ'; return status; }
@@ -207,7 +190,6 @@ const secondaryButtonStyle = { padding: 14, minHeight: 48, borderRadius: 16, cur
 const secondaryLinkStyle = { ...secondaryButtonStyle, textDecoration: 'none', display: 'grid', placeItems: 'center' } as const;
 const actionRowStyle = { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(150px, 100%), 1fr))', gap: 10 } as const;
 const noticeStyle = { border: '1px solid rgba(255,255,255,0.12)', borderRadius: 16, padding: 12, background: 'rgba(255,255,255,0.07)', overflowWrap: 'anywhere' as const };
-const warningStyle = { border: '1px solid rgba(245,197,66,.30)', borderRadius: 16, padding: 12, background: 'rgba(245,197,66,.10)', color: '#fde68a', fontWeight: 850, lineHeight: 1.5 } as const;
 const emptyStyle = { border: '1px dashed rgba(255,255,255,.18)', borderRadius: 18, padding: 14, background: 'rgba(255,255,255,.04)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap' as const, color: 'rgba(255,255,255,.82)' };
 const bankLinkStyle = { color: '#f5c542', textDecoration: 'none', fontWeight: 900 } as const;
 const accountBoxStyle = { border: '1px solid rgba(245,197,66,.22)', borderRadius: 18, padding: 12, background: 'rgba(245,197,66,.06)', display: 'grid', gap: 10, minWidth: 0 };
@@ -220,10 +202,8 @@ const listStyle = { display: 'grid', gap: 12, minWidth: 0 } as const;
 const historySectionStyle = { display: 'grid', gap: 10, minWidth: 0 } as const;
 const historyCardStyle = { border: '1px solid rgba(255,255,255,0.10)', borderRadius: 20, padding: 14, background: '#151515', display: 'grid', gap: 8, minWidth: 0, overflow: 'hidden' as const };
 const historyTopStyle = { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(160px, 100%), 1fr))', gap: 8, alignItems: 'center' } as const;
-const stepperStyle = { border: '1px solid rgba(255,255,255,.10)', borderRadius: 22, padding: 8, background: 'rgba(255,255,255,.045)', display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(min(120px,100%),1fr))', gap: 6, minWidth: 0 } as const;
 const modalBackdropStyle = { position: 'fixed' as const, inset: 0, zIndex: 90, background: 'rgba(0,0,0,.68)', display: 'grid', placeItems: 'end center', padding: 12 };
 const modalStyle = { width: '100%', maxWidth: 560, maxHeight: '90dvh', overflowY: 'auto' as const, border: '1px solid rgba(255,255,255,.14)', borderRadius: 26, padding: 16, background: '#151515', color: '#fff', display: 'grid', gap: 12, boxShadow: '0 24px 90px rgba(0,0,0,.55)' };
 const modalHeadStyle = { display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10 } as const;
 const closeButtonStyle = { width: 42, height: 42, borderRadius: 14, border: '1px solid rgba(255,255,255,.14)', background: 'rgba(255,255,255,.08)', color: '#fff', fontSize: 24, cursor: 'pointer' } as const;
-function stepItemStyle(active: boolean) { return { border: '1px solid rgba(255,255,255,.10)', borderRadius: 16, padding: 10, background: active ? 'rgba(245,197,66,.16)' : 'rgba(255,255,255,.04)', display: 'grid', gap: 5, color: active ? '#f5c542' : 'rgba(255,255,255,.68)', minWidth: 0 }; }
 function statusBadgeStyle(status: string) { return { width: 'fit-content', border: '1px solid rgba(255,255,255,.12)', borderRadius: 999, padding: '6px 10px', background: status === 'COMPLETED' || status === 'APPROVED' ? 'rgba(34,197,94,.14)' : status === 'REJECTED' ? 'rgba(239,68,68,.14)' : 'rgba(245,197,66,.14)', color: status === 'COMPLETED' || status === 'APPROVED' ? '#bbf7d0' : status === 'REJECTED' ? '#fecaca' : '#fde68a', fontSize: 12, fontWeight: 900 }; }
