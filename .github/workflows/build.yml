@@ -28,6 +28,9 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Validate shell scripts
+        run: bash -n scripts/*.sh
+
       - name: Generate Prisma client
         run: pnpm prisma generate
 
