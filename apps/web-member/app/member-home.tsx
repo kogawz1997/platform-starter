@@ -35,7 +35,7 @@ export default function MemberHome(props: MemberHomeProps) {
   }, []);
 
   async function loadActivity() {
-    setActivityMessage('กำลังโหลดรายการล่าสุด...');
+    setActivityMessage('กำลังโหลด...');
     const [topupRes, withdrawalRes, ledgerRes] = await Promise.all([
       memberApiFetch('/member/topups'),
       memberApiFetch('/member/withdrawals'),
@@ -47,7 +47,7 @@ export default function MemberHome(props: MemberHomeProps) {
     if (topupRes.ok) setTopups(topupData.items ?? []);
     if (withdrawalRes.ok) setWithdrawals(withdrawalData.items ?? []);
     if (ledgerRes.ok) setLedgers(ledgerData.items ?? []);
-    if (!topupRes.ok || !withdrawalRes.ok || !ledgerRes.ok) setActivityMessage(topupData?.message ?? withdrawalData?.message ?? ledgerData?.message ?? 'โหลดรายการล่าสุดไม่สำเร็จ');
+    if (!topupRes.ok || !withdrawalRes.ok || !ledgerRes.ok) setActivityMessage(topupData?.message ?? withdrawalData?.message ?? ledgerData?.message ?? 'โหลดข้อมูลไม่สำเร็จ');
     else setActivityMessage('');
   }
 
@@ -61,20 +61,19 @@ export default function MemberHome(props: MemberHomeProps) {
 
       {isLoggedIn && pendingCount > 0 && <section className="member-info-card" style={alertCardStyle}>
         <p>รอดำเนินการ</p>
-        <h2>มีรายการรอตรวจสอบ {pendingCount} รายการ</h2>
-        <span>รายการเติมเงินหรือถอนเงินที่ยังไม่เสร็จจะแสดงที่นี่</span>
+        <h2>{pendingCount} รายการ</h2>
         <div style={pendingListStyle}>
-          {pendingTopups.map((item) => <ActivityRow key={item.id} title="เติมเงินรอตรวจสอบ" href="/deposit" item={item} />)}
-          {pendingWithdrawals.map((item) => <ActivityRow key={item.id} title="ถอนเงินรอดำเนินการ" href="/withdraw" item={item} />)}
+          {pendingTopups.map((item) => <ActivityRow key={item.id} title="เติมเงิน" href="/deposit" item={item} />)}
+          {pendingWithdrawals.map((item) => <ActivityRow key={item.id} title="ถอนเงิน" href="/withdraw" item={item} />)}
         </div>
       </section>}
 
       {isLoggedIn && <section className="member-info-card">
-        <div style={sectionHeadStyle}><div><p>รายการล่าสุด</p><h2>เงินเข้า-ออกล่าสุด</h2></div><a href="/transactions" style={{ color: props.primaryColor, fontWeight: 900, textDecoration: 'none' }}>ดูทั้งหมด</a></div>
+        <div style={sectionHeadStyle}><h2>ล่าสุด</h2><a href="/transactions" style={{ color: props.primaryColor, fontWeight: 900, textDecoration: 'none' }}>ทั้งหมด</a></div>
         {activityMessage && <div style={noticeStyle}>{activityMessage}</div>}
         <div style={pendingListStyle}>
           {ledgers.slice(0, 5).map((item) => <LedgerRow key={item.id} item={item} />)}
-          {ledgers.length === 0 && !activityMessage && <span>ยังไม่มีรายการเงินเข้า-ออก</span>}
+          {ledgers.length === 0 && !activityMessage && <span>ยังไม่มีรายการ</span>}
         </div>
       </section>}
     </section>
@@ -86,20 +85,20 @@ function ActivityRow({ title, href, item }: { title: string; href: string; item:
 }
 
 function LedgerRow({ item }: { item: LedgerItem }) {
-  return <div style={rowStyle}><div><strong>{ledgerTypeLabel(item.type)}</strong><span>{new Date(item.createdAt).toLocaleString('th-TH')}</span></div><div style={rightStyle}><strong>{item.direction === 'CREDIT' ? '+' : '-'} {formatMoney(item.amount, 'THB')}</strong><span>ยอดหลังรายการ: {formatMoney(item.balanceAfter, 'THB')}</span></div></div>;
+  return <div style={rowStyle}><div><strong>{ledgerTypeLabel(item.type)}</strong><span>{new Date(item.createdAt).toLocaleString('th-TH')}</span></div><div style={rightStyle}><strong>{item.direction === 'CREDIT' ? '+' : '-'} {formatMoney(item.amount, 'THB')}</strong></div></div>;
 }
 
 function ledgerTypeLabel(type: string) {
   const upper = type.toUpperCase();
   if (upper.includes('DEPOSIT') || upper.includes('TOPUP')) return 'เติมเงิน';
   if (upper.includes('WITHDRAW')) return 'ถอนเงิน';
-  if (upper.includes('ADJUST')) return 'ปรับยอดโดยแอดมิน';
-  return 'รายการเงิน';
+  if (upper.includes('ADJUST')) return 'ปรับยอด';
+  return 'รายการ';
 }
 
 function statusLabel(status: string) {
   const upper = status.toUpperCase();
-  if (upper === 'PENDING') return 'รอตรวจสอบ';
+  if (upper === 'PENDING') return 'รอ';
   if (upper === 'APPROVED' || upper === 'COMPLETED') return 'สำเร็จ';
   if (upper === 'REJECTED') return 'ไม่อนุมัติ';
   return status;
