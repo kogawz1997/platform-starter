@@ -20,8 +20,9 @@ type RiskAlert = {
   createdAt: string;
 };
 
-type RiskResponse = { items?: RiskAlert[]; summary?: { openCount?: number; criticalCount?: number } };
+type RiskResponse = { items?: RiskAlert[]; total?: number; page?: number; pageCount?: number; summary?: { openCount?: number; criticalCount?: number } };
 
+const PAGE_SIZE = 20;
 const statusOptions = ['', 'OPEN', 'REVIEWING', 'RESOLVED', 'DISMISSED'];
 const severityOptions = ['', 'LOW', 'MEDIUM', 'HIGH', 'CRITICAL'];
 const typeOptions = ['', 'REPEATED_TOPUPS', 'RAPID_DEPOSIT_WITHDRAWAL', 'HIGH_WITHDRAWAL', 'BANK_CHANGE_WITHDRAWAL', 'MULTIPLE_PENDING_TOPUPS', 'WALLET_LEDGER_MISMATCH'];
@@ -29,6 +30,9 @@ const typeOptions = ['', 'REPEATED_TOPUPS', 'RAPID_DEPOSIT_WITHDRAWAL', 'HIGH_WI
 export default function RiskAlertsPage() {
   const [items, setItems] = useState<RiskAlert[]>([]);
   const [summary, setSummary] = useState({ openCount: 0, criticalCount: 0 });
+  const [total, setTotal] = useState(0);
+  const [page, setPage] = useState(1);
+  const [pageCount, setPageCount] = useState(1);
   const [status, setStatus] = useState('OPEN');
   const [severity, setSeverity] = useState('');
   const [type, setType] = useState('');
@@ -39,14 +43,16 @@ export default function RiskAlertsPage() {
   const [cooldownRemaining, setCooldownRemaining] = useState(0);
   const [message, setMessage] = useState('');
 
-  useEffect(() => { load(); }, [status, severity, type]);
+  useEffect(() => { load(1); }, []);
+  useEffect(() => { load(page); }, [page]);
+  useEffect(() => { setPage(1); load(1); }, [status, severity, type]);
   useEffect(() => {
     if (cooldownRemaining <= 0) return;
     const timer = window.setInterval(() => setCooldownRemaining((value) => Math.max(0, value - 1)), 1000);
     return () => window.clearInterval(timer);
   }, [cooldownRemaining]);
 
-  async function load() {
+  async function load(nextPage = page) {
     setLoading(true);
     const query = new URLSearchParams();
     if (status) query.set('status', status);
@@ -54,12 +60,16 @@ export default function RiskAlertsPage() {
     if (type) query.set('type', type);
     if (createdFrom) query.set('createdFrom', createdFrom);
     if (createdTo) query.set('createdTo', createdTo);
+    query.set('page', String(nextPage));
+    query.set('take', String(PAGE_SIZE));
 
     const res = await adminApiFetch(`/admin/risk-alerts?${query.toString()}`);
     const data = (await res.json().catch(() => null)) as RiskResponse | { message?: string; retryAfter?: number } | null;
     if (res.ok && data) {
       const payload = data as RiskResponse;
       setItems(payload.items ?? []);
+      setTotal(Number(payload.total ?? payload.items?.length ?? 0));
+      setPageCount(Math.max(Number(payload.pageCount ?? 1), 1));
       setSummary({ openCount: Number(payload.summary?.openCount ?? 0), criticalCount: Number(payload.summary?.criticalCount ?? 0) });
       setMessage('');
     } else {
@@ -85,7 +95,7 @@ export default function RiskAlertsPage() {
       setMessage(data?.message ?? 'สแกนความเสี่ยงไม่สำเร็จ');
     }
     setScanning(false);
-    await load();
+    await load(page);
   }
 
   async function updateStatus(id: string, nextStatus: RiskAlert['status']) {
@@ -93,7 +103,12 @@ export default function RiskAlertsPage() {
     const data = await res.json().catch(() => null);
     if (!res.ok) setMessage(data?.message ?? 'อัปเดตสถานะไม่สำเร็จ');
     else setMessage('อัปเดตสถานะแล้ว');
-    await load();
+    await load(page);
+  }
+
+  function applyDateFilters() {
+    setPage(1);
+    load(1);
   }
 
   function clearFilters() {
@@ -102,6 +117,8 @@ export default function RiskAlertsPage() {
     setType('');
     setCreatedFrom('');
     setCreatedTo('');
+    setPage(1);
+    setTimeout(() => load(1), 0);
   }
 
   const activeShowing = useMemo(() => items.filter((item) => item.status === 'OPEN' || item.status === 'REVIEWING').length, [items]);
@@ -111,7 +128,8 @@ export default function RiskAlertsPage() {
     <AdminMetricGrid>
       <AdminMetric title="Active alerts" value={String(summary.openCount)} helper="OPEN + REVIEWING ทั้งระบบ" />
       <AdminMetric title="High risk" value={String(summary.criticalCount)} helper="HIGH + CRITICAL" />
-      <AdminMetric title="Showing" value={String(items.length)} helper={`${activeShowing} active ใน filter นี้`} />
+      <AdminMetric title="Showing" value={String(items.length)} helper={`${total} total`} />
+      <AdminMetric title="Page" value={`${page}/${pageCount}`} helper={`${PAGE_SIZE} per page`} />
     </AdminMetricGrid>
 
     {cooldownRemaining > 0 && <AdminNotice>Risk scan cooldown เหลือ {cooldownRemaining} วินาที</AdminNotice>}
@@ -122,7 +140,8 @@ export default function RiskAlertsPage() {
       <label style={fieldStyle}>Type<select value={type} onChange={(event) => setType(event.target.value)} style={inputStyle}>{typeOptions.map((value) => <option key={value} value={value}>{value || 'ALL'}</option>)}</select></label>
       <label style={fieldStyle}>From<input type="date" value={createdFrom} onChange={(event) => setCreatedFrom(event.target.value)} style={inputStyle} /></label>
       <label style={fieldStyle}>To<input type="date" value={createdTo} onChange={(event) => setCreatedTo(event.target.value)} style={inputStyle} /></label>
-      <div style={filterActionStyle}><AdminButton tone="secondary" onClick={load}>Apply</AdminButton><AdminButton tone="secondary" onClick={clearFilters}>Reset</AdminButton></div>
+      <div style={filterActionStyle}><AdminButton tone="secondary" onClick={applyDateFilters}>Apply</AdminButton><AdminButton tone="secondary" onClick={clearFilters}>Reset</AdminButton></div>
+      <div style={pagerStyle}><AdminButton disabled={loading || page <= 1} onClick={() => setPage((value) => Math.max(value - 1, 1))}>Prev</AdminButton><span>Page {page} / {pageCount}</span><AdminButton disabled={loading || page >= pageCount} onClick={() => setPage((value) => Math.min(value + 1, pageCount))}>Next</AdminButton></div>
     </AdminToolbar>
 
     {message && <AdminNotice>{message}</AdminNotice>}
@@ -171,6 +190,7 @@ function statusTone(value: RiskAlert['status']) {
 const fieldStyle = { display: 'grid', gap: 6, color: '#94a3b8', fontSize: 12, fontWeight: 900, minWidth: 0, width: '100%', maxWidth: '100%', overflow: 'hidden' as const } as const;
 const inputStyle = { minHeight: 44, borderRadius: 12, border: '1px solid rgba(148,163,184,.22)', background: '#0b1220', color: '#f8fafc', padding: '0 12px', width: '100%', minWidth: 0, maxWidth: '100%', boxSizing: 'border-box' as const, fontSize: 16 };
 const filterActionStyle = { display: 'grid', gridTemplateColumns: 'repeat(2,minmax(0,1fr))', alignItems: 'end', gap: 8, minWidth: 0, width: '100%' } as const;
+const pagerStyle = { display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' as const };
 const alertBodyStyle = { display: 'grid', gap: 8, flex: '1 1 240px', minWidth: 0, maxWidth: '100%', overflow: 'hidden' as const };
 const mutedStyle = { color: '#94a3b8', fontSize: 13, lineHeight: 1.45 } as const;
 const actionStyle = { display: 'flex', gap: 8, flexWrap: 'wrap' as const, alignItems: 'start', justifyContent: 'flex-end' as const, minWidth: 0, maxWidth: '100%' };
