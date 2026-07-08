@@ -61,33 +61,34 @@ export default function WithdrawPage() {
     const parsedAmount = Number(amount.replace(/,/g, '').trim());
     const selected = banks.find((item) => item.id === bankAccountId && item.status === 'ACTIVE');
     if (!Number.isFinite(parsedAmount) || parsedAmount <= 0) { setMessage('กรุณาใส่จำนวนเงินมากกว่า 0'); return; }
-    if (!selected) { setMessage('กรุณาเลือกบัญชีถอนเงินที่แอดมินอนุมัติแล้ว'); return; }
+    if (!selected) { setMessage('กรุณาเลือกบัญชีถอนเงินที่อนุมัติแล้ว'); return; }
     setIsSubmitting(true); setMessage('กำลังส่งคำขอถอน...');
     const res = await memberApiFetch('/member/withdrawals', { method: 'POST', body: JSON.stringify({ amount: parsedAmount, method, accountName: selected.accountName, accountNumber: selected.accountNumber, bankName: selected.bankName, note }) });
     const data = await res.json().catch(() => null); setIsSubmitting(false);
     if (!res.ok) { setMessage(data?.message ?? 'ส่งคำขอถอนไม่สำเร็จ'); return; }
-    setAmount(''); setNote(''); setItems((current) => [data, ...current]); setMessage('ส่งคำขอถอนสำเร็จ รอแอดมินดำเนินการ'); await loadAll();
+    setAmount(''); setNote(''); setItems((current) => [data, ...current]); setMessage('ส่งคำขอถอนสำเร็จ'); await loadAll();
   }
 
   const activeBanks = banks.filter((item) => item.status === 'ACTIVE');
+  const hasSelectedBank = Boolean(bankName && accountName && accountNumber);
 
   return (
     <main style={pageStyle}>
-      <a href="/" style={backStyle}>← หน้าแรก</a><p style={eyebrowStyle}>Wallet</p><h1 style={titleStyle}>ถอนเงิน</h1><p style={mutedStyle}>ถอนเข้าบัญชีที่บันทึกไว้และผ่านการอนุมัติแล้วเท่านั้น</p>
-      {isLoading && <div style={noticeStyle}>กำลังโหลดยอดเงินและบัญชีถอน...</div>}
+      <a href="/" style={backStyle}>← หน้าแรก</a><h1 style={titleStyle}>ถอนเงิน</h1>
+      {isLoading && <div style={noticeStyle}>กำลังโหลด...</div>}
       {message && <div style={noticeStyle}>{message}</div>}
-      <section style={heroCardStyle}><p style={mutedStyle}>ยอดที่ถอนได้</p><h1 style={amountTitleStyle}>{wallet ? `${wallet.currency} ${Number(wallet.availableBalance).toLocaleString('th-TH', { minimumFractionDigits: 2 })}` : 'THB 0.00'}</h1>{wallet && <div style={walletMetaStyle}><span>Locked: {Number(wallet.lockedBalance).toLocaleString('th-TH', { minimumFractionDigits: 2 })}</span><span>Status: {wallet.status}</span></div>}</section>
+      <section style={heroCardStyle}><p style={mutedStyle}>ยอดที่ถอนได้</p><h1 style={amountTitleStyle}>{wallet ? `${wallet.currency} ${Number(wallet.availableBalance).toLocaleString('th-TH', { minimumFractionDigits: 2 })}` : 'THB 0.00'}</h1>{wallet && <div style={walletMetaStyle}><span>รอดำเนินการ: {Number(wallet.lockedBalance).toLocaleString('th-TH', { minimumFractionDigits: 2 })}</span><span>{wallet.status === 'ACTIVE' ? 'ใช้งานได้' : wallet.status}</span></div>}</section>
       <form onSubmit={submit} style={cardStyle}>
         <label style={labelStyle}>จำนวนเงิน<input value={amount} onChange={(e) => setAmount(e.target.value)} inputMode="decimal" placeholder="เช่น 100" style={inputStyle} /></label>
         <label style={labelStyle}>ช่องทาง<select value={method} onChange={(e) => setMethod(e.target.value)} style={inputStyle}><option value="bank_transfer">โอนธนาคาร</option></select></label>
-        <label style={labelStyle}>บัญชีถอนที่อนุมัติแล้ว<select value={bankAccountId} onChange={(e) => chooseBank(e.target.value)} style={inputStyle}><option value="">เลือกบัญชีถอน</option>{banks.map((item) => <option key={item.id} value={item.id} disabled={item.status !== 'ACTIVE'}>{item.bankName} / {item.accountNumber} {item.isPrimary ? '(หลัก)' : ''} {item.status !== 'ACTIVE' ? `- ${item.status}` : ''}</option>)}</select></label>
-        {activeBanks.length === 0 && <div style={noticeStyle}>ยังไม่มีบัญชีถอนที่อนุมัติแล้ว ไปเพิ่มบัญชีและรอแอดมินตรวจสอบก่อน</div>}
-        <a href="/bank-accounts" style={bankLinkStyle}>จัดการบัญชีถอนเงิน</a>
-        <section style={accountBoxStyle}>
-          <InfoRow label="ชื่อบัญชี" value={accountName || '-'} />
-          <InfoRow label="เลขบัญชี" value={accountNumber || '-'} action={accountNumber ? <button type="button" onClick={() => copyText(accountNumber, 'เลขบัญชี')} style={copyButtonStyle}>คัดลอก</button> : null} />
-          <InfoRow label="ธนาคาร" value={bankName || '-'} action={bankName ? <button type="button" onClick={() => copyText(bankName, 'ชื่อธนาคาร')} style={copyButtonStyle}>คัดลอก</button> : null} />
-        </section>
+        <label style={labelStyle}>บัญชีธนาคาร<select value={bankAccountId} onChange={(e) => chooseBank(e.target.value)} style={inputStyle}><option value="">เลือกบัญชี</option>{banks.map((item) => <option key={item.id} value={item.id} disabled={item.status !== 'ACTIVE'}>{item.bankName} / {item.accountNumber} {item.isPrimary ? '(หลัก)' : ''} {item.status !== 'ACTIVE' ? `- ${item.status}` : ''}</option>)}</select></label>
+        {activeBanks.length === 0 && <div style={noticeStyle}>ยังไม่มีบัญชีที่อนุมัติแล้ว</div>}
+        <a href="/bank-accounts" style={bankLinkStyle}>การจัดการบัญชีธนาคาร</a>
+        {hasSelectedBank && <section style={accountBoxStyle}>
+          <InfoRow label="ชื่อบัญชี" value={accountName} />
+          <InfoRow label="เลขบัญชี" value={accountNumber} action={<button type="button" onClick={() => copyText(accountNumber, 'เลขบัญชี')} style={copyButtonStyle}>คัดลอก</button>} />
+          <InfoRow label="ธนาคาร" value={bankName} action={<button type="button" onClick={() => copyText(bankName, 'ชื่อธนาคาร')} style={copyButtonStyle}>คัดลอก</button>} />
+        </section>}
         <label style={labelStyle}>หมายเหตุ<textarea value={note} onChange={(e) => setNote(e.target.value)} placeholder="รายละเอียดเพิ่มเติม ถ้ามี" style={textareaStyle} /></label>
         <button type="submit" disabled={isSubmitting || activeBanks.length === 0} style={buttonStyle}>{isSubmitting ? 'กำลังส่ง...' : 'ส่งคำขอถอน'}</button>
       </form>
@@ -99,7 +100,6 @@ export default function WithdrawPage() {
 function InfoRow({ label, value, action }: { label: string; value: string; action?: React.ReactNode }) { return <div style={infoRowStyle}><div style={{ minWidth: 0 }}><span>{label}</span><strong>{value}</strong></div>{action}</div>; }
 const pageStyle = { minHeight: '100vh', background: '#080808', color: '#fff', padding: '18px 12px calc(44px + env(safe-area-inset-bottom))', display: 'grid', gap: 14, width: '100%', maxWidth: 920, margin: '0 auto', overflowX: 'hidden' as const } as const;
 const backStyle = { color: '#f5c542', textDecoration: 'none', fontWeight: 900 } as const;
-const eyebrowStyle = { margin: 0, opacity: 0.66, fontSize: 14 } as const;
 const titleStyle = { margin: 0, fontSize: 'clamp(34px, 11vw, 58px)', lineHeight: 0.98, letterSpacing: -1.2, overflowWrap: 'anywhere' as const };
 const mutedStyle = { margin: 0, opacity: 0.76, lineHeight: 1.55, overflowWrap: 'anywhere' as const };
 const heroCardStyle = { border: '1px solid rgba(255,255,255,0.12)', borderRadius: 24, padding: 14, background: '#181818', display: 'grid', gap: 8, minWidth: 0, overflow: 'hidden' as const };
