@@ -31,6 +31,12 @@ export class AdminAuthController {
     return this.adminAuthService.enableTwoFactor(user.id, code, this.meta(req));
   }
 
+  @UseGuards(AdminAuthGuard)
+  @Post('2fa/recovery-codes/regenerate')
+  regenerateRecoveryCodes(@CurrentUser() user: any, @Body('code') code: string, @Req() req: any) {
+    return this.adminAuthService.regenerateRecoveryCodes(user.id, code, this.meta(req));
+  }
+
   @Post('refresh')
   refresh(@Body('refreshToken') refreshToken: string, @Req() req: any) {
     return this.adminAuthService.refreshSession(refreshToken, this.meta(req));
