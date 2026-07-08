@@ -4,12 +4,17 @@ import { ReactNode, useEffect, useMemo, useState } from 'react';
 import { usePathname } from 'next/navigation';
 import { API_URL, clearMemberSession, memberApiFetch, refreshMemberToken } from './member-api';
 
-const menuItems = [
+const bottomNavItems = [
   { title: 'หน้าหลัก', href: '/', icon: '⌂' },
   { title: 'ฝาก', href: '/deposit', icon: '＋' },
   { title: 'ถอนเงิน', href: '/withdraw', icon: '−' },
   { title: 'ประวัติ', href: '/transactions', icon: '≡', badge: true },
-  { title: 'การจัดการบัญชีธนาคาร', shortTitle: 'บัญชี', href: '/bank-accounts', icon: '◉' },
+  { title: 'บัญชี', href: '/bank-accounts', icon: '◉' },
+];
+
+const drawerItems = [
+  { title: 'สถานะรายการ', href: '/transactions', description: 'เช็กรายการรอตรวจสอบ', badge: true },
+  { title: 'การจัดการบัญชีธนาคาร', href: '/bank-accounts', description: 'เพิ่มหรือแก้ไขบัญชีธนาคาร' },
 ];
 
 type MoneyRequest = { status: string };
@@ -96,16 +101,23 @@ export default function MemberChrome({ children }: { children: ReactNode }) {
       </header>
       {menuOpen && <button type="button" className="member-menu-backdrop" onClick={() => setMenuOpen(false)} aria-label="ปิดเมนู" />}
       <aside className={menuOpen ? 'member-drawer open' : 'member-drawer'} aria-hidden={!menuOpen}>
-        <div className="member-drawer-head"><div><strong>ศูนย์สมาชิก</strong></div><button type="button" onClick={() => setMenuOpen(false)} aria-label="ปิดเมนู">×</button></div>
-        <nav className="member-drawer-nav">{menuItems.map((item) => <a key={item.href} href={item.href} onClick={() => setMenuOpen(false)} className={activeHref === item.href ? 'active' : ''}>{item.title}{item.badge && pendingCount > 0 && <span>{pendingCount}</span>}</a>)}</nav>
+        <div className="member-drawer-head"><div><strong>เมนูเพิ่มเติม</strong><p>เมนูหลักอยู่ด้านล่างจอ</p></div><button type="button" onClick={() => setMenuOpen(false)} aria-label="ปิดเมนู">×</button></div>
+        <nav className="member-drawer-nav">
+          {drawerItems.map((item) => (
+            <a key={item.href} href={item.href} onClick={() => setMenuOpen(false)} className={activeHref === item.href ? 'active' : ''}>
+              <span className="member-drawer-copy"><strong>{item.title}</strong><small>{item.badge && pendingCount > 0 ? `${pendingCount} รายการรอตรวจสอบ` : item.description}</small></span>
+              {item.badge && pendingCount > 0 && <em>{pendingCount}</em>}
+            </a>
+          ))}
+        </nav>
         <button type="button" className="member-logout-button" onClick={logout}>ออกจากระบบ</button>
       </aside>
       {children}
       <nav className="member-bottom-nav" aria-label="เมนูหลัก">
-        {menuItems.map((item) => (
-          <a key={item.href} href={item.href} className={activeHref === item.href ? 'active' : ''}>
+        {bottomNavItems.map((item) => (
+          <a key={item.href} href={item.href} className={activeHref === item.href ? 'active' : ''} aria-current={activeHref === item.href ? 'page' : undefined}>
             <span className="member-bottom-icon">{item.icon}</span>
-            <span>{item.shortTitle ?? item.title}</span>
+            <span>{item.title}</span>
             {item.badge && pendingCount > 0 && <em>{pendingCount}</em>}
           </a>
         ))}
