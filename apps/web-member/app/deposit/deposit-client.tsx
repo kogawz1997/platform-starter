@@ -6,7 +6,6 @@ import { memberApiFetch } from '../member-api';
 type TopUpItem = { id: string; amount: string; currency: string; status: string; method?: string | null; note?: string | null; adminNote?: string | null; createdAt: string };
 type ReceivingAccount = { id: string; bankName: string; accountName: string; accountNumber: string; promptPay?: string | null; qrImageUrl?: string | null; minAmount?: string | null; maxAmount?: string | null; sortOrder?: number };
 type MethodCode = 'bank_transfer' | 'promptpay' | 'wallet' | 'other';
-
 type DepositStep = 'select' | 'transfer' | 'waiting';
 
 const AMOUNTS = [100, 300, 500, 1000, 3000, 5000];
@@ -16,10 +15,12 @@ const METHODS: Record<MethodCode, { label: string; numberLabel: string }> = {
   wallet: { label: 'วอเลต', numberLabel: 'วอเลต' },
   other: { label: 'อื่น ๆ', numberLabel: 'รายละเอียด' },
 };
-const STEP_ITEMS: { key: DepositStep; title: string; caption: string }[] = [
-  { key: 'select', title: 'เลือกยอด', caption: 'ยอดและช่องทาง' },
-  { key: 'transfer', title: 'โอนเงิน', caption: 'แนบสลิป' },
-  { key: 'waiting', title: 'รอตรวจสอบ', caption: 'ติดตามสถานะ' },
+const STEP_ITEMS = [
+  { title: 'เลือกยอด', caption: 'จำนวนเงิน' },
+  { title: 'เลือกช่องทาง', caption: 'บัญชีธนาคาร' },
+  { title: 'โอนเงิน', caption: 'โอนให้ตรงยอด' },
+  { title: 'แนบสลิป', caption: 'ตรวจสอบก่อนส่ง' },
+  { title: 'รอตรวจสอบ', caption: 'ติดตามสถานะ' },
 ];
 
 export default function DepositClient() {
@@ -34,21 +35,26 @@ export default function DepositClient() {
   const [note, setNote] = useState('');
   const [message, setMessage] = useState('กำลังโหลด...');
   const [loading, setLoading] = useState(false);
+  const [initialLoading, setInitialLoading] = useState(true);
+  const [confirmOpen, setConfirmOpen] = useState(false);
 
   const parsedAmount = useMemo(() => Number(amount.replace(/,/g, '').trim()), [amount]);
   const usable = useMemo(() => accounts.filter((account) => matchAmount(account, parsedAmount)), [accounts, parsedAmount]);
   const availableMethods = useMemo(() => Array.from(new Set(usable.map(accountType))) as MethodCode[], [usable]);
+  const currentStepIndex = step === 'waiting' ? 4 : step === 'transfer' ? (slipImageData ? 3 : 2) : method ? 1 : 0;
 
   useEffect(() => { loadInitial(); }, []);
   useEffect(() => { if (availableMethods.length > 0 && !availableMethods.includes(method)) setMethod(availableMethods[0]); }, [availableMethods, method]);
 
   async function loadInitial() {
+    setInitialLoading(true);
     const [historyRes, accountRes] = await Promise.all([memberApiFetch('/member/topups'), memberApiFetch('/member/receiving-bank-accounts')]);
     const historyData = await historyRes.json().catch(() => null);
     const accountData = await accountRes.json().catch(() => null);
     if (historyRes.ok) setHistory(historyData.items ?? []);
     if (accountRes.ok) setAccounts(accountData.items ?? []);
     if (!historyRes.ok || !accountRes.ok) setMessage(historyData?.message ?? accountData?.message ?? 'โหลดข้อมูลไม่สำเร็จ'); else setMessage('');
+    setInitialLoading(false);
   }
 
   async function copyText(value: string, label: string) {
@@ -59,6 +65,7 @@ export default function DepositClient() {
   async function nextStep(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!Number.isFinite(parsedAmount) || parsedAmount <= 0) { setMessage('กรุณาใส่จำนวนเงินมากกว่า 0'); return; }
+    if (availableMethods.length === 0) { setMessage('ยังไม่มีบัญชีธนาคารสำหรับยอดหรือช่องทางนี้'); return; }
     setLoading(true); setMessage('กำลังเตรียมข้อมูล...');
     const res = await memberApiFetch(`/member/receiving-bank-account?paymentType=${encodeURIComponent(method)}&amount=${encodeURIComponent(String(parsedAmount))}`);
     const data = await res.json().catch(() => null); setLoading(false);
@@ -70,12 +77,19 @@ export default function DepositClient() {
     const file = event.target.files?.[0]; if (!file) return;
     if (!file.type.startsWith('image/')) { setMessage('กรุณาเลือกไฟล์รูปภาพ'); return; }
     setMessage('กำลังเตรียมรูปสลิป...');
-    const imageData = await resizeImage(file, 900, 0.72); setSlipImageName(file.name); setSlipImageData(imageData); setMessage('แนบสลิปแล้ว');
+    const imageData = await resizeImage(file, 900, 0.72); setSlipImageName(file.name); setSlipImageData(imageData); setMessage('แนบสลิปแล้ว ตรวจสอบข้อมูลก่อนส่งรายการ');
+  }
+
+  function openConfirm() {
+    if (!selected) { setMessage('ไม่พบบัญชีธนาคาร'); return; }
+    if (!slipImageData) { setMessage('กรุณาแนบสลิปก่อน'); return; }
+    setConfirmOpen(true);
   }
 
   async function submit() {
     if (!selected) { setMessage('ไม่พบบัญชีธนาคาร'); return; }
     if (!slipImageData) { setMessage('กรุณาแนบสลิปก่อน'); return; }
+    setConfirmOpen(false);
     setLoading(true); setMessage('กำลังอัปโหลดสลิป...');
     const slipRes = await memberApiFetch('/member/topups/slip', { method: 'POST', body: JSON.stringify({ slipImageData, slipImageName }) });
     const slipData = await slipRes.json().catch(() => null);
@@ -93,28 +107,32 @@ export default function DepositClient() {
       <a href="/" style={backStyle}>← หน้าแรก</a>
       <section style={heroStyle}>
         <div>
-          <p style={mutedStyle}>ฝากเงินเข้ากระเป๋า</p>
+          <p style={mutedStyle}>ฝากเข้ากระเป๋า</p>
           <h1 style={titleStyle}>ฝาก</h1>
         </div>
         <span style={heroBadgeStyle}>รอตรวจสอบโดยแอดมิน</span>
       </section>
-      <StepProgress current={step} />
+      <StepProgress currentIndex={currentStepIndex} />
       {message && <div style={noticeStyle}>{message}</div>}
 
       {step === 'select' && (
         <form onSubmit={nextStep} style={cardStyle}>
-          <div style={cardHeaderStyle}><span>ขั้นตอนที่ 1</span><h2 style={sectionHeadingStyle}>เลือกยอดและช่องทาง</h2><p style={mutedStyle}>เลือกยอดที่ต้องการฝาก แล้วระบบจะแสดงบัญชีธนาคารที่รองรับยอดนี้</p></div>
+          <div style={cardHeaderStyle}><span>ขั้นตอนที่ 1-2</span><h2 style={sectionHeadingStyle}>เลือกยอดและช่องทาง</h2><p style={mutedStyle}>เลือกยอดที่ต้องการฝาก แล้วระบบจะแสดงบัญชีธนาคารที่รองรับยอดนี้</p></div>
           <div style={amountGridStyle}>{AMOUNTS.map((value) => <button key={value} type="button" onClick={() => setAmount(String(value))} style={amountButtonStyle(Number(amount) === value)}>฿{value.toLocaleString('th-TH')}</button>)}</div>
           <label style={labelStyle}>จำนวนเงิน<input value={amount} onChange={(e) => setAmount(e.target.value)} inputMode="decimal" style={inputStyle} /></label>
           <div style={methodGridStyle}>{(['bank_transfer', 'promptpay', 'wallet', 'other'] as MethodCode[]).map((code) => { const enabled = usable.some((account) => accountType(account) === code); return <button key={code} type="button" disabled={!enabled} onClick={() => enabled && setMethod(code)} style={methodStyle(method === code, enabled)}><strong>{METHODS[code].label}</strong><span>{enabled ? 'พร้อมใช้งาน' : 'ยังไม่เปิดใช้งาน'}</span></button>; })}</div>
-          <button type="submit" disabled={loading} style={primaryButtonStyle}>{loading ? 'กำลังเตรียม...' : 'ถัดไป'}</button>
+          {!initialLoading && accounts.length === 0 && <EmptyAction title="ยังไม่มีบัญชีธนาคาร" description="ยังไม่มีช่องทางสำหรับรับฝากตอนนี้ กรุณาลองใหม่ภายหลังหรือติดต่อผู้ดูแล" />}
+          {!initialLoading && accounts.length > 0 && availableMethods.length === 0 && <EmptyAction title="ไม่พบช่องทางที่รองรับยอดนี้" description="ลองเปลี่ยนยอดฝาก หรือเลือกยอดที่อยู่ในช่วงที่ระบบเปิดรับ" />}
+          <WarningBox text="โอนเงินให้ตรงยอดที่เลือก และใช้บัญชีธนาคารที่ระบบแสดงเท่านั้น เพื่อให้ตรวจสอบได้เร็ว" />
+          <button type="submit" disabled={loading || availableMethods.length === 0} style={primaryButtonStyle}>{loading ? 'กำลังเตรียม...' : 'ถัดไป'}</button>
         </form>
       )}
 
       {step === 'transfer' && selected && (
         <section style={cardStyle}>
-          <div style={cardHeaderStyle}><span>ขั้นตอนที่ 2</span><h2 style={sectionHeadingStyle}>โอนเงินและแนบสลิป</h2><p style={mutedStyle}>โอนยอดให้ตรงกับรายการ แล้วแนบสลิปก่อนส่งตรวจสอบ</p></div>
+          <div style={cardHeaderStyle}><span>ขั้นตอนที่ 3-4</span><h2 style={sectionHeadingStyle}>โอนเงินและแนบสลิป</h2><p style={mutedStyle}>โอนยอดให้ตรงกับรายการ แล้วแนบสลิปก่อนส่งตรวจสอบ</p></div>
           <section style={transferSummaryStyle}><span>ยอดฝาก</span><strong>฿{parsedAmount.toLocaleString('th-TH', { minimumFractionDigits: 2 })}</strong><em>{METHODS[method].label}</em></section>
+          <WarningBox text="อย่ากดส่งรายการถ้ายังไม่ได้โอนเงินจริง หรือสลิปไม่ใช่รายการเดียวกับยอดนี้" />
           <section style={boxStyle}>
             <InfoRow label="ชื่อบัญชี" value={selected.accountName} />
             <InfoRow label={METHODS[method].numberLabel} value={selected.accountNumber} action={<button type="button" onClick={() => copyText(selected.accountNumber, METHODS[method].numberLabel)} style={copyButtonStyle}>คัดลอก</button>} />
@@ -124,17 +142,26 @@ export default function DepositClient() {
           <label style={labelStyle}>แนบสลิป<input type="file" accept="image/*" onChange={uploadSlip} style={inputStyle} /></label>
           {slipImageData && <section style={previewBoxStyle}><strong>สลิป</strong><img src={slipImageData} alt="slip" style={slipStyle} /></section>}
           <label style={labelStyle}>หมายเหตุ<textarea value={note} onChange={(e) => setNote(e.target.value)} style={textareaStyle} placeholder="รายละเอียดเพิ่มเติม ถ้ามี" /></label>
-          <div style={actionRowStyle}><button type="button" onClick={() => setStep('select')} style={secondaryButtonStyle}>ย้อนกลับ</button><button type="button" onClick={submit} disabled={loading || !slipImageData} style={primaryButtonStyle}>{loading ? 'กำลังส่ง...' : 'ส่งรายการ'}</button></div>
+          <div style={actionRowStyle}><button type="button" onClick={() => setStep('select')} style={secondaryButtonStyle}>ย้อนกลับ</button><button type="button" onClick={openConfirm} disabled={loading || !slipImageData} style={primaryButtonStyle}>{loading ? 'กำลังส่ง...' : 'ตรวจสอบก่อนส่ง'}</button></div>
         </section>
       )}
 
       {step === 'waiting' && (
         <section style={cardStyle}>
-          <div style={cardHeaderStyle}><span>ขั้นตอนที่ 3</span><h2 style={sectionHeadingStyle}>รอตรวจสอบ</h2><p style={mutedStyle}>ระบบรับรายการแล้ว รอแอดมินตรวจสอบสลิปและปรับยอดเข้ากระเป๋า</p></div>
+          <div style={cardHeaderStyle}><span>ขั้นตอนที่ 5</span><h2 style={sectionHeadingStyle}>รอตรวจสอบ</h2><p style={mutedStyle}>ระบบรับรายการแล้ว รอแอดมินตรวจสอบสลิปและปรับยอดเข้ากระเป๋า</p></div>
           <div style={successBoxStyle}>รายการฝากถูกส่งแล้ว</div>
           <div style={actionRowStyle}><a href="/transactions" style={secondaryLinkStyle}>ดูประวัติ</a><button type="button" onClick={() => setStep('select')} style={primaryButtonStyle}>ฝากอีกครั้ง</button></div>
         </section>
       )}
+
+      {confirmOpen && selected && <SummaryModal title="ตรวจสอบรายการฝาก" onClose={() => setConfirmOpen(false)} onConfirm={submit} loading={loading} confirmLabel="ยืนยันส่งรายการ">
+        <InfoRow label="ยอดฝาก" value={`THB ${parsedAmount.toLocaleString('th-TH', { minimumFractionDigits: 2 })}`} />
+        <InfoRow label="ช่องทาง" value={METHODS[method].label} />
+        <InfoRow label="บัญชีธนาคาร" value={`${selected.accountName} / ${selected.accountNumber}`} />
+        {slipImageName && <InfoRow label="สลิป" value={slipImageName} />}
+        {note && <InfoRow label="หมายเหตุ" value={note} />}
+        <WarningBox text="หลังส่งรายการแล้ว ระบบจะรอแอดมินตรวจสอบ กรุณาตรวจยอดและบัญชีให้ถูกต้องก่อนยืนยัน" />
+      </SummaryModal>}
 
       <section style={historySectionStyle}>
         <div style={historyHeadStyle}><h2 style={sectionHeadingStyle}>ประวัติ</h2><a href="/transactions" style={backStyle}>ทั้งหมด</a></div>
@@ -145,11 +172,13 @@ export default function DepositClient() {
   );
 }
 
-function StepProgress({ current }: { current: DepositStep }) {
-  const currentIndex = STEP_ITEMS.findIndex((item) => item.key === current);
-  return <section style={stepperStyle}>{STEP_ITEMS.map((item, index) => <div key={item.key} style={stepItemStyle(index <= currentIndex)}><strong>{index + 1}</strong><div><span>{item.title}</span><small>{item.caption}</small></div></div>)}</section>;
+function StepProgress({ currentIndex }: { currentIndex: number }) {
+  return <section style={stepperStyle}>{STEP_ITEMS.map((item, index) => <div key={item.title} style={stepItemStyle(index <= currentIndex)}><strong>{index + 1}</strong><div><span>{item.title}</span><small>{item.caption}</small></div></div>)}</section>;
 }
 function InfoRow({ label, value, action }: { label: string; value: string; action?: React.ReactNode }) { return <div style={infoRowStyle}><div style={{ minWidth: 0 }}><span>{label}</span><strong>{value}</strong></div>{action}</div>; }
+function WarningBox({ text }: { text: string }) { return <div style={warningStyle}>⚠️ {text}</div>; }
+function EmptyAction({ title, description }: { title: string; description: string }) { return <div style={emptyStyle}><strong>{title}</strong><span>{description}</span></div>; }
+function SummaryModal({ title, children, onClose, onConfirm, loading, confirmLabel }: { title: string; children: React.ReactNode; onClose: () => void; onConfirm: () => void; loading: boolean; confirmLabel: string }) { return <div style={modalBackdropStyle}><section style={modalStyle}><div style={historyHeadStyle}><h2 style={sectionHeadingStyle}>{title}</h2><button type="button" onClick={onClose} style={closeButtonStyle}>×</button></div>{children}<div style={actionRowStyle}><button type="button" onClick={onClose} style={secondaryButtonStyle}>แก้ไข</button><button type="button" onClick={onConfirm} disabled={loading} style={primaryButtonStyle}>{loading ? 'กำลังส่ง...' : confirmLabel}</button></div></section></div>; }
 function accountType(account: ReceivingAccount): MethodCode { if (account.bankName === 'พร้อมเพย์') return 'promptpay'; if (account.bankName === 'วอเลต') return 'wallet'; if (account.bankName === 'อื่น ๆ') return 'other'; return 'bank_transfer'; }
 function matchAmount(account: ReceivingAccount, amount: number) { const min = account.minAmount ? Number(account.minAmount) : 0; const max = account.maxAmount ? Number(account.maxAmount) : Infinity; if (!Number.isFinite(amount) || amount <= 0) return true; return amount >= min && amount <= max; }
 function methodLabel(value?: string | null) { if (value === 'bank_transfer') return 'บัญชีธนาคาร'; if (value === 'promptpay') return 'พร้อมเพย์'; if (value === 'wallet') return 'วอเลต'; return value || '-'; }
@@ -175,6 +204,8 @@ const secondaryButtonStyle = { padding: 14, minHeight: 48, borderRadius: 16, cur
 const secondaryLinkStyle = { ...secondaryButtonStyle, textDecoration: 'none', display: 'grid', placeItems: 'center' } as const;
 const actionRowStyle = { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(150px, 100%), 1fr))', gap: 10 } as const;
 const noticeStyle = { border: '1px solid rgba(255,255,255,.12)', borderRadius: 16, padding: 12, background: 'rgba(255,255,255,.07)', overflowWrap: 'anywhere' as const };
+const warningStyle = { border: '1px solid rgba(245,197,66,.30)', borderRadius: 16, padding: 12, background: 'rgba(245,197,66,.10)', color: '#fde68a', fontWeight: 850, lineHeight: 1.5 } as const;
+const emptyStyle = { border: '1px dashed rgba(255,255,255,.18)', borderRadius: 18, padding: 14, background: 'rgba(255,255,255,.04)', display: 'grid', gap: 5, color: 'rgba(255,255,255,.82)' } as const;
 const boxStyle = { border: '1px solid rgba(255,255,255,.10)', borderRadius: 20, padding: 14, background: 'rgba(255,255,255,.04)', overflow: 'hidden' as const, display: 'grid', gap: 10 };
 const transferSummaryStyle = { border: '1px solid rgba(245,197,66,.24)', borderRadius: 22, padding: 14, background: 'rgba(245,197,66,.10)', display: 'grid', gap: 5, minWidth: 0 } as const;
 const qrStyle = { width: 220, maxWidth: '100%', borderRadius: 18, border: '1px solid rgba(255,255,255,.14)' } as const;
@@ -186,8 +217,11 @@ const historySectionStyle = { display: 'grid', gap: 10, minWidth: 0 } as const;
 const historyHeadStyle = { display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10 } as const;
 const historyCardStyle = { border: '1px solid rgba(255,255,255,.10)', borderRadius: 20, padding: 14, background: '#151515', display: 'grid', gap: 8, minWidth: 0, overflow: 'hidden' as const };
 const historyTopStyle = { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(160px, 100%), 1fr))', gap: 8, alignItems: 'center' } as const;
-const stepperStyle = { border: '1px solid rgba(255,255,255,.10)', borderRadius: 22, padding: 8, background: 'rgba(255,255,255,.045)', display: 'grid', gridTemplateColumns: 'repeat(3,minmax(0,1fr))', gap: 6, minWidth: 0 } as const;
+const stepperStyle = { border: '1px solid rgba(255,255,255,.10)', borderRadius: 22, padding: 8, background: 'rgba(255,255,255,.045)', display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(min(120px,100%),1fr))', gap: 6, minWidth: 0 } as const;
 const successBoxStyle = { border: '1px solid rgba(101,217,139,.30)', borderRadius: 18, padding: 14, background: 'rgba(101,217,139,.10)', color: '#a9ffc4', fontWeight: 950 } as const;
+const modalBackdropStyle = { position: 'fixed' as const, inset: 0, zIndex: 90, background: 'rgba(0,0,0,.68)', display: 'grid', placeItems: 'end center', padding: 12 };
+const modalStyle = { width: '100%', maxWidth: 560, maxHeight: '90dvh', overflowY: 'auto' as const, border: '1px solid rgba(255,255,255,.14)', borderRadius: 26, padding: 16, background: '#151515', color: '#fff', display: 'grid', gap: 12, boxShadow: '0 24px 90px rgba(0,0,0,.55)' };
+const closeButtonStyle = { width: 42, height: 42, borderRadius: 14, border: '1px solid rgba(255,255,255,.14)', background: 'rgba(255,255,255,.08)', color: '#fff', fontSize: 24, cursor: 'pointer' } as const;
 function stepItemStyle(active: boolean) { return { border: '1px solid rgba(255,255,255,.10)', borderRadius: 16, padding: 10, background: active ? 'rgba(245,197,66,.16)' : 'rgba(255,255,255,.04)', display: 'grid', gap: 5, color: active ? '#f5c542' : 'rgba(255,255,255,.68)', minWidth: 0 }; }
 function amountButtonStyle(active: boolean) { return { padding: 14, minHeight: 52, borderRadius: 18, border: active ? '2px solid #f5c542' : '1px solid rgba(255,255,255,.14)', background: active ? 'rgba(245,197,66,.18)' : 'rgba(255,255,255,.08)', color: active ? '#f5c542' : '#fff', fontWeight: 900, width: '100%' }; }
 function methodStyle(active: boolean, enabled: boolean) { return { display: 'grid', gap: 4, textAlign: 'left' as const, padding: 14, minHeight: 58, borderRadius: 18, border: active ? '2px solid #f5c542' : '1px solid rgba(255,255,255,.14)', background: active ? 'rgba(245,197,66,.18)' : 'rgba(255,255,255,.08)', color: active ? '#f5c542' : '#fff', opacity: enabled ? 1 : 0.45, width: '100%' }; }
