@@ -15,6 +15,18 @@ const PERMISSIONS = [
     module: 'admin-access',
     description: 'Allow assigning and removing roles from admin users.',
   },
+  {
+    code: 'admin.reports.view',
+    name: 'View admin reports',
+    module: 'reports',
+    description: 'Allow viewing finance reports, trends, and reconciliation pages.',
+  },
+  {
+    code: 'admin.activity.view',
+    name: 'View admin activity',
+    module: 'activity',
+    description: 'Allow viewing the admin activity timeline.',
+  },
 ];
 
 async function main() {
