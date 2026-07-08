@@ -1,0 +1,68 @@
+name: Smoke API
+
+on:
+  workflow_dispatch:
+    inputs:
+      api_url:
+        description: API base URL
+        required: true
+        default: https://api-service.up.railway.app
+      run_admin_checks:
+        description: Run admin-token checks when secret is available
+        required: true
+        type: boolean
+        default: true
+      run_member_checks:
+        description: Run member-token checks when secret is available
+        required: true
+        type: boolean
+        default: false
+
+jobs:
+  smoke-api:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Make scripts executable
+        run: chmod +x scripts/smoke-api.sh scripts/verify-production-env.sh
+
+      - name: Run production env verification
+        env:
+          API_URL: ${{ inputs.api_url }}
+          DATABASE_URL: ${{ secrets.PROD_DATABASE_URL }}
+          JWT_ACCESS_KEY: ${{ secrets.PROD_JWT_ACCESS_KEY }}
+          ADMIN_JWT_ACCESS_TTL: ${{ secrets.PROD_ADMIN_JWT_ACCESS_TTL }}
+          ADMIN_REFRESH_TTL_HOURS: ${{ secrets.PROD_ADMIN_REFRESH_TTL_HOURS }}
+          MEMBER_WEB_URL: ${{ secrets.PROD_MEMBER_WEB_URL }}
+          ADMIN_WEB_URL: ${{ secrets.PROD_ADMIN_WEB_URL }}
+          PRIVATE_MEDIA_DIR: ${{ secrets.PROD_PRIVATE_MEDIA_DIR }}
+          REDIS_URL: ${{ secrets.PROD_REDIS_URL }}
+          STORAGE_DRIVER: ${{ secrets.PROD_STORAGE_DRIVER }}
+          S3_ENDPOINT: ${{ secrets.PROD_S3_ENDPOINT }}
+          S3_REGION: ${{ secrets.PROD_S3_REGION }}
+          S3_BUCKET: ${{ secrets.PROD_S3_BUCKET }}
+          S3_ACCESS_KEY_ID: ${{ secrets.PROD_S3_ACCESS_KEY_ID }}
+          S3_SECRET_ACCESS_KEY: ${{ secrets.PROD_S3_SECRET_ACCESS_KEY }}
+          S3_FORCE_PATH_STYLE: ${{ secrets.PROD_S3_FORCE_PATH_STYLE }}
+        run: ./scripts/verify-production-env.sh
+
+      - name: Run anonymous smoke checks
+        env:
+          API_URL: ${{ inputs.api_url }}
+        run: ./scripts/smoke-api.sh
+
+      - name: Run admin smoke checks
+        if: ${{ inputs.run_admin_checks }}
+        env:
+          API_URL: ${{ inputs.api_url }}
+          ADMIN_TOKEN: ${{ secrets.PROD_ADMIN_TOKEN }}
+        run: ./scripts/smoke-api.sh
+
+      - name: Run member smoke checks
+        if: ${{ inputs.run_member_checks }}
+        env:
+          API_URL: ${{ inputs.api_url }}
+          MEMBER_TOKEN: ${{ secrets.PROD_MEMBER_TOKEN }}
+        run: ./scripts/smoke-api.sh
