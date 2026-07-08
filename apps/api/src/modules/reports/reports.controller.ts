@@ -20,6 +20,11 @@ export class ReportsController {
     return this.reportsService.getTrends(query);
   }
 
+  @Get('queue-aging')
+  getQueueAging() {
+    return this.reportsService.getQueueAging();
+  }
+
   @Get('reconciliation')
   getReconciliation(@Query() query: { limit?: string }) {
     return this.reportsService.getReconciliation(query);
