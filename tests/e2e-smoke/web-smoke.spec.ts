@@ -11,6 +11,8 @@ const adminProtectedPages = [
   { name: 'admin dashboard', path: '/dashboard' },
   { name: 'admin topups', path: '/topups' },
   { name: 'admin withdrawals', path: '/withdrawals' },
+  { name: 'admin reports', path: '/reports' },
+  { name: 'admin activity', path: '/activity' },
   { name: 'admin security', path: '/security' },
 ];
 
@@ -42,7 +44,7 @@ test.describe('admin protected smoke', () => {
       const response = await page.goto(`${adminUrl}${pageDef.path}`, { waitUntil: 'domcontentloaded' });
       expect(response?.status(), pageDef.name).toBeLessThan(500);
       await expect(page.locator('body')).toBeVisible();
-      await expect(page).toHaveURL(/login|dashboard|topups|withdrawals|security/);
+      await expect(page).toHaveURL(/login|dashboard|topups|withdrawals|reports|activity|security/);
     });
   }
 });
