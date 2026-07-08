@@ -15,6 +15,7 @@ import { BankAccountsModule } from './modules/bank-accounts/bank-accounts.module
 import { RiskAlertsModule } from './modules/risk-alerts/risk-alerts.module';
 import { AdminAccessModule } from './modules/admin-access/admin-access.module';
 import { AdminAuditModule } from './modules/admin-audit/admin-audit.module';
+import { AdminActivityModule } from './modules/admin-activity/admin-activity.module';
 import { HealthModule } from './modules/health/health.module';
 
 @Module({
@@ -35,6 +36,7 @@ import { HealthModule } from './modules/health/health.module';
     RiskAlertsModule,
     AdminAccessModule,
     AdminAuditModule,
+    AdminActivityModule,
     HealthModule,
   ],
 })
