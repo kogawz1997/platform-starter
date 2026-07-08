@@ -16,11 +16,12 @@ API_URL="https://api-service.up.railway.app" \
 - `GET /health` ต้อง `200`
 - `GET /version` ต้อง `200`
 - admin protected endpoints ต้อง `401` ถ้าไม่มี token
+- admin security endpoints ต้อง `401` ถ้าไม่มี token
 - member protected endpoints ต้อง `401` ถ้าไม่มี token
 
 ## With admin token
 
-ใช้ตรวจ endpoint admin ที่ต้อง login แล้ว เช่น audit, members, topups, withdrawals, ledgers
+ใช้ตรวจ endpoint admin ที่ต้อง login แล้ว เช่น security, audit, members, wallets, topups, withdrawals, ledgers, risk alerts และ finance summary
 
 ```bash
 API_URL="https://api-service.up.railway.app" \
@@ -28,13 +29,18 @@ ADMIN_TOKEN="<admin-access-token>" \
 ./scripts/smoke-api.sh
 ```
 
-Admin checks:
+Admin checks now cover:
 
-- `GET /admin/audit-logs?page=1&take=1`
-- `GET /admin/members?page=1&take=1`
-- `GET /admin/topups?page=1&take=1`
-- `GET /admin/withdrawals?page=1&take=1`
-- `GET /admin/ledgers?page=1&take=1`
+- current admin profile
+- active sessions
+- audit logs pagination
+- members pagination
+- wallets pagination
+- topups pagination
+- withdrawals pagination
+- ledgers pagination
+- risk alerts pagination
+- finance summary
 
 ## With member token
 
@@ -46,9 +52,18 @@ MEMBER_TOKEN="<member-access-token>" \
 
 Member checks:
 
-- `GET /member/wallet`
-- `GET /member/topups`
-- `GET /member/withdrawals`
+- member wallet
+- member topups
+- member withdrawals
+
+## With both tokens
+
+```bash
+API_URL="https://api-service.up.railway.app" \
+ADMIN_TOKEN="<admin-access-token>" \
+MEMBER_TOKEN="<member-access-token>" \
+./scripts/smoke-api.sh
+```
 
 ## Local usage
 
@@ -75,3 +90,7 @@ Smoke result: <n> passed, 0 failed
 4. รัน smoke test พร้อม `ADMIN_TOKEN`
 5. Login member แล้ว copy access token หากต้องการเช็ก member flow
 6. ถ้าผ่านทั้งหมดค่อย deploy/QA web-admin และ web-member ต่อ
+
+## Notes
+
+Smoke test นี้เน้นตรวจ health, auth guard, pagination และ endpoint สำคัญหลัง deploy โดยไม่ทำ business operation ที่เปลี่ยนยอดเงินหรือสถานะรายการจริง
