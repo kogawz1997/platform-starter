@@ -8,7 +8,7 @@ const menuItems = [
   ['หน้าหลัก', '/'],
   ['เติมเงิน', '/deposit'],
   ['ถอนเงิน', '/withdraw'],
-  ['รายการเงินเข้า-ออก', '/transactions'],
+  ['เงินเข้า-ออก', '/transactions'],
   ['บัญชีรับเงิน', '/bank-accounts'],
 ];
 
@@ -56,17 +56,17 @@ export default function MemberChrome({ children }: { children: ReactNode }) {
   }
 
   if (isAuthPage) return <>{children}</>;
-  if (!ready || !isLoggedIn) return <main style={{ minHeight: '100dvh', display: 'grid', placeItems: 'center', background: '#080808', color: '#fff', padding: 16 }}>กำลังตรวจสอบการเข้าสู่ระบบ...</main>;
+  if (!ready || !isLoggedIn) return <main style={{ minHeight: '100dvh', display: 'grid', placeItems: 'center', background: '#080808', color: '#fff', padding: 16 }}>กำลังโหลด...</main>;
 
   return (
     <>
       <header className="member-topbar global-member-topbar">
-        <a href="/" className="member-brand"><span className="member-brand-mark">P</span><span className="member-brand-copy"><strong>ศูนย์สมาชิก</strong><small>จัดการเงินและบัญชี</small></span></a>
+        <a href="/" className="member-brand"><span className="member-brand-mark">P</span><span className="member-brand-copy"><strong>ศูนย์สมาชิก</strong></span></a>
         <div className="member-actions"><button type="button" className="member-menu-button" onClick={() => setMenuOpen(true)} aria-label="เปิดเมนู">☰</button></div>
       </header>
       {menuOpen && <button type="button" className="member-menu-backdrop" onClick={() => setMenuOpen(false)} aria-label="ปิดเมนู" />}
       <aside className={menuOpen ? 'member-drawer open' : 'member-drawer'} aria-hidden={!menuOpen}>
-        <div className="member-drawer-head"><div><strong>ศูนย์สมาชิก</strong><p>เมนูใช้งานบัญชี</p></div><button type="button" onClick={() => setMenuOpen(false)} aria-label="ปิดเมนู">×</button></div>
+        <div className="member-drawer-head"><div><strong>ศูนย์สมาชิก</strong></div><button type="button" onClick={() => setMenuOpen(false)} aria-label="ปิดเมนู">×</button></div>
         <nav className="member-drawer-nav">{menuItems.map(([title, href]) => <a key={href} href={href} onClick={() => setMenuOpen(false)} className={pathname === href ? 'active' : ''}>{title}</a>)}</nav>
         <button type="button" className="member-logout-button" onClick={logout}>ออกจากระบบ</button>
       </aside>
