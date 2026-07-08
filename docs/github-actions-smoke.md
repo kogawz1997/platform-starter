@@ -11,8 +11,68 @@ Workflow: `.github/workflows/smoke.yml`
 3. Select `Smoke API`
 4. Click `Run workflow`
 5. Set `api_url`
-6. Choose whether to run admin/member token checks
-7. Run
+6. Choose quick mode or full verification mode
+7. Choose whether to run admin/member token checks
+8. Run
+
+## Workflow inputs
+
+```txt
+api_url
+run_env_verification
+run_admin_checks
+run_member_checks
+```
+
+Recommended quick smoke:
+
+```txt
+run_env_verification = false
+run_admin_checks = false or true if PROD_ADMIN_TOKEN is fresh
+run_member_checks = false or true if PROD_MEMBER_TOKEN is fresh
+```
+
+Recommended full production verification:
+
+```txt
+run_env_verification = true
+run_admin_checks = true
+run_member_checks = true
+```
+
+## Modes
+
+### Quick smoke mode
+
+Use this after a normal deploy when you only want to confirm the API is reachable and protected endpoints still require auth.
+
+Requirements:
+
+- `api_url`
+- optional `PROD_ADMIN_TOKEN`
+- optional `PROD_MEMBER_TOKEN`
+
+Set:
+
+```txt
+run_env_verification = false
+```
+
+### Full verification mode
+
+Use this after changing production env such as Redis, R2/S3, URLs, auth keys, or storage config.
+
+Requirements:
+
+- all required production env secrets
+- optional Redis/storage secrets depending on your setup
+- fresh admin/member tokens if token checks are enabled
+
+Set:
+
+```txt
+run_env_verification = true
+```
 
 ## Required repository secrets
 
@@ -65,12 +125,14 @@ Same idea for member token.
 
 ## What it runs
 
-The workflow runs:
+The workflow can run:
 
 ```bash
 scripts/verify-production-env.sh
 scripts/smoke-api.sh
 ```
+
+`verify-production-env.sh` only runs when `run_env_verification` is enabled.
 
 Smoke checks cover:
 
