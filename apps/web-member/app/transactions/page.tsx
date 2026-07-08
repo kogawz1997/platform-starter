@@ -19,13 +19,13 @@ type ChartRow = { date: string; income: number; outcome: number };
 
 export default function TransactionsPage() {
   const [items, setItems] = useState<LedgerItem[]>([]);
-  const [message, setMessage] = useState('กำลังโหลดรายการ...');
+  const [message, setMessage] = useState('กำลังโหลด...');
 
   useEffect(() => {
     memberApiFetch('/member/wallet/ledger?limit=100')
       .then(async (res) => {
         const data = await res.json().catch(() => null);
-        if (!res.ok) throw new Error(data?.message ?? 'โหลดรายการไม่สำเร็จ');
+        if (!res.ok) throw new Error(data?.message ?? 'โหลดข้อมูลไม่สำเร็จ');
         return data;
       })
       .then((data) => { setItems(data.items ?? []); setMessage(''); })
@@ -56,23 +56,22 @@ export default function TransactionsPage() {
     <main style={pageStyle}>
       <section style={containerStyle}>
         <a href="/" style={backStyle}>← หน้าแรก</a>
-        <h1 style={titleStyle}>รายการเงินเข้า-ออก</h1>
-        <p style={mutedStyle}>ดูยอดเงินเข้า ยอดเงินออก และประวัติการเปลี่ยนแปลงในบัญชี</p>
+        <h1 style={titleStyle}>เงินเข้า-ออก</h1>
         {message && <div style={noticeStyle}>{message}</div>}
 
         <section style={summaryGridStyle}>
-          <SummaryCard label="เงินเข้า" value={summary.income} tone="credit" />
-          <SummaryCard label="เงินออก" value={summary.outcome} tone="debit" />
+          <SummaryCard label="เข้า" value={summary.income} tone="credit" />
+          <SummaryCard label="ออก" value={summary.outcome} tone="debit" />
           <SummaryCard label="สุทธิ" value={summary.net} tone={summary.net >= 0 ? 'credit' : 'debit'} />
-          <div style={summaryCardStyle}><span>จำนวนรายการ</span><strong>{summary.count.toLocaleString('th-TH')}</strong></div>
+          <div style={summaryCardStyle}><span>รายการ</span><strong>{summary.count.toLocaleString('th-TH')}</strong></div>
         </section>
 
         {chartRows.length > 0 && <section style={chartCardStyle}>
-          <div style={chartHeadStyle}><div><span>ภาพรวม 7 วันล่าสุด</span><h2>กราฟเงินเข้า-ออก</h2></div><small>เขียว = เงินเข้า · แดง = เงินออก</small></div>
+          <div style={chartHeadStyle}><h2>7 วันล่าสุด</h2><small>เข้า / ออก</small></div>
           <div style={chartGridStyle}>{chartRows.map((row) => <div key={row.date} style={chartColumnStyle}><div style={barTrackStyle}><div style={{ ...barStyle('credit'), height: `${Math.max(8, (row.income / chartMax) * 100)}%` }} /><div style={{ ...barStyle('debit'), height: `${Math.max(8, (row.outcome / chartMax) * 100)}%` }} /></div><span>{row.date}</span></div>)}</div>
         </section>}
 
-        <section style={listHeadStyle}><h2>ประวัติรายการ</h2><span>{items.length.toLocaleString('th-TH')} รายการล่าสุด</span></section>
+        <section style={listHeadStyle}><h2>รายการ</h2><span>{items.length.toLocaleString('th-TH')}</span></section>
         <div style={listStyle}>
           {items.map((item) => (
             <section key={item.id} style={cardStyle}>
@@ -85,8 +84,8 @@ export default function TransactionsPage() {
                 <h2 style={amountStyle(item.direction)}>{item.direction === 'CREDIT' ? '+' : '-'} {formatMoney(item.amount)}</h2>
               </div>
               <div style={balanceStyle}>
-                <div style={balanceItemStyle}><span>ก่อนทำรายการ</span><strong>{formatMoney(item.balanceBefore)}</strong></div>
-                <div style={balanceItemStyle}><span>หลังทำรายการ</span><strong>{formatMoney(item.balanceAfter)}</strong></div>
+                <div style={balanceItemStyle}><span>ก่อน</span><strong>{formatMoney(item.balanceBefore)}</strong></div>
+                <div style={balanceItemStyle}><span>หลัง</span><strong>{formatMoney(item.balanceAfter)}</strong></div>
               </div>
             </section>
           ))}
@@ -105,12 +104,12 @@ function typeLabel(type: string) {
   const upper = type.toUpperCase();
   if (upper.includes('DEPOSIT') || upper.includes('TOPUP')) return 'เติมเงิน';
   if (upper.includes('WITHDRAW')) return 'ถอนเงิน';
-  if (upper.includes('ADJUST')) return 'ปรับยอดโดยแอดมิน';
-  return 'รายการเงิน';
+  if (upper.includes('ADJUST')) return 'ปรับยอด';
+  return 'รายการ';
 }
 
 function directionLabel(direction: string) {
-  return direction === 'CREDIT' ? 'เงินเข้า' : 'เงินออก';
+  return direction === 'CREDIT' ? 'เข้า' : 'ออก';
 }
 
 function formatMoney(value: string | number) {
@@ -122,10 +121,10 @@ const containerStyle = { width: '100%', maxWidth: 920, margin: '0 auto', padding
 const backStyle = { color: '#f5c542', textDecoration: 'none', fontWeight: 800 } as const;
 const titleStyle = { margin: '6px 0 0', fontSize: 'clamp(34px, 10vw, 54px)', lineHeight: 1, overflowWrap: 'anywhere' as const };
 const mutedStyle = { margin: 0, opacity: 0.76, lineHeight: 1.55, overflowWrap: 'anywhere' as const };
-const summaryGridStyle = { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(170px, 100%), 1fr))', gap: 10, minWidth: 0 } as const;
+const summaryGridStyle = { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(150px, 100%), 1fr))', gap: 10, minWidth: 0 } as const;
 const summaryCardStyle = { border: '1px solid rgba(255,255,255,0.10)', borderRadius: 20, padding: 14, background: 'linear-gradient(180deg, rgba(255,255,255,.06), rgba(255,255,255,.025))', display: 'grid', gap: 8, minWidth: 0, overflow: 'hidden' as const };
 const chartCardStyle = { border: '1px solid rgba(255,255,255,0.10)', borderRadius: 24, padding: 16, background: '#181818', display: 'grid', gap: 14, minWidth: 0, overflow: 'hidden' as const };
-const chartHeadStyle = { display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'flex-start', flexWrap: 'wrap' as const };
+const chartHeadStyle = { display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center', flexWrap: 'wrap' as const };
 const chartGridStyle = { display: 'grid', gridTemplateColumns: 'repeat(7, minmax(0, 1fr))', gap: 8, alignItems: 'end', minHeight: 170 } as const;
 const chartColumnStyle = { display: 'grid', gap: 8, alignItems: 'end', justifyItems: 'center', minWidth: 0 } as const;
 const barTrackStyle = { width: '100%', height: 138, borderRadius: 999, background: 'rgba(255,255,255,.06)', border: '1px solid rgba(255,255,255,.08)', display: 'flex', alignItems: 'end', gap: 3, padding: 4, overflow: 'hidden' as const };
