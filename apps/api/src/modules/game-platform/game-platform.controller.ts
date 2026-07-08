@@ -49,6 +49,12 @@ export class GamePlatformController {
     return this.gamePlatformService.updateProvider(id, normalizeUpdateGameProviderDto(body), user, this.meta(req));
   }
 
+  @RequirePermission('game.providers.manage')
+  @Post('game-providers/:providerId/health-check')
+  healthCheckProvider(@Param('providerId') providerId: string, @CurrentUser() user: any, @Req() req: any) {
+    return this.gamePlatformService.healthCheckProvider(providerId, user, this.meta(req));
+  }
+
   @RequirePermission('game.providers.view')
   @Get('game-providers/:providerId/endpoints')
   listProviderEndpoints(@Param('providerId') providerId: string) {
@@ -86,9 +92,6 @@ export class GamePlatformController {
   }
 
   private meta(req: any) {
-    return {
-      ipAddress: req.ip,
-      userAgent: req.headers?.['user-agent'],
-    };
+    return { ipAddress: req.ip, userAgent: req.headers?.['user-agent'] };
   }
 }
