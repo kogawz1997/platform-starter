@@ -15,6 +15,7 @@ export default function AdminSecurityPage() {
   const [qrDataUrl, setQrDataUrl] = useState('');
   const [sessions, setSessions] = useState<SessionItem[]>([]);
   const [code, setCode] = useState('');
+  const [deactivateCode, setDeactivateCode] = useState('');
   const [regenerateCode, setRegenerateCode] = useState('');
   const [recoveryCodes, setRecoveryCodes] = useState<string[]>([]);
   const [message, setMessage] = useState('');
@@ -64,6 +65,22 @@ export default function AdminSecurityPage() {
     setRecoveryCodes(data?.recoveryCodes ?? []);
     setCode('');
     setMessage('เปิดใช้งาน 2FA แล้ว กรุณาบันทึก recovery codes ทันที ระบบจะแสดงให้เห็นครั้งเดียว');
+    await loadMe();
+  }
+
+  async function deactivate2FA() {
+    if (!deactivateCode.trim()) { setMessage('กรุณาใส่ TOTP หรือ recovery code ก่อน'); return; }
+    if (!window.confirm('ยืนยันเปลี่ยนสถานะ 2FA?')) return;
+    setLoading(true); setMessage('กำลังเปลี่ยนสถานะ 2FA...');
+    const res = await adminApiFetch('/admin/auth/2fa/disable', { method: 'POST', body: JSON.stringify({ code: deactivateCode.trim() }) });
+    const data = await res.json().catch(() => null);
+    setLoading(false);
+    if (!res.ok) { setMessage(data?.message ?? 'เปลี่ยนสถานะ 2FA ไม่สำเร็จ'); return; }
+    setDeactivateCode('');
+    setRegenerateCode('');
+    setRecoveryCodes([]);
+    setSetup(null);
+    setMessage('อัปเดตสถานะ 2FA แล้ว');
     await loadMe();
   }
 
@@ -165,6 +182,10 @@ export default function AdminSecurityPage() {
       <div style={recoveryGridStyle}>{recoveryCodes.map((item) => <code key={item} style={recoveryCodeStyle}>{item}</code>)}</div>
       <AdminButton onClick={copyRecoveryCodes}>Copy all recovery codes</AdminButton>
     </AdminCard>}
+
+    <AdminCard title="Deactivate 2FA" description="เปลี่ยนสถานะ 2FA โดยต้องยืนยันด้วย TOTP หรือ recovery code ปัจจุบัน">
+      <div style={copyRowStyle}><input value={deactivateCode} onChange={(event) => setDeactivateCode(event.target.value)} placeholder="ใส่ TOTP code หรือ recovery code ปัจจุบัน" style={inputStyle} /><AdminButton disabled={loading} tone="danger" onClick={deactivate2FA}>Deactivate</AdminButton></div>
+    </AdminCard>
 
     <AdminCard title="Regenerate Recovery Codes" description="สร้าง recovery codes ชุดใหม่ ชุดเก่าจะใช้ไม่ได้ทันที">
       <div style={copyRowStyle}><input value={regenerateCode} onChange={(event) => setRegenerateCode(event.target.value)} placeholder="ใส่ TOTP code หรือ recovery code ปัจจุบัน" style={inputStyle} /><AdminButton disabled={loading} tone="secondary" onClick={regenerateRecoveryCodes}>Regenerate</AdminButton></div>
