@@ -15,8 +15,6 @@ type LedgerItem = {
   createdAt: string;
 };
 
-type ChartRow = { date: string; income: number; outcome: number };
-
 export default function TransactionsPage() {
   const [items, setItems] = useState<LedgerItem[]>([]);
   const [message, setMessage] = useState('กำลังโหลด...');
@@ -38,25 +36,11 @@ export default function TransactionsPage() {
     return { income, outcome, net: income - outcome, count: items.length };
   }, [items]);
 
-  const chartRows = useMemo<ChartRow[]>(() => {
-    const map = new Map<string, ChartRow>();
-    items.slice().reverse().forEach((item) => {
-      const date = new Date(item.createdAt).toLocaleDateString('th-TH', { day: '2-digit', month: '2-digit' });
-      const row = map.get(date) ?? { date, income: 0, outcome: 0 };
-      if (item.direction === 'CREDIT') row.income += Number(item.amount);
-      else row.outcome += Number(item.amount);
-      map.set(date, row);
-    });
-    return Array.from(map.values()).slice(-7);
-  }, [items]);
-
-  const chartMax = Math.max(...chartRows.map((row) => Math.max(row.income, row.outcome)), 1);
-
   return (
     <main style={pageStyle}>
       <section style={containerStyle}>
         <a href="/" style={backStyle}>← หน้าแรก</a>
-        <h1 style={titleStyle}>เงินเข้า-ออก</h1>
+        <h1 style={titleStyle}>ประวัติ</h1>
         {message && <div style={noticeStyle}>{message}</div>}
 
         <section style={summaryGridStyle}>
@@ -65,11 +49,6 @@ export default function TransactionsPage() {
           <SummaryCard label="สุทธิ" value={summary.net} tone={summary.net >= 0 ? 'credit' : 'debit'} />
           <div style={summaryCardStyle}><span>รายการ</span><strong>{summary.count.toLocaleString('th-TH')}</strong></div>
         </section>
-
-        {chartRows.length > 0 && <section style={chartCardStyle}>
-          <div style={chartHeadStyle}><h2>7 วันล่าสุด</h2><small>เข้า / ออก</small></div>
-          <div style={chartGridStyle}>{chartRows.map((row) => <div key={row.date} style={chartColumnStyle}><div style={barTrackStyle}><div style={{ ...barStyle('credit'), height: `${Math.max(8, (row.income / chartMax) * 100)}%` }} /><div style={{ ...barStyle('debit'), height: `${Math.max(8, (row.outcome / chartMax) * 100)}%` }} /></div><span>{row.date}</span></div>)}</div>
-        </section>}
 
         <section style={listHeadStyle}><h2>รายการ</h2><span>{items.length.toLocaleString('th-TH')}</span></section>
         <div style={listStyle}>
@@ -102,7 +81,7 @@ function SummaryCard({ label, value, tone }: { label: string; value: number; ton
 
 function typeLabel(type: string) {
   const upper = type.toUpperCase();
-  if (upper.includes('DEPOSIT') || upper.includes('TOPUP')) return 'เติมเงิน';
+  if (upper.includes('DEPOSIT') || upper.includes('TOPUP')) return 'ฝาก';
   if (upper.includes('WITHDRAW')) return 'ถอนเงิน';
   if (upper.includes('ADJUST')) return 'ปรับยอด';
   return 'รายการ';
@@ -123,12 +102,6 @@ const titleStyle = { margin: '6px 0 0', fontSize: 'clamp(34px, 10vw, 54px)', lin
 const mutedStyle = { margin: 0, opacity: 0.76, lineHeight: 1.55, overflowWrap: 'anywhere' as const };
 const summaryGridStyle = { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(150px, 100%), 1fr))', gap: 10, minWidth: 0 } as const;
 const summaryCardStyle = { border: '1px solid rgba(255,255,255,0.10)', borderRadius: 20, padding: 14, background: 'linear-gradient(180deg, rgba(255,255,255,.06), rgba(255,255,255,.025))', display: 'grid', gap: 8, minWidth: 0, overflow: 'hidden' as const };
-const chartCardStyle = { border: '1px solid rgba(255,255,255,0.10)', borderRadius: 24, padding: 16, background: '#181818', display: 'grid', gap: 14, minWidth: 0, overflow: 'hidden' as const };
-const chartHeadStyle = { display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center', flexWrap: 'wrap' as const };
-const chartGridStyle = { display: 'grid', gridTemplateColumns: 'repeat(7, minmax(0, 1fr))', gap: 8, alignItems: 'end', minHeight: 170 } as const;
-const chartColumnStyle = { display: 'grid', gap: 8, alignItems: 'end', justifyItems: 'center', minWidth: 0 } as const;
-const barTrackStyle = { width: '100%', height: 138, borderRadius: 999, background: 'rgba(255,255,255,.06)', border: '1px solid rgba(255,255,255,.08)', display: 'flex', alignItems: 'end', gap: 3, padding: 4, overflow: 'hidden' as const };
-function barStyle(tone: 'credit' | 'debit') { return { flex: 1, minHeight: 8, borderRadius: 999, background: tone === 'credit' ? 'linear-gradient(180deg,#bbf7d0,#22c55e)' : 'linear-gradient(180deg,#fecaca,#ef4444)' }; }
 const listHeadStyle = { display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'end', flexWrap: 'wrap' as const };
 const listStyle = { display: 'grid', gap: 12, minWidth: 0 } as const;
 const cardStyle = { border: '1px solid rgba(255,255,255,0.10)', borderRadius: 24, padding: 16, background: '#181818', display: 'grid', gap: 12, minWidth: 0, overflow: 'hidden' as const };
