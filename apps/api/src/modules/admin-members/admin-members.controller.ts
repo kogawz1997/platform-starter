@@ -9,8 +9,8 @@ export class AdminMembersController {
   constructor(private readonly adminMembersService: AdminMembersService) {}
 
   @Get()
-  listMembers(@Query('search') search?: string, @Query('status') status?: string) {
-    return this.adminMembersService.listMembers(search, status);
+  listMembers(@Query('search') search?: string, @Query('status') status?: string, @Query('page') page?: string, @Query('take') take?: string) {
+    return this.adminMembersService.listMembers({ search, status, page, take });
   }
 
   @Get(':id')
