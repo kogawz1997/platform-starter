@@ -91,7 +91,7 @@ export default function ReportsPage() {
           <AdminMetric title="Withdrawal volume" value={formatMoney(trends.totals.withdrawalAmount)} helper={`${trends.totals.withdrawalCount} completed`} />
           <AdminMetric title="Net flow" value={formatMoney(trends.totals.netFlow)} helper="topup - withdrawal" />
         </AdminMetricGrid>
-        <AdminStack>{trends.daily.map((item) => <AdminRow key={item.date}><div><strong>{item.date}</strong><p>{item.topUpCount} topups · {item.withdrawalCount} withdrawals</p></div><div style={trendAmountStyle}><TrendAmount label="Top-up" value={item.topUpAmount} tone="success" /><TrendAmount label="Withdraw" value={item.withdrawalAmount} tone="warning" /><TrendAmount label="Net" value={item.netFlow} tone={Number(item.netFlow) >= 0 ? 'success' : 'danger'} /></div></AdminRow>)}</AdminStack>
+        <AdminStack>{trends.daily.map((item) => <div key={item.date} style={trendRowStyle}><div style={trendDateStyle}><strong>{item.date}</strong><p>{item.topUpCount} topups · {item.withdrawalCount} withdrawals</p></div><div style={trendAmountStyle}><TrendAmount label="Top-up" value={item.topUpAmount} tone="success" /><TrendAmount label="Withdraw" value={item.withdrawalAmount} tone="warning" /><TrendAmount label="Net" value={item.netFlow} tone={Number(item.netFlow) >= 0 ? 'success' : 'danger'} /></div></div>)}</AdminStack>
       </AdminCard>}
 
       {daily && <AdminCard title="Daily Summary" description={`${new Date(daily.range.from).toLocaleDateString('th-TH')} - ${new Date(daily.range.to).toLocaleDateString('th-TH')}`}><AdminGrid><GroupCard title="Top-ups" items={daily.topUps} /><GroupCard title="Withdrawals" items={daily.withdrawals} /><GroupCard title="Adjustments" items={daily.adjustments.map((item) => ({ status: item.direction, count: item.count, amount: item.amount }))} /></AdminGrid></AdminCard>}
@@ -109,5 +109,7 @@ function TrendAmount({ label, value, tone }: { label: string; value: string; ton
 }
 
 const toolbarStyle = { display: 'flex', gap: 8, flexWrap: 'wrap' as const };
-const trendAmountStyle = { display: 'grid', gridTemplateColumns: 'repeat(3, minmax(100px, 1fr))', gap: 8, textAlign: 'right' as const };
-const trendAmountItemStyle = { display: 'grid', gap: 6 };
+const trendRowStyle = { display: 'grid', gridTemplateColumns: 'minmax(0, 1fr)', gap: 12, border: '1px solid rgba(148,163,184,.18)', borderRadius: 14, padding: 12, background: 'rgba(148,163,184,.045)', minWidth: 0, overflow: 'hidden' as const };
+const trendDateStyle = { display: 'grid', gap: 4, minWidth: 0 };
+const trendAmountStyle = { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(150px, 100%), 1fr))', gap: 10, textAlign: 'left' as const, minWidth: 0, width: '100%' };
+const trendAmountItemStyle = { display: 'grid', gap: 6, minWidth: 0 };
