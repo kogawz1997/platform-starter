@@ -8,6 +8,7 @@ import { AdminSignInDto } from './dto/admin-sign-in.dto';
 import { VerifyAdminTwoFactorDto } from './dto/verify-admin-2fa.dto';
 
 const BASE32_ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
+const RECOVERY_CODE_COUNT = 10;
 
 @Injectable()
 export class AdminAuthService {
@@ -31,7 +32,7 @@ export class AdminAuthService {
     }
 
     if (admin.twoFactorEnabled && !dto.twoFactorCode) return { requiresTwoFactor: true, challengeId: admin.id };
-    if (admin.twoFactorEnabled) this.assertTotp(admin.twoFactorSecret, dto.twoFactorCode ?? '');
+    if (admin.twoFactorEnabled) await this.assertTwoFactorOrRecovery(admin.id, admin.twoFactorSecret, dto.twoFactorCode ?? '', meta);
 
     await this.safeWriteLoginHistory(admin.id, true, meta);
     await this.safeWriteAudit(admin.id, 'admin.login', 'auth', admin.id, meta);
@@ -54,15 +55,36 @@ export class AdminAuthService {
     const admin = await this.prisma.adminUser.findUnique({ where: { id: adminUserId } });
     if (!admin || admin.status !== 'ACTIVE' || !admin.twoFactorSecret) throw new UnauthorizedException('Two factor setup is not ready');
     this.assertTotp(admin.twoFactorSecret, code);
-    await this.prisma.adminUser.update({ where: { id: admin.id }, data: { twoFactorEnabled: true } });
+    const recoveryCodes = this.generateRecoveryCodes();
+    const hashedCodes = await Promise.all(recoveryCodes.map((item) => argon2.hash(this.normalizeRecoveryCode(item))));
+    await this.prisma.$transaction([
+      this.prisma.adminUser.update({ where: { id: admin.id }, data: { twoFactorEnabled: true } }),
+      this.prisma.adminRecoveryCode.deleteMany({ where: { adminUserId: admin.id } }),
+      ...hashedCodes.map((codeHash) => this.prisma.adminRecoveryCode.create({ data: { adminUserId: admin.id, codeHash } })),
+    ]);
     await this.safeWriteAudit(admin.id, 'admin.otp.enable', 'auth', admin.id, meta);
-    return { success: true };
+    await this.safeWriteAudit(admin.id, 'admin.recovery_codes.generate', 'auth', admin.id, meta);
+    return { success: true, recoveryCodes };
+  }
+
+  async regenerateRecoveryCodes(adminUserId: string, code: string, meta: RequestMeta = {}) {
+    const admin = await this.prisma.adminUser.findUnique({ where: { id: adminUserId } });
+    if (!admin || admin.status !== 'ACTIVE' || !admin.twoFactorEnabled) throw new UnauthorizedException('Two factor is not enabled');
+    await this.assertTwoFactorOrRecovery(admin.id, admin.twoFactorSecret, code, meta);
+    const recoveryCodes = this.generateRecoveryCodes();
+    const hashedCodes = await Promise.all(recoveryCodes.map((item) => argon2.hash(this.normalizeRecoveryCode(item))));
+    await this.prisma.$transaction([
+      this.prisma.adminRecoveryCode.deleteMany({ where: { adminUserId: admin.id } }),
+      ...hashedCodes.map((codeHash) => this.prisma.adminRecoveryCode.create({ data: { adminUserId: admin.id, codeHash } })),
+    ]);
+    await this.safeWriteAudit(admin.id, 'admin.recovery_codes.regenerate', 'auth', admin.id, meta);
+    return { success: true, recoveryCodes };
   }
 
   async verifyTwoFactor(dto: VerifyAdminTwoFactorDto, meta: RequestMeta = {}) {
     const admin = await this.prisma.adminUser.findUnique({ where: { id: dto.challengeId } });
     if (!admin || admin.status !== 'ACTIVE' || !admin.twoFactorEnabled) throw new UnauthorizedException('Invalid challenge');
-    this.assertTotp(admin.twoFactorSecret, dto.code);
+    await this.assertTwoFactorOrRecovery(admin.id, admin.twoFactorSecret, dto.code, meta);
     await this.safeWriteLoginHistory(admin.id, true, meta);
     await this.safeWriteAudit(admin.id, 'admin.otp.verify', 'auth', admin.id, meta);
     return this.createAdminSession(admin.id, meta);
@@ -85,25 +107,9 @@ export class AdminAuthService {
   }
 
   async listSessions(adminUserId: string, currentSessionId: string) {
-    const sessions = await this.prisma.authSession.findMany({
-      where: { adminUserId, type: 'ADMIN' },
-      orderBy: { createdAt: 'desc' },
-      take: 30,
-    });
+    const sessions = await this.prisma.authSession.findMany({ where: { adminUserId, type: 'ADMIN' }, orderBy: { createdAt: 'desc' }, take: 30 });
     const now = new Date();
-    return {
-      items: sessions.map((session) => ({
-        id: session.id,
-        deviceId: session.deviceId,
-        ipAddress: session.ipAddress,
-        userAgent: session.userAgent,
-        createdAt: session.createdAt,
-        expiresAt: session.expiresAt,
-        revokedAt: session.revokedAt,
-        current: session.id === currentSessionId,
-        active: !session.revokedAt && session.expiresAt > now,
-      })),
-    };
+    return { items: sessions.map((session) => ({ id: session.id, deviceId: session.deviceId, ipAddress: session.ipAddress, userAgent: session.userAgent, createdAt: session.createdAt, expiresAt: session.expiresAt, revokedAt: session.revokedAt, current: session.id === currentSessionId, active: !session.revokedAt && session.expiresAt > now })) };
   }
 
   async revokeSession(adminUserId: string, currentSessionId: string, sessionId: string, meta: RequestMeta = {}) {
@@ -133,6 +139,30 @@ export class AdminAuthService {
     const session = await this.prisma.authSession.create({ data: { type: 'ADMIN', adminUserId, refreshTokenHash, ipAddress: meta.ipAddress, userAgent: meta.userAgent, deviceId: meta.deviceId, expiresAt } });
     const accessToken = await this.jwtService.signAsync({ sub: adminUserId, type: 'ADMIN', sessionId: session.id }, { secret: this.configService.get<string>('JWT_ACCESS_KEY') ?? 'local_access_key', expiresIn: (this.configService.get<string>('ADMIN_JWT_ACCESS_TTL') ?? '10m') as any });
     return { accessToken, refreshToken: `${session.id}.${rawToken}`, expiresAt };
+  }
+
+  private async assertTwoFactorOrRecovery(adminUserId: string, secret: string | null, code: string, meta: RequestMeta = {}) {
+    try {
+      this.assertTotp(secret, code);
+      return 'totp';
+    } catch {}
+    const matchedRecoveryCode = await this.useRecoveryCode(adminUserId, code);
+    if (!matchedRecoveryCode) throw new UnauthorizedException('Invalid code');
+    await this.safeWriteAudit(adminUserId, 'admin.recovery_codes.use', 'auth', adminUserId, meta);
+    return 'recovery_code';
+  }
+
+  private async useRecoveryCode(adminUserId: string, code: string) {
+    const normalized = this.normalizeRecoveryCode(code);
+    if (!/^[A-Z0-9]{12}$/.test(normalized)) return false;
+    const rows = await this.prisma.adminRecoveryCode.findMany({ where: { adminUserId, usedAt: null }, orderBy: { createdAt: 'asc' } });
+    for (const row of rows) {
+      if (await argon2.verify(row.codeHash, normalized)) {
+        const result = await this.prisma.adminRecoveryCode.updateMany({ where: { id: row.id, usedAt: null }, data: { usedAt: new Date() } });
+        return result.count === 1;
+      }
+    }
+    return false;
   }
 
   private assertTotp(secret: string | null, code: string) {
@@ -165,6 +195,17 @@ export class AdminAuthService {
       output += BASE32_ALPHABET[parseInt(chunk, 2)];
     }
     return output;
+  }
+
+  private generateRecoveryCodes() {
+    return Array.from({ length: RECOVERY_CODE_COUNT }, () => {
+      const value = randomBytes(9).toString('base64url').replace(/[^a-zA-Z0-9]/g, '').toUpperCase().padEnd(12, '0').slice(0, 12);
+      return `${value.slice(0, 4)}-${value.slice(4, 8)}-${value.slice(8, 12)}`;
+    });
+  }
+
+  private normalizeRecoveryCode(value: string) {
+    return String(value ?? '').replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
   }
 
   private base32Decode(value: string) {
