@@ -7,6 +7,8 @@ import { GameProviderEndpointType, GameProviderWalletMode } from './game-platfor
 import { NormalizedGameProviderInput } from './dto/game-provider.dto';
 import { NormalizedGameProviderEndpointInput } from './dto/game-provider-endpoint.dto';
 import { NormalizedGameProviderCredentialInput, NormalizedGameProviderCredentialUpdate } from './dto/game-provider-credential.dto';
+import { ProviderAdapterContext } from './provider-adapter.interface';
+import { ProviderAdapterRegistry } from './adapters/provider-adapter.registry';
 
 const DATA_MODELS = [
   'GameProvider',
@@ -37,16 +39,17 @@ type RequestMeta = { ipAddress?: string; userAgent?: string };
 
 @Injectable()
 export class GamePlatformService {
-  constructor(private readonly prisma: PrismaService, private readonly configService: ConfigService) {}
+  constructor(private readonly prisma: PrismaService, private readonly configService: ConfigService, private readonly adapterRegistry: ProviderAdapterRegistry) {}
 
   overview() {
     return {
       status: 'scaffold',
       models: DATA_MODELS,
       adapterMethods: ADAPTER_METHODS,
+      registeredAdapters: this.adapterRegistry.listAdapterCodes(),
       walletModes: ['SEAMLESS', 'TRANSFER', 'HYBRID'] satisfies GameProviderWalletMode[],
       endpointTypes: ['LAUNCH', 'BALANCE', 'TRANSFER_IN', 'TRANSFER_OUT', 'GAME_LIST', 'BET_HISTORY', 'WEBHOOK', 'HEALTH_CHECK'] satisfies GameProviderEndpointType[],
-      note: 'Scaffold only. Real provider API calls and wallet transfer logic are not enabled yet.',
+      note: 'Scaffold only. Health check supports registered safe adapters. Real wallet transfer logic is not enabled yet.',
     };
   }
 
@@ -67,11 +70,7 @@ export class GamePlatformService {
   async listProviders() {
     const items = await this.prisma.gameProvider.findMany({
       orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }],
-      include: {
-        _count: {
-          select: { endpoints: true, credentials: true, games: true, sessions: true, transfers: true, webhookLogs: true },
-        },
-      },
+      include: { _count: { select: { endpoints: true, credentials: true, games: true, sessions: true, transfers: true, webhookLogs: true } } },
     });
     return { items };
   }
@@ -87,7 +86,7 @@ export class GamePlatformService {
       },
     });
     if (!item) throw new NotFoundException('Game provider not found');
-    return item;
+    return { ...item, readiness: this.providerReadiness(item), adapterRegistered: this.adapterRegistry.hasAdapter(item.code) };
   }
 
   async createProvider(input: NormalizedGameProviderInput, actor: AdminActor, meta: RequestMeta) {
@@ -95,9 +94,7 @@ export class GamePlatformService {
       const item = await this.prisma.gameProvider.create({ data: input as Prisma.GameProviderCreateInput });
       await this.audit(actor, 'game_provider.create', item.id, null, this.safeJson(item), meta);
       return item;
-    } catch (error) {
-      this.handleProviderWriteError(error, 'Game provider code already exists');
-    }
+    } catch (error) { this.handleProviderWriteError(error, 'Game provider code already exists'); }
   }
 
   async updateProvider(id: string, input: Partial<NormalizedGameProviderInput>, actor: AdminActor, meta: RequestMeta) {
@@ -107,9 +104,7 @@ export class GamePlatformService {
       const item = await this.prisma.gameProvider.update({ where: { id }, data: input as Prisma.GameProviderUpdateInput });
       await this.audit(actor, 'game_provider.update', item.id, this.safeJson(current), this.safeJson(item), meta);
       return item;
-    } catch (error) {
-      this.handleProviderWriteError(error, 'Game provider code already exists');
-    }
+    } catch (error) { this.handleProviderWriteError(error, 'Game provider code already exists'); }
   }
 
   async listProviderEndpoints(providerId: string) {
@@ -124,9 +119,7 @@ export class GamePlatformService {
       const item = await this.prisma.gameProviderEndpoint.create({ data: { providerId, ...input } as Prisma.GameProviderEndpointUncheckedCreateInput });
       await this.audit(actor, 'game_provider_endpoint.create', item.id, null, this.safeJson(item), meta);
       return item;
-    } catch (error) {
-      this.handleProviderWriteError(error, 'Endpoint type already exists for this provider');
-    }
+    } catch (error) { this.handleProviderWriteError(error, 'Endpoint type already exists for this provider'); }
   }
 
   async updateProviderEndpoint(providerId: string, endpointId: string, input: Partial<NormalizedGameProviderEndpointInput>, actor: AdminActor, meta: RequestMeta) {
@@ -137,9 +130,7 @@ export class GamePlatformService {
       const item = await this.prisma.gameProviderEndpoint.update({ where: { id: endpointId }, data: input as Prisma.GameProviderEndpointUpdateInput });
       await this.audit(actor, 'game_provider_endpoint.update', item.id, this.safeJson(current), this.safeJson(item), meta);
       return item;
-    } catch (error) {
-      this.handleProviderWriteError(error, 'Endpoint type already exists for this provider');
-    }
+    } catch (error) { this.handleProviderWriteError(error, 'Endpoint type already exists for this provider'); }
   }
 
   async listProviderCredentials(providerId: string) {
@@ -152,21 +143,12 @@ export class GamePlatformService {
     await this.assertProvider(providerId);
     try {
       const item = await this.prisma.gameProviderCredential.create({
-        data: {
-          providerId,
-          type: input.type,
-          encryptedValue: this.encryptSecret(input.value),
-          maskedValue: this.maskSecret(input.value),
-          isEnabled: input.isEnabled,
-          rotatedAt: new Date(),
-        } as Prisma.GameProviderCredentialUncheckedCreateInput,
+        data: { providerId, type: input.type, encryptedValue: this.encryptSecret(input.value), maskedValue: this.maskSecret(input.value), isEnabled: input.isEnabled, rotatedAt: new Date() } as Prisma.GameProviderCredentialUncheckedCreateInput,
         select: this.credentialSelect(),
       });
       await this.audit(actor, 'game_provider_credential.create', item.id, null, this.safeJson(item), meta);
       return item;
-    } catch (error) {
-      this.handleProviderWriteError(error, 'Credential type already exists for this provider');
-    }
+    } catch (error) { this.handleProviderWriteError(error, 'Credential type already exists for this provider'); }
   }
 
   async updateProviderCredential(providerId: string, credentialId: string, input: NormalizedGameProviderCredentialUpdate, actor: AdminActor, meta: RequestMeta) {
@@ -176,18 +158,27 @@ export class GamePlatformService {
     const data: Prisma.GameProviderCredentialUpdateInput = {};
     if (input.type !== undefined) data.type = input.type as any;
     if (input.isEnabled !== undefined) data.isEnabled = input.isEnabled;
-    if (input.value !== undefined) {
-      data.encryptedValue = this.encryptSecret(input.value);
-      data.maskedValue = this.maskSecret(input.value);
-      data.rotatedAt = new Date();
-    }
+    if (input.value !== undefined) { data.encryptedValue = this.encryptSecret(input.value); data.maskedValue = this.maskSecret(input.value); data.rotatedAt = new Date(); }
     try {
       const item = await this.prisma.gameProviderCredential.update({ where: { id: credentialId }, data, select: this.credentialSelect() });
       await this.audit(actor, 'game_provider_credential.update', item.id, this.safeJson(current), this.safeJson(item), meta);
       return item;
-    } catch (error) {
-      this.handleProviderWriteError(error, 'Credential type already exists for this provider');
-    }
+    } catch (error) { this.handleProviderWriteError(error, 'Credential type already exists for this provider'); }
+  }
+
+  async healthCheckProvider(providerId: string, actor: AdminActor, meta: RequestMeta) {
+    const provider = await this.prisma.gameProvider.findUnique({
+      where: { id: providerId },
+      include: { endpoints: { where: { isEnabled: true }, orderBy: { type: 'asc' } }, credentials: { where: { isEnabled: true }, orderBy: { type: 'asc' }, select: this.credentialSelect() } },
+    });
+    if (!provider) throw new NotFoundException('Game provider not found');
+    const readiness = this.providerReadiness(provider);
+    const adapter = this.adapterRegistry.getAdapter(provider.code);
+    const context = this.buildAdapterContext(provider);
+    const result = await adapter.healthCheck(context);
+    const response = { ...result, readiness, adapterRegistered: true, checkedAt: new Date().toISOString() };
+    await this.audit(actor, 'game_provider.health_check', provider.id, null, this.safeJson({ ok: result.ok, payload: result.payload, errorCode: result.errorCode, readiness }), meta);
+    return response;
   }
 
   private async assertProvider(providerId: string) {
@@ -196,9 +187,28 @@ export class GamePlatformService {
     return provider;
   }
 
-  private credentialSelect() {
-    return { id: true, providerId: true, type: true, maskedValue: true, isEnabled: true, rotatedAt: true, createdAt: true, updatedAt: true } as const;
+  private buildAdapterContext(provider: { code: string; walletMode: GameProviderWalletMode; currency: string; endpoints: Array<{ type: GameProviderEndpointType; url: string; timeoutMs: number }>; credentials: Array<{ type: string; maskedValue: string }> }): ProviderAdapterContext {
+    const endpointMap = provider.endpoints.reduce<Partial<Record<GameProviderEndpointType, string>>>((result, endpoint) => { result[endpoint.type] = endpoint.url; return result; }, {});
+    const credentialMap = provider.credentials.reduce<Record<string, string>>((result, credential) => { result[credential.type] = credential.maskedValue; return result; }, {});
+    return { providerCode: provider.code, baseUrl: endpointMap.HEALTH_CHECK ?? endpointMap.LAUNCH ?? '', walletMode: provider.walletMode, currency: provider.currency, timeoutMs: Math.max(...provider.endpoints.map((endpoint) => endpoint.timeoutMs), 10000), endpointMap, credentialMap };
   }
+
+  private providerReadiness(provider: { status: string; code: string; endpoints?: Array<{ type: GameProviderEndpointType; isEnabled: boolean }>; credentials?: Array<{ type: string; isEnabled: boolean }> }) {
+    const endpointSet = new Set((provider.endpoints ?? []).filter((item) => item.isEnabled).map((item) => item.type));
+    const credentialSet = new Set((provider.credentials ?? []).filter((item) => item.isEnabled).map((item) => item.type));
+    const checks = [
+      { key: 'adapter_registered', label: 'Adapter registered', ok: this.adapterRegistry.hasAdapter(provider.code) },
+      { key: 'provider_active', label: 'Provider active', ok: provider.status === 'ACTIVE' },
+      { key: 'launch_endpoint', label: 'LAUNCH endpoint enabled', ok: endpointSet.has('LAUNCH') },
+      { key: 'balance_endpoint', label: 'BALANCE endpoint enabled', ok: endpointSet.has('BALANCE') },
+      { key: 'transfer_endpoints', label: 'TRANSFER_IN and TRANSFER_OUT enabled', ok: endpointSet.has('TRANSFER_IN') && endpointSet.has('TRANSFER_OUT') },
+      { key: 'api_key', label: 'API_KEY credential enabled', ok: credentialSet.has('API_KEY') },
+      { key: 'webhook_secret', label: 'WEBHOOK_SECRET credential enabled', ok: credentialSet.has('WEBHOOK_SECRET') },
+    ];
+    return { checks, ready: checks.every((item) => item.ok), passed: checks.filter((item) => item.ok).length, total: checks.length };
+  }
+
+  private credentialSelect() { return { id: true, providerId: true, type: true, maskedValue: true, isEnabled: true, rotatedAt: true, createdAt: true, updatedAt: true } as const; }
 
   private encryptSecret(value: string) {
     const keySource = this.configService.get<string>('GAME_CREDENTIAL_SECRET') ?? this.configService.get<string>('JWT_ACCESS_KEY') ?? 'local_game_credential_key';
@@ -210,34 +220,13 @@ export class GamePlatformService {
     return `aes-256-gcm:${iv.toString('base64')}:${tag.toString('base64')}:${encrypted.toString('base64')}`;
   }
 
-  private maskSecret(value: string) {
-    if (value.length <= 8) return `${value.slice(0, 1)}••••${value.slice(-1)}`;
-    return `${value.slice(0, 4)}••••${value.slice(-4)}`;
-  }
+  private maskSecret(value: string) { if (value.length <= 8) return `${value.slice(0, 1)}••••${value.slice(-1)}`; return `${value.slice(0, 4)}••••${value.slice(-4)}`; }
 
   private async audit(actor: AdminActor, action: string, targetId: string, oldData: Prisma.InputJsonValue | null, newData: Prisma.InputJsonValue | null, meta: RequestMeta) {
-    await this.prisma.adminAuditLog.create({
-      data: {
-        adminUserId: actor.id,
-        action,
-        module: 'game-platform',
-        targetId,
-        oldData: oldData ?? Prisma.JsonNull,
-        newData: newData ?? Prisma.JsonNull,
-        ipAddress: meta.ipAddress,
-        userAgent: meta.userAgent,
-      },
-    });
+    await this.prisma.adminAuditLog.create({ data: { adminUserId: actor.id, action, module: 'game-platform', targetId, oldData: oldData ?? Prisma.JsonNull, newData: newData ?? Prisma.JsonNull, ipAddress: meta.ipAddress, userAgent: meta.userAgent } });
   }
 
-  private safeJson(value: unknown) {
-    return JSON.parse(JSON.stringify(value)) as Prisma.InputJsonValue;
-  }
+  private safeJson(value: unknown) { return JSON.parse(JSON.stringify(value)) as Prisma.InputJsonValue; }
 
-  private handleProviderWriteError(error: unknown, message: string): never {
-    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
-      throw new ConflictException(message);
-    }
-    throw error;
-  }
+  private handleProviderWriteError(error: unknown, message: string): never { if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') throw new ConflictException(message); throw error; }
 }
