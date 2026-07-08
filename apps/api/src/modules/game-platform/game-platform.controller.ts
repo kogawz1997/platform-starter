@@ -7,6 +7,7 @@ import { GamePlatformService } from './game-platform.service';
 import { CreateGameProviderDto, UpdateGameProviderDto, normalizeCreateGameProviderDto, normalizeUpdateGameProviderDto } from './dto/game-provider.dto';
 import { CreateGameProviderEndpointDto, UpdateGameProviderEndpointDto, normalizeCreateGameProviderEndpointDto, normalizeUpdateGameProviderEndpointDto } from './dto/game-provider-endpoint.dto';
 import { CreateGameProviderCredentialDto, UpdateGameProviderCredentialDto, normalizeCreateGameProviderCredentialDto, normalizeUpdateGameProviderCredentialDto } from './dto/game-provider-credential.dto';
+import { CreateGameDto, UpdateGameDto, normalizeCreateGameDto, normalizeUpdateGameDto } from './dto/game-catalog.dto';
 
 @UseGuards(AdminAuthGuard, PermissionsGuard)
 @Controller('admin')
@@ -15,83 +16,71 @@ export class GamePlatformController {
 
   @RequirePermission('game.providers.view')
   @Get('game-platform/overview')
-  overview() {
-    return this.gamePlatformService.overview();
-  }
+  overview() { return this.gamePlatformService.overview(); }
 
   @RequirePermission('game.providers.view')
   @Get('game-platform/data-model-plan')
-  dataModelPlan() {
-    return this.gamePlatformService.dataModelPlan();
-  }
+  dataModelPlan() { return this.gamePlatformService.dataModelPlan(); }
 
   @RequirePermission('game.providers.view')
   @Get('game-providers')
-  listProviders() {
-    return this.gamePlatformService.listProviders();
-  }
+  listProviders() { return this.gamePlatformService.listProviders(); }
 
   @RequirePermission('game.providers.view')
   @Get('game-providers/:id')
-  getProvider(@Param('id') id: string) {
-    return this.gamePlatformService.getProvider(id);
-  }
+  getProvider(@Param('id') id: string) { return this.gamePlatformService.getProvider(id); }
 
   @RequirePermission('game.providers.manage')
   @Post('game-providers')
-  createProvider(@Body() body: CreateGameProviderDto, @CurrentUser() user: any, @Req() req: any) {
-    return this.gamePlatformService.createProvider(normalizeCreateGameProviderDto(body), user, this.meta(req));
-  }
+  createProvider(@Body() body: CreateGameProviderDto, @CurrentUser() user: any, @Req() req: any) { return this.gamePlatformService.createProvider(normalizeCreateGameProviderDto(body), user, this.meta(req)); }
 
   @RequirePermission('game.providers.manage')
   @Patch('game-providers/:id')
-  updateProvider(@Param('id') id: string, @Body() body: UpdateGameProviderDto, @CurrentUser() user: any, @Req() req: any) {
-    return this.gamePlatformService.updateProvider(id, normalizeUpdateGameProviderDto(body), user, this.meta(req));
-  }
+  updateProvider(@Param('id') id: string, @Body() body: UpdateGameProviderDto, @CurrentUser() user: any, @Req() req: any) { return this.gamePlatformService.updateProvider(id, normalizeUpdateGameProviderDto(body), user, this.meta(req)); }
+
+  @RequirePermission('game.providers.view')
+  @Get('games')
+  listGames() { return this.gamePlatformService.listGames(); }
+
+  @RequirePermission('game.providers.view')
+  @Get('games/:id')
+  getGame(@Param('id') id: string) { return this.gamePlatformService.getGame(id); }
+
+  @RequirePermission('game.providers.manage')
+  @Post('games')
+  createGame(@Body() body: CreateGameDto, @CurrentUser() user: any, @Req() req: any) { return this.gamePlatformService.createGame(normalizeCreateGameDto(body), user, this.meta(req)); }
+
+  @RequirePermission('game.providers.manage')
+  @Patch('games/:id')
+  updateGame(@Param('id') id: string, @Body() body: UpdateGameDto, @CurrentUser() user: any, @Req() req: any) { return this.gamePlatformService.updateGame(id, normalizeUpdateGameDto(body), user, this.meta(req)); }
 
   @RequirePermission('game.providers.manage')
   @Post('game-providers/:providerId/health-check')
-  healthCheckProvider(@Param('providerId') providerId: string, @CurrentUser() user: any, @Req() req: any) {
-    return this.gamePlatformService.healthCheckProvider(providerId, user, this.meta(req));
-  }
+  healthCheckProvider(@Param('providerId') providerId: string, @CurrentUser() user: any, @Req() req: any) { return this.gamePlatformService.healthCheckProvider(providerId, user, this.meta(req)); }
 
   @RequirePermission('game.providers.view')
   @Get('game-providers/:providerId/endpoints')
-  listProviderEndpoints(@Param('providerId') providerId: string) {
-    return this.gamePlatformService.listProviderEndpoints(providerId);
-  }
+  listProviderEndpoints(@Param('providerId') providerId: string) { return this.gamePlatformService.listProviderEndpoints(providerId); }
 
   @RequirePermission('game.providers.manage')
   @Post('game-providers/:providerId/endpoints')
-  createProviderEndpoint(@Param('providerId') providerId: string, @Body() body: CreateGameProviderEndpointDto, @CurrentUser() user: any, @Req() req: any) {
-    return this.gamePlatformService.createProviderEndpoint(providerId, normalizeCreateGameProviderEndpointDto(body), user, this.meta(req));
-  }
+  createProviderEndpoint(@Param('providerId') providerId: string, @Body() body: CreateGameProviderEndpointDto, @CurrentUser() user: any, @Req() req: any) { return this.gamePlatformService.createProviderEndpoint(providerId, normalizeCreateGameProviderEndpointDto(body), user, this.meta(req)); }
 
   @RequirePermission('game.providers.manage')
   @Patch('game-providers/:providerId/endpoints/:endpointId')
-  updateProviderEndpoint(@Param('providerId') providerId: string, @Param('endpointId') endpointId: string, @Body() body: UpdateGameProviderEndpointDto, @CurrentUser() user: any, @Req() req: any) {
-    return this.gamePlatformService.updateProviderEndpoint(providerId, endpointId, normalizeUpdateGameProviderEndpointDto(body), user, this.meta(req));
-  }
+  updateProviderEndpoint(@Param('providerId') providerId: string, @Param('endpointId') endpointId: string, @Body() body: UpdateGameProviderEndpointDto, @CurrentUser() user: any, @Req() req: any) { return this.gamePlatformService.updateProviderEndpoint(providerId, endpointId, normalizeUpdateGameProviderEndpointDto(body), user, this.meta(req)); }
 
   @RequirePermission('game.providers.view')
   @Get('game-providers/:providerId/credentials')
-  listProviderCredentials(@Param('providerId') providerId: string) {
-    return this.gamePlatformService.listProviderCredentials(providerId);
-  }
+  listProviderCredentials(@Param('providerId') providerId: string) { return this.gamePlatformService.listProviderCredentials(providerId); }
 
   @RequirePermission('game.providers.manage')
   @Post('game-providers/:providerId/credentials')
-  createProviderCredential(@Param('providerId') providerId: string, @Body() body: CreateGameProviderCredentialDto, @CurrentUser() user: any, @Req() req: any) {
-    return this.gamePlatformService.createProviderCredential(providerId, normalizeCreateGameProviderCredentialDto(body), user, this.meta(req));
-  }
+  createProviderCredential(@Param('providerId') providerId: string, @Body() body: CreateGameProviderCredentialDto, @CurrentUser() user: any, @Req() req: any) { return this.gamePlatformService.createProviderCredential(providerId, normalizeCreateGameProviderCredentialDto(body), user, this.meta(req)); }
 
   @RequirePermission('game.providers.manage')
   @Patch('game-providers/:providerId/credentials/:credentialId')
-  updateProviderCredential(@Param('providerId') providerId: string, @Param('credentialId') credentialId: string, @Body() body: UpdateGameProviderCredentialDto, @CurrentUser() user: any, @Req() req: any) {
-    return this.gamePlatformService.updateProviderCredential(providerId, credentialId, normalizeUpdateGameProviderCredentialDto(body), user, this.meta(req));
-  }
+  updateProviderCredential(@Param('providerId') providerId: string, @Param('credentialId') credentialId: string, @Body() body: UpdateGameProviderCredentialDto, @CurrentUser() user: any, @Req() req: any) { return this.gamePlatformService.updateProviderCredential(providerId, credentialId, normalizeUpdateGameProviderCredentialDto(body), user, this.meta(req)); }
 
-  private meta(req: any) {
-    return { ipAddress: req.ip, userAgent: req.headers?.['user-agent'] };
-  }
+  private meta(req: any) { return { ipAddress: req.ip, userAgent: req.headers?.['user-agent'] }; }
 }
