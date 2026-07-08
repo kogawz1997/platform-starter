@@ -60,21 +60,21 @@ export default function MemberHome(props: MemberHomeProps) {
       {props.showBalanceHeader && <WalletCard primaryColor={props.primaryColor} cardColor={props.cardColor} showButtons={props.showButtons && isLoggedIn} />}
 
       {isLoggedIn && pendingCount > 0 && <section className="member-info-card" style={alertCardStyle}>
-        <p>Pending</p>
+        <p>รอดำเนินการ</p>
         <h2>มีรายการรอตรวจสอบ {pendingCount} รายการ</h2>
-        <span>รายการฝาก/ถอนที่ยังรอแอดมินดำเนินการจะแสดงอยู่ตรงนี้</span>
+        <span>รายการเติมเงินหรือถอนเงินที่ยังไม่เสร็จจะแสดงที่นี่</span>
         <div style={pendingListStyle}>
-          {pendingTopups.map((item) => <ActivityRow key={item.id} title="ฝากเงินรอตรวจ" href="/deposit" item={item} />)}
+          {pendingTopups.map((item) => <ActivityRow key={item.id} title="เติมเงินรอตรวจสอบ" href="/deposit" item={item} />)}
           {pendingWithdrawals.map((item) => <ActivityRow key={item.id} title="ถอนเงินรอดำเนินการ" href="/withdraw" item={item} />)}
         </div>
       </section>}
 
       {isLoggedIn && <section className="member-info-card">
-        <div style={sectionHeadStyle}><div><p>Recent activity</p><h2>รายการล่าสุด</h2></div><a href="/transactions" style={{ color: props.primaryColor, fontWeight: 900, textDecoration: 'none' }}>ดูทั้งหมด</a></div>
+        <div style={sectionHeadStyle}><div><p>รายการล่าสุด</p><h2>เงินเข้า-ออกล่าสุด</h2></div><a href="/transactions" style={{ color: props.primaryColor, fontWeight: 900, textDecoration: 'none' }}>ดูทั้งหมด</a></div>
         {activityMessage && <div style={noticeStyle}>{activityMessage}</div>}
         <div style={pendingListStyle}>
           {ledgers.slice(0, 5).map((item) => <LedgerRow key={item.id} item={item} />)}
-          {ledgers.length === 0 && !activityMessage && <span>ยังไม่มีรายการล่าสุด</span>}
+          {ledgers.length === 0 && !activityMessage && <span>ยังไม่มีรายการเงินเข้า-ออก</span>}
         </div>
       </section>}
     </section>
@@ -82,11 +82,27 @@ export default function MemberHome(props: MemberHomeProps) {
 }
 
 function ActivityRow({ title, href, item }: { title: string; href: string; item: MoneyRequest }) {
-  return <a href={href} style={rowLinkStyle}><div><strong>{title}</strong><span>{new Date(item.createdAt).toLocaleString('th-TH')}</span></div><div style={rightStyle}><strong>{formatMoney(item.amount, item.currency)}</strong><span>{item.status}</span></div></a>;
+  return <a href={href} style={rowLinkStyle}><div><strong>{title}</strong><span>{new Date(item.createdAt).toLocaleString('th-TH')}</span></div><div style={rightStyle}><strong>{formatMoney(item.amount, item.currency)}</strong><span>{statusLabel(item.status)}</span></div></a>;
 }
 
 function LedgerRow({ item }: { item: LedgerItem }) {
-  return <div style={rowStyle}><div><strong>{item.type} / {item.direction}</strong><span>{new Date(item.createdAt).toLocaleString('th-TH')}</span></div><div style={rightStyle}><strong>{item.direction === 'CREDIT' ? '+' : '-'} {formatMoney(item.amount, 'THB')}</strong><span>หลัง: {formatMoney(item.balanceAfter, 'THB')}</span></div></div>;
+  return <div style={rowStyle}><div><strong>{ledgerTypeLabel(item.type)}</strong><span>{new Date(item.createdAt).toLocaleString('th-TH')}</span></div><div style={rightStyle}><strong>{item.direction === 'CREDIT' ? '+' : '-'} {formatMoney(item.amount, 'THB')}</strong><span>ยอดหลังรายการ: {formatMoney(item.balanceAfter, 'THB')}</span></div></div>;
+}
+
+function ledgerTypeLabel(type: string) {
+  const upper = type.toUpperCase();
+  if (upper.includes('DEPOSIT') || upper.includes('TOPUP')) return 'เติมเงิน';
+  if (upper.includes('WITHDRAW')) return 'ถอนเงิน';
+  if (upper.includes('ADJUST')) return 'ปรับยอดโดยแอดมิน';
+  return 'รายการเงิน';
+}
+
+function statusLabel(status: string) {
+  const upper = status.toUpperCase();
+  if (upper === 'PENDING') return 'รอตรวจสอบ';
+  if (upper === 'APPROVED' || upper === 'COMPLETED') return 'สำเร็จ';
+  if (upper === 'REJECTED') return 'ไม่อนุมัติ';
+  return status;
 }
 
 function formatMoney(value: string | number, currency: string) {
@@ -96,7 +112,7 @@ function formatMoney(value: string | number, currency: string) {
 const alertCardStyle = { borderColor: 'rgba(245,197,66,.32)', background: 'linear-gradient(180deg, rgba(245,197,66,.13), rgba(255,255,255,.04))' } as const;
 const pendingListStyle = { display: 'grid', gap: 10, marginTop: 12, minWidth: 0 } as const;
 const sectionHeadStyle = { display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, flexWrap: 'wrap' as const, minWidth: 0 };
-const rowStyle = { display: 'flex', justifyContent: 'space-between', gap: 12, border: '1px solid rgba(255,255,255,.10)', borderRadius: 16, padding: 12, background: 'rgba(255,255,255,.045)', flexWrap: 'wrap' as const, minWidth: 0 };
+const rowStyle = { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(190px, 100%), 1fr))', gap: 12, border: '1px solid rgba(255,255,255,.10)', borderRadius: 16, padding: 12, background: 'rgba(255,255,255,.045)', minWidth: 0 };
 const rowLinkStyle = { ...rowStyle, color: 'inherit', textDecoration: 'none' } as const;
-const rightStyle = { textAlign: 'right' as const, display: 'grid', gap: 4, minWidth: 0 };
+const rightStyle = { textAlign: 'left' as const, display: 'grid', gap: 4, minWidth: 0 };
 const noticeStyle = { border: '1px solid rgba(255,255,255,.12)', borderRadius: 16, padding: 12, background: 'rgba(255,255,255,.06)', marginTop: 12 } as const;
