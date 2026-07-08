@@ -15,6 +15,8 @@ export default function AdminSecurityPage() {
   const [qrDataUrl, setQrDataUrl] = useState('');
   const [sessions, setSessions] = useState<SessionItem[]>([]);
   const [code, setCode] = useState('');
+  const [regenerateCode, setRegenerateCode] = useState('');
+  const [recoveryCodes, setRecoveryCodes] = useState<string[]>([]);
   const [message, setMessage] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -43,7 +45,7 @@ export default function AdminSecurityPage() {
   }
 
   async function startSetup() {
-    setLoading(true); setMessage('กำลังสร้าง 2FA secret...');
+    setLoading(true); setMessage('กำลังสร้าง 2FA secret...'); setRecoveryCodes([]);
     const res = await adminApiFetch('/admin/auth/2fa/setup', { method: 'POST' });
     const data = await res.json().catch(() => null);
     setLoading(false);
@@ -59,9 +61,23 @@ export default function AdminSecurityPage() {
     const data = await res.json().catch(() => null);
     setLoading(false);
     if (!res.ok) { setMessage(data?.message ?? 'เปิดใช้งาน 2FA ไม่สำเร็จ'); return; }
+    setRecoveryCodes(data?.recoveryCodes ?? []);
     setCode('');
-    setMessage('เปิดใช้งาน 2FA แล้ว');
+    setMessage('เปิดใช้งาน 2FA แล้ว กรุณาบันทึก recovery codes ทันที ระบบจะแสดงให้เห็นครั้งเดียว');
     await loadMe();
+  }
+
+  async function regenerateRecoveryCodes() {
+    if (!regenerateCode.trim()) { setMessage('กรุณาใส่รหัส 2FA หรือ recovery code ปัจจุบันก่อนสร้างชุดใหม่'); return; }
+    if (!window.confirm('สร้าง recovery codes ชุดใหม่? ชุดเก่าทั้งหมดจะใช้ไม่ได้ทันที')) return;
+    setLoading(true); setMessage('กำลังสร้าง recovery codes ชุดใหม่...');
+    const res = await adminApiFetch('/admin/auth/2fa/recovery-codes/regenerate', { method: 'POST', body: JSON.stringify({ code: regenerateCode.trim() }) });
+    const data = await res.json().catch(() => null);
+    setLoading(false);
+    if (!res.ok) { setMessage(data?.message ?? 'สร้าง recovery codes ไม่สำเร็จ'); return; }
+    setRecoveryCodes(data?.recoveryCodes ?? []);
+    setRegenerateCode('');
+    setMessage('สร้าง recovery codes ชุดใหม่แล้ว กรุณาบันทึกทันที');
   }
 
   async function revokeSession(session: SessionItem) {
@@ -103,6 +119,10 @@ export default function AdminSecurityPage() {
     catch { setMessage(`คัดลอก${label}ไม่สำเร็จ`); }
   }
 
+  async function copyRecoveryCodes() {
+    await copy(recoveryCodes.join('\n'), ' recovery codes');
+  }
+
   const activeCount = sessions.filter((item) => item.active).length;
   const otherActiveCount = sessions.filter((item) => item.active && !item.current).length;
 
@@ -140,6 +160,16 @@ export default function AdminSecurityPage() {
       </AdminStack>
     </AdminCard>
 
+    {recoveryCodes.length > 0 && <AdminCard title="Recovery Codes" description="บันทึกไว้ทันที ใช้แทนรหัส Authenticator ได้ และแต่ละ code ใช้ได้ครั้งเดียว">
+      <AdminNotice>ระบบจะแสดง recovery codes ชุดนี้ให้เห็นครั้งเดียวเท่านั้น อย่าเก็บไว้ใน chat หรือที่สาธารณะ เดี๋ยวความปลอดภัยจะกลายเป็นการแสดงมายากลราคาถูก</AdminNotice>
+      <div style={recoveryGridStyle}>{recoveryCodes.map((item) => <code key={item} style={recoveryCodeStyle}>{item}</code>)}</div>
+      <AdminButton onClick={copyRecoveryCodes}>Copy all recovery codes</AdminButton>
+    </AdminCard>}
+
+    <AdminCard title="Regenerate Recovery Codes" description="สร้าง recovery codes ชุดใหม่ ชุดเก่าจะใช้ไม่ได้ทันที">
+      <div style={copyRowStyle}><input value={regenerateCode} onChange={(event) => setRegenerateCode(event.target.value)} placeholder="ใส่ TOTP code หรือ recovery code ปัจจุบัน" style={inputStyle} /><AdminButton disabled={loading} tone="warning" onClick={regenerateRecoveryCodes}>Regenerate</AdminButton></div>
+    </AdminCard>
+
     <AdminCard title="Admin Sessions" description="รายการ session ล่าสุดของบัญชีแอดมินนี้">
       <div style={sessionToolbarStyle}><AdminButton disabled={loading || otherActiveCount === 0} onClick={logoutOtherDevices}>Logout other devices</AdminButton><AdminButton disabled={loading || activeCount === 0} tone="danger" onClick={endEverySession}>End all sessions</AdminButton></div>
       <AdminStack>{sessions.map((session) => <section key={session.id} style={sessionBoxStyle}><div style={sessionTopStyle}><div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}><AdminBadge tone={session.active ? 'success' : 'neutral'}>{session.active ? 'ACTIVE' : 'ENDED'}</AdminBadge>{session.current && <AdminBadge tone="warning">CURRENT</AdminBadge>}</div>{session.active && <AdminButton disabled={loading} tone="danger" onClick={() => revokeSession(session)}>Revoke</AdminButton>}</div><strong>{session.deviceId || 'Unknown device'}</strong><p>IP: {session.ipAddress || '-'}</p><p style={agentStyle}>UA: {session.userAgent || '-'}</p><p>Created: {new Date(session.createdAt).toLocaleString('th-TH')}</p><p>Expires: {new Date(session.expiresAt).toLocaleString('th-TH')}</p>{session.revokedAt && <p>Ended: {new Date(session.revokedAt).toLocaleString('th-TH')}</p>}</section>)}{sessions.length === 0 && <AdminNotice>ยังไม่มี session ให้แสดง</AdminNotice>}</AdminStack>
@@ -155,6 +185,8 @@ const inputStyle = { minHeight: 44, borderRadius: 12, border: '1px solid rgba(14
 const copyButtonStyle = { border: '1px solid rgba(245,197,66,.35)', borderRadius: 12, padding: '0 12px', background: 'rgba(245,197,66,.14)', color: '#f5c542', fontWeight: 900, cursor: 'pointer' } as const;
 const qrBoxStyle = { border: '1px solid rgba(148,163,184,.18)', borderRadius: 16, padding: 14, display: 'grid', justifyItems: 'center', gap: 10, background: '#0b1220' } as const;
 const qrImageStyle = { width: 220, height: 220, maxWidth: '100%', borderRadius: 12, background: '#fff', padding: 8 } as const;
+const recoveryGridStyle = { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 8, margin: '12px 0' } as const;
+const recoveryCodeStyle = { border: '1px solid rgba(245,197,66,.24)', borderRadius: 12, padding: 10, background: 'rgba(245,197,66,.08)', color: '#f5c542', fontWeight: 900, textAlign: 'center' as const, letterSpacing: 1 };
 const sessionBoxStyle = { border: '1px solid rgba(148,163,184,.18)', borderRadius: 16, padding: 12, display: 'grid', gap: 6, minWidth: 0 } as const;
 const sessionTopStyle = { display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'center', flexWrap: 'wrap' as const };
 const sessionToolbarStyle = { display: 'flex', gap: 10, flexWrap: 'wrap' as const, marginBottom: 12 };
