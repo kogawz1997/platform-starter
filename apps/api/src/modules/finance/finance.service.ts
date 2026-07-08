@@ -92,6 +92,82 @@ export class FinanceService {
     };
   }
 
+  async getReports(daysInput?: string | number) {
+    const days = Math.min(Math.max(Number(daysInput ?? 7) || 7, 1), 31);
+    const now = new Date();
+    const todayStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 0, 0, 0, 0));
+    const start = new Date(todayStart);
+    start.setUTCDate(start.getUTCDate() - (days - 1));
+    const end = new Date(todayStart);
+    end.setUTCDate(end.getUTCDate() + 1);
+    end.setUTCMilliseconds(-1);
+
+    const [topUps, withdrawals, pendingTopUps, pendingWithdrawals, totalMembers, activeMembers] = await Promise.all([
+      this.prisma.topUpRequest.findMany({
+        where: { status: 'APPROVED', reviewedAt: { gte: start, lte: end } },
+        select: { amount: true, reviewedAt: true },
+        orderBy: { reviewedAt: 'asc' },
+      }),
+      this.prisma.withdrawalRequest.findMany({
+        where: { status: 'COMPLETED', reviewedAt: { gte: start, lte: end } },
+        select: { amount: true, reviewedAt: true },
+        orderBy: { reviewedAt: 'asc' },
+      }),
+      this.prisma.topUpRequest.count({ where: { status: 'PENDING' } }),
+      this.prisma.withdrawalRequest.count({ where: { status: 'PENDING' } }),
+      this.prisma.user.count(),
+      this.prisma.user.count({ where: { status: 'ACTIVE' } }),
+    ]);
+
+    const daily = Array.from({ length: days }, (_, index) => {
+      const day = new Date(start);
+      day.setUTCDate(start.getUTCDate() + index);
+      return {
+        date: day.toISOString().slice(0, 10),
+        topUpAmount: '0',
+        topUpCount: 0,
+        withdrawalAmount: '0',
+        withdrawalCount: 0,
+        netFlow: '0',
+      };
+    });
+
+    const byDate = new Map(daily.map((item) => [item.date, item]));
+    for (const item of topUps) {
+      const date = item.reviewedAt?.toISOString().slice(0, 10);
+      if (!date || !byDate.has(date)) continue;
+      const row = byDate.get(date)!;
+      row.topUpCount += 1;
+      row.topUpAmount = this.addDecimal(row.topUpAmount, item.amount);
+      row.netFlow = this.addDecimal(row.netFlow, item.amount);
+    }
+    for (const item of withdrawals) {
+      const date = item.reviewedAt?.toISOString().slice(0, 10);
+      if (!date || !byDate.has(date)) continue;
+      const row = byDate.get(date)!;
+      row.withdrawalCount += 1;
+      row.withdrawalAmount = this.addDecimal(row.withdrawalAmount, item.amount);
+      row.netFlow = this.subtractDecimal(row.netFlow, item.amount);
+    }
+
+    const totals = daily.reduce((acc, row) => ({
+      topUpAmount: this.addDecimal(acc.topUpAmount, row.topUpAmount),
+      topUpCount: acc.topUpCount + row.topUpCount,
+      withdrawalAmount: this.addDecimal(acc.withdrawalAmount, row.withdrawalAmount),
+      withdrawalCount: acc.withdrawalCount + row.withdrawalCount,
+      netFlow: this.addDecimal(acc.netFlow, row.netFlow),
+    }), { topUpAmount: '0', topUpCount: 0, withdrawalAmount: '0', withdrawalCount: 0, netFlow: '0' });
+
+    return {
+      range: { days, start: start.toISOString().slice(0, 10), end: end.toISOString().slice(0, 10) },
+      totals,
+      queues: { pendingTopUps, pendingWithdrawals, pendingTotal: pendingTopUps + pendingWithdrawals },
+      members: { total: totalMembers, active: activeMembers },
+      daily,
+      generatedAt: new Date(),
+    };
+  }
+
   private formatRequest(item: any) {
     return {
       id: item.id,
@@ -104,5 +180,16 @@ export class FinanceService {
       createdAt: item.createdAt,
       user: item.user ? { ...item.user, shortId: item.user.id.slice(0, 8) } : null,
     };
+  }
+
+  private addDecimal(a: any, b: any) {
+    if (a?.plus) return a.plus(b).toString();
+    if (b?.plus) return b.plus(a).toString();
+    return String(Number(a ?? 0) + Number(b ?? 0));
+  }
+
+  private subtractDecimal(a: any, b: any) {
+    if (a?.minus) return a.minus(b).toString();
+    return String(Number(a ?? 0) - Number(b ?? 0));
   }
 }
