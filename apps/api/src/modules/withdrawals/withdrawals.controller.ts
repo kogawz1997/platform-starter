@@ -24,7 +24,7 @@ export class WithdrawalsController {
 
   @UseGuards(AdminAuthGuard)
   @Get('admin/withdrawals')
-  getAdminRequests(@Query('status') status?: string) { return this.withdrawalsService.getAdminRequests(status); }
+  getAdminRequests(@Query('status') status?: string, @Query('page') page?: string, @Query('take') take?: string) { return this.withdrawalsService.getAdminRequests(status, { page, take }); }
 
   @UseGuards(AdminAuthGuard)
   @Get('admin/withdrawals/:id')
