@@ -13,6 +13,7 @@
     "db:push": "prisma db push --schema prisma/schema.prisma",
     "db:seed": "tsx prisma/seed.ts",
     "db:seed:access": "tsx prisma/seed-access.ts",
+    "db:seed:games": "tsx prisma/seed-games.ts",
     "db:studio": "prisma studio --schema prisma/schema.prisma",
     "build:api": "pnpm db:generate && pnpm --filter @platform/api build",
     "start:api": "pnpm db:generate && pnpm --filter @platform/api start:prod",
