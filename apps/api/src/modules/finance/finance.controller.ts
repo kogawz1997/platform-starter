@@ -1,4 +1,4 @@
-import { Controller, Get, UseGuards } from '@nestjs/common';
+import { Controller, Get, Query, UseGuards } from '@nestjs/common';
 import { AdminAuthGuard } from '../../common/guards/admin-auth.guard';
 import { FinanceService } from './finance.service';
 
@@ -10,5 +10,10 @@ export class FinanceController {
   @Get('summary')
   getSummary() {
     return this.financeService.getSummary();
+  }
+
+  @Get('reports')
+  getReports(@Query('days') days?: string) {
+    return this.financeService.getReports(days);
   }
 }
