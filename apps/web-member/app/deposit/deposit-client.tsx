@@ -9,6 +9,7 @@ type MethodCode = 'bank_transfer' | 'promptpay' | 'wallet' | 'other';
 type DepositStep = 'select' | 'transfer' | 'waiting';
 
 const AMOUNTS = [100, 300, 500, 1000, 3000, 5000];
+const METHOD_CODES: MethodCode[] = ['bank_transfer', 'promptpay', 'wallet', 'other'];
 const METHODS: Record<MethodCode, { label: string; numberLabel: string }> = {
   bank_transfer: { label: 'บัญชีธนาคาร', numberLabel: 'เลขบัญชี' },
   promptpay: { label: 'พร้อมเพย์', numberLabel: 'เบอร์พร้อมเพย์' },
@@ -104,7 +105,7 @@ export default function DepositClient() {
           <div style={cardHeaderStyle}><h2 style={sectionHeadingStyle}>เลือกยอดและช่องทาง</h2><p style={mutedStyle}>เลือกยอดที่ต้องการฝาก แล้วระบบจะแสดงบัญชีธนาคารที่รองรับยอดนี้</p></div>
           <div style={amountGridStyle}>{AMOUNTS.map((value) => <button key={value} type="button" onClick={() => setAmount(String(value))} style={amountButtonStyle(Number(amount) === value)}>฿{value.toLocaleString('th-TH')}</button>)}</div>
           <label style={labelStyle}>จำนวนเงิน<input value={amount} onChange={(e) => setAmount(e.target.value)} inputMode="decimal" style={inputStyle} /></label>
-          <div style={methodGridStyle}>{(['bank_transfer', 'promptpay', 'wallet', 'other'] as MethodCode[]).map((code) => { const enabled = usable.some((account) => accountType(account) === code); return <button key={code} type="button" disabled={!enabled} onClick={() => enabled && setMethod(code)} style={methodStyle(method === code, enabled)}><strong>{METHODS[code].label}</strong><span>{enabled ? 'พร้อมใช้งาน' : 'ยังไม่เปิดใช้งาน'}</span></button>; })}</div>
+          <label style={labelStyle}>ช่องทาง<select value={method} onChange={(e) => setMethod(e.target.value as MethodCode)} disabled={availableMethods.length === 0} style={inputStyle}>{METHOD_CODES.map((code) => { const enabled = availableMethods.includes(code); return <option key={code} value={code} disabled={!enabled}>{METHODS[code].label}{enabled ? '' : ' - ยังไม่เปิดใช้งาน'}</option>; })}</select></label>
           {!initialLoading && accounts.length === 0 && <EmptyAction title="ยังไม่มีบัญชีธนาคาร" description="ยังไม่มีช่องทางสำหรับรับฝากตอนนี้ กรุณาลองใหม่ภายหลังหรือติดต่อผู้ดูแล" />}
           {!initialLoading && accounts.length > 0 && availableMethods.length === 0 && <EmptyAction title="ไม่พบช่องทางที่รองรับยอดนี้" description="ลองเปลี่ยนยอดฝาก หรือเลือกยอดที่อยู่ในช่วงที่ระบบเปิดรับ" />}
           <button type="submit" disabled={loading || availableMethods.length === 0} style={primaryButtonStyle}>{loading ? 'กำลังเตรียม...' : 'ถัดไป'}</button>
@@ -172,7 +173,6 @@ const labelStyle = { display: 'grid', gap: 8, fontWeight: 800, minWidth: 0 } as 
 const inputStyle = { width: '100%', padding: '13px 14px', borderRadius: 14, border: '1px solid rgba(255,255,255,.16)', background: '#242424', color: '#fff', boxSizing: 'border-box' as const, fontSize: 16 };
 const textareaStyle = { ...inputStyle, minHeight: 96, resize: 'vertical' as const };
 const amountGridStyle = { display: 'grid', gridTemplateColumns: 'repeat(2,minmax(0,1fr))', gap: 10 } as const;
-const methodGridStyle = { display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(min(180px,100%),1fr))', gap: 10 } as const;
 const primaryButtonStyle = { padding: 14, minHeight: 48, borderRadius: 16, cursor: 'pointer', background: '#f5c542', color: '#111', border: 0, fontWeight: 900, width: '100%', textDecoration: 'none', display: 'grid', placeItems: 'center' } as const;
 const secondaryButtonStyle = { padding: 14, minHeight: 48, borderRadius: 16, cursor: 'pointer', background: 'rgba(255,255,255,.08)', color: '#fff', border: '1px solid rgba(255,255,255,.14)', fontWeight: 900, width: '100%' } as const;
 const secondaryLinkStyle = { ...secondaryButtonStyle, textDecoration: 'none', display: 'grid', placeItems: 'center' } as const;
@@ -195,5 +195,4 @@ const modalBackdropStyle = { position: 'fixed' as const, inset: 0, zIndex: 90, b
 const modalStyle = { width: '100%', maxWidth: 560, maxHeight: '90dvh', overflowY: 'auto' as const, border: '1px solid rgba(255,255,255,.14)', borderRadius: 26, padding: 16, background: '#151515', color: '#fff', display: 'grid', gap: 12, boxShadow: '0 24px 90px rgba(0,0,0,.55)' };
 const closeButtonStyle = { width: 42, height: 42, borderRadius: 14, border: '1px solid rgba(255,255,255,.14)', background: 'rgba(255,255,255,.08)', color: '#fff', fontSize: 24, cursor: 'pointer' } as const;
 function amountButtonStyle(active: boolean) { return { padding: 14, minHeight: 52, borderRadius: 18, border: active ? '2px solid #f5c542' : '1px solid rgba(255,255,255,.14)', background: active ? 'rgba(245,197,66,.18)' : 'rgba(255,255,255,.08)', color: active ? '#f5c542' : '#fff', fontWeight: 900, width: '100%' }; }
-function methodStyle(active: boolean, enabled: boolean) { return { display: 'grid', gap: 4, textAlign: 'left' as const, padding: 14, minHeight: 58, borderRadius: 18, border: active ? '2px solid #f5c542' : '1px solid rgba(255,255,255,.14)', background: active ? 'rgba(245,197,66,.18)' : 'rgba(255,255,255,.08)', color: active ? '#f5c542' : '#fff', opacity: enabled ? 1 : 0.45, width: '100%' }; }
 function statusBadgeStyle(status: string) { return { width: 'fit-content', borderRadius: 999, padding: '6px 10px', background: status === 'APPROVED' || status === 'COMPLETED' ? 'rgba(80,255,140,.14)' : status === 'REJECTED' ? 'rgba(255,80,80,.14)' : 'rgba(245,197,66,.14)', border: '1px solid rgba(255,255,255,.12)', fontSize: 12, fontWeight: 900 }; }
