@@ -20,7 +20,7 @@ export default function MemberBankAccountsPage() {
 
   async function loadItems() {
     setLoading(true);
-    setMessage('กำลังโหลดบัญชีถอนเงิน...');
+    setMessage('กำลังโหลด...');
     const res = await memberApiFetch('/member/bank-accounts');
     const data = await res.json().catch(() => null);
     setLoading(false);
@@ -30,13 +30,13 @@ export default function MemberBankAccountsPage() {
 
   async function addBank(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (items.length > 0) { setMessage('สมาชิก 1 คนเพิ่มบัญชีถอนได้ 1 บัญชีเท่านั้น'); return; }
+    if (items.length > 0) { setMessage('เพิ่มได้ 1 บัญชีเท่านั้น'); return; }
     if (!bankName.trim() || !accountName.trim() || !accountNumber.trim()) { setMessage('กรอกข้อมูลบัญชีให้ครบก่อน'); return; }
     setBusy(true); setMessage('กำลังเพิ่มบัญชี...');
     const res = await memberApiFetch('/member/bank-accounts', { method: 'POST', body: JSON.stringify({ bankName, accountName, accountNumber }) });
     const data = await res.json().catch(() => null); setBusy(false);
     if (!res.ok) { setMessage(data?.message ?? 'เพิ่มบัญชีไม่สำเร็จ'); return; }
-    setItems((current) => [data.item, ...current]); setBankName(THAI_BANKS[0]); setAccountName(''); setAccountNumber(''); setMessage('เพิ่มบัญชีแล้ว รอแอดมินตรวจสอบ');
+    setItems((current) => [data.item, ...current]); setBankName(THAI_BANKS[0]); setAccountName(''); setAccountNumber(''); setMessage('เพิ่มบัญชีแล้ว รอตรวจสอบ');
   }
 
   async function setPrimary(id: string) {
@@ -51,25 +51,23 @@ export default function MemberBankAccountsPage() {
   return (
     <main style={pageStyle}>
       <a href="/" style={backStyle}>← หน้าแรก</a>
-      <p style={eyebrowStyle}>Wallet</p>
-      <h1 style={titleStyle}>บัญชีถอนเงิน</h1>
-      <p style={mutedStyle}>สมาชิก 1 คนเพิ่มบัญชีถอนได้ 1 บัญชี และชื่อบัญชีต้องตรงกับชื่อบัญชีสมาชิก</p>
+      <h1 style={titleStyle}>การจัดการบัญชีธนาคาร</h1>
 
-      {loading && <div style={noticeStyle}>กำลังโหลดบัญชีถอนเงิน...</div>}
+      {loading && <div style={noticeStyle}>กำลังโหลด...</div>}
       {items.length === 0 && !loading && <form onSubmit={addBank} style={cardStyle}>
-        <h2 style={sectionTitleStyle}>เพิ่มบัญชีใหม่</h2>
+        <h2 style={sectionTitleStyle}>เพิ่มบัญชี</h2>
         <label style={labelStyle}>ธนาคาร<select value={bankName} onChange={(e) => setBankName(e.target.value)} style={inputStyle}>{THAI_BANKS.map((bank) => <option key={bank} value={bank}>{bank}</option>)}</select></label>
-        <label style={labelStyle}>ชื่อบัญชี<input value={accountName} onChange={(e) => setAccountName(e.target.value)} placeholder="ต้องตรงกับชื่อบัญชีสมาชิก" style={inputStyle} /></label>
+        <label style={labelStyle}>ชื่อบัญชี<input value={accountName} onChange={(e) => setAccountName(e.target.value)} placeholder="ชื่อบัญชี" style={inputStyle} /></label>
         <label style={labelStyle}>เลขบัญชี<input value={accountNumber} onChange={(e) => setAccountNumber(e.target.value)} placeholder="เลขบัญชี" inputMode="numeric" style={inputStyle} /></label>
         <button type="submit" disabled={busy} style={primaryButtonStyle}>{busy ? 'กำลังเพิ่ม...' : 'เพิ่มบัญชี'}</button>
       </form>}
 
-      {items.length > 0 && <div style={noticeStyle}>เพิ่มบัญชีแล้ว หากต้องการเปลี่ยนบัญชีให้ติดต่อแอดมิน</div>}
+      {items.length > 0 && <div style={noticeStyle}>เพิ่มบัญชีแล้ว หากต้องการเปลี่ยนให้ติดต่อแอดมิน</div>}
       {message && <div style={noticeStyle}>{message}</div>}
 
       <section style={listStyle}>
-        {items.map((item) => <div key={item.id} style={cardStyle}><div style={rowStyle}><div style={infoStyle}><div style={badgeRowStyle}><span style={badgeStyle(item.status)}>{item.status}</span>{item.isPrimary && <span style={primaryBadgeStyle}>บัญชีหลัก</span>}</div><h2 style={bankTitleStyle}>{item.bankName}</h2><InfoText label="ชื่อบัญชี" value={item.accountName} /><InfoText label="เลขบัญชี" value={item.accountNumber} />{item.adminNote && <InfoText label="Admin note" value={item.adminNote} />}</div><div style={actionStyle}>{!item.isPrimary && <button type="button" onClick={() => setPrimary(item.id)} style={secondaryButtonStyle}>ตั้งเป็นหลัก</button>}</div></div></div>)}
-        {items.length === 0 && !loading && <div style={noticeStyle}>ยังไม่มีบัญชีถอนเงิน</div>}
+        {items.map((item) => <div key={item.id} style={cardStyle}><div style={rowStyle}><div style={infoStyle}><div style={badgeRowStyle}><span style={badgeStyle(item.status)}>{item.status}</span>{item.isPrimary && <span style={primaryBadgeStyle}>บัญชีหลัก</span>}</div><h2 style={bankTitleStyle}>{item.bankName}</h2><InfoText label="ชื่อบัญชี" value={item.accountName} /><InfoText label="เลขบัญชี" value={item.accountNumber} />{item.adminNote && <InfoText label="หมายเหตุ" value={item.adminNote} />}</div><div style={actionStyle}>{!item.isPrimary && <button type="button" onClick={() => setPrimary(item.id)} style={secondaryButtonStyle}>ตั้งเป็นหลัก</button>}</div></div></div>)}
+        {items.length === 0 && !loading && <div style={noticeStyle}>ยังไม่มีบัญชีธนาคาร</div>}
       </section>
     </main>
   );
@@ -79,7 +77,6 @@ function InfoText({ label, value }: { label: string; value: string }) { return <
 
 const pageStyle = { width: '100%', maxWidth: 900, margin: '0 auto', padding: '18px 12px calc(44px + env(safe-area-inset-bottom))', color: '#fff', overflowX: 'hidden' as const } as const;
 const backStyle = { color: '#f5c542', textDecoration: 'none', fontWeight: 900 } as const;
-const eyebrowStyle = { margin: '18px 0 0', opacity: 0.66, fontSize: 14 } as const;
 const titleStyle = { margin: '6px 0 8px', fontSize: 'clamp(34px, 11vw, 58px)', lineHeight: 0.98, letterSpacing: -1.2, overflowWrap: 'anywhere' as const };
 const mutedStyle = { margin: 0, opacity: 0.76, lineHeight: 1.55, overflowWrap: 'anywhere' as const };
 const cardStyle = { border: '1px solid rgba(255,255,255,0.12)', borderRadius: 24, padding: 16, background: '#181818', display: 'grid', gap: 12, minWidth: 0, overflow: 'hidden' as const };
