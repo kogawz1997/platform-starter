@@ -1,6 +1,8 @@
 name: Smoke API
 
 on:
+  schedule:
+    - cron: '0 1 * * *'
   workflow_dispatch:
     inputs:
       api_url:
@@ -26,6 +28,8 @@ on:
 jobs:
   smoke-api:
     runs-on: ubuntu-latest
+    env:
+      RESOLVED_API_URL: ${{ inputs.api_url || secrets.PROD_API_URL || 'https://api-service.up.railway.app' }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -34,9 +38,9 @@ jobs:
         run: chmod +x scripts/smoke-api.sh scripts/verify-production-env.sh
 
       - name: Run production env verification
-        if: ${{ inputs.run_env_verification }}
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.run_env_verification }}
         env:
-          API_URL: ${{ inputs.api_url }}
+          API_URL: ${{ env.RESOLVED_API_URL }}
           DATABASE_URL: ${{ secrets.PROD_DATABASE_URL }}
           JWT_ACCESS_KEY: ${{ secrets.PROD_JWT_ACCESS_KEY }}
           ADMIN_JWT_ACCESS_TTL: ${{ secrets.PROD_ADMIN_JWT_ACCESS_TTL }}
@@ -56,13 +60,13 @@ jobs:
 
       - name: Run anonymous smoke checks
         env:
-          API_URL: ${{ inputs.api_url }}
+          API_URL: ${{ env.RESOLVED_API_URL }}
         run: ./scripts/smoke-api.sh
 
       - name: Run admin smoke checks
-        if: ${{ inputs.run_admin_checks }}
+        if: ${{ github.event_name == 'schedule' || inputs.run_admin_checks }}
         env:
-          API_URL: ${{ inputs.api_url }}
+          API_URL: ${{ env.RESOLVED_API_URL }}
           ADMIN_TOKEN: ${{ secrets.PROD_ADMIN_TOKEN }}
         run: |
           if [[ -z "$ADMIN_TOKEN" ]]; then
@@ -72,9 +76,9 @@ jobs:
           ./scripts/smoke-api.sh
 
       - name: Run member smoke checks
-        if: ${{ inputs.run_member_checks }}
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.run_member_checks }}
         env:
-          API_URL: ${{ inputs.api_url }}
+          API_URL: ${{ env.RESOLVED_API_URL }}
           MEMBER_TOKEN: ${{ secrets.PROD_MEMBER_TOKEN }}
         run: |
           if [[ -z "$MEMBER_TOKEN" ]]; then
