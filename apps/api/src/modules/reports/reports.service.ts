@@ -122,6 +122,41 @@ export class ReportsService {
     };
   }
 
+  async getQueueAging() {
+    const now = Date.now();
+    const [topUps, withdrawals] = await Promise.all([
+      this.prisma.topUpRequest.findMany({
+        where: { status: 'PENDING' },
+        include: { user: { select: { id: true, username: true, email: true, phone: true } } },
+        orderBy: { createdAt: 'asc' },
+        take: 20,
+      }),
+      this.prisma.withdrawalRequest.findMany({
+        where: { status: 'PENDING' },
+        include: { user: { select: { id: true, username: true, email: true, phone: true } } },
+        orderBy: { createdAt: 'asc' },
+        take: 20,
+      }),
+    ]);
+
+    const topUpItems = topUps.map((item) => this.formatAgingItem('TOPUP', item, now));
+    const withdrawalItems = withdrawals.map((item) => this.formatAgingItem('WITHDRAWAL', item, now));
+    const allItems = [...topUpItems, ...withdrawalItems].sort((a, b) => b.ageMinutes - a.ageMinutes);
+
+    return {
+      summary: {
+        pendingTopUps: topUpItems.length,
+        pendingWithdrawals: withdrawalItems.length,
+        oldestAgeMinutes: allItems[0]?.ageMinutes ?? 0,
+        over15Minutes: allItems.filter((item) => item.ageMinutes >= 15).length,
+        over60Minutes: allItems.filter((item) => item.ageMinutes >= 60).length,
+        over24Hours: allItems.filter((item) => item.ageMinutes >= 1440).length,
+      },
+      oldest: allItems.slice(0, 20),
+      generatedAt: new Date().toISOString(),
+    };
+  }
+
   async getReconciliation(query: ReportQuery = {}) {
     const safeLimit = Math.min(Math.max(Number(query.limit) || 100, 1), 500);
     const wallets = await this.prisma.wallet.findMany({ orderBy: { updatedAt: 'desc' }, take: safeLimit, include: { user: { select: { id: true, username: true, email: true, phone: true } } } });
@@ -160,6 +195,27 @@ export class ReportsService {
 
   private formatGroup(item: any) {
     return { status: item.status, count: item._count._all, amount: item._sum.amount?.toString() ?? '0' };
+  }
+
+  private formatAgingItem(type: 'TOPUP' | 'WITHDRAWAL', item: any, now: number) {
+    const ageMinutes = Math.max(Math.floor((now - item.createdAt.getTime()) / 60000), 0);
+    return {
+      id: item.id,
+      type,
+      userId: item.userId,
+      username: item.user?.username ?? item.user?.email ?? item.userId.slice(0, 8),
+      amount: item.amount.toString(),
+      currency: item.currency,
+      createdAt: item.createdAt.toISOString(),
+      ageMinutes,
+      ageLabel: this.ageLabel(ageMinutes),
+    };
+  }
+
+  private ageLabel(minutes: number) {
+    if (minutes >= 1440) return `${Math.floor(minutes / 1440)}d ${Math.floor((minutes % 1440) / 60)}h`;
+    if (minutes >= 60) return `${Math.floor(minutes / 60)}h ${minutes % 60}m`;
+    return `${minutes}m`;
   }
 
   private addDecimal(a: any, b: any) {
