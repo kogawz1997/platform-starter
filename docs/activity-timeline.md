@@ -8,7 +8,11 @@ Activity Timeline เป็นหน้า read-only สำหรับรวม
 GET /admin/activity/timeline?page=1&take=30&type=ALL
 ```
 
-Requires admin auth.
+Requires admin auth and permission:
+
+```txt
+admin.activity.view
+```
 
 ## Query params
 
@@ -16,6 +20,13 @@ Requires admin auth.
 page = page number, default 1
 take = page size, default 30, max 100
 type = ALL | AUDIT | LEDGER | TOPUP | WITHDRAWAL
+from = ISO date/date string
+to = ISO date/date string
+search = keyword search across title, status, ref, actor, member
+actor = admin username/email keyword
+memberId = exact member user ID
+refType = exact ref type, such as topup or withdrawal
+refId = exact reference ID
 ```
 
 ## Sources
@@ -41,9 +52,28 @@ Features:
 
 - summary metrics
 - type filters
+- advanced filters
+- search
 - timeline list
 - pagination
 - quick links to related pages
+
+## Permission seed
+
+After deploy, run:
+
+```bash
+pnpm db:seed:access
+```
+
+This creates and attaches:
+
+```txt
+admin.activity.view
+admin.reports.view
+```
+
+If this is not seeded, non-wildcard admin roles may receive `403 Permission denied`.
 
 ## Smoke checks
 
@@ -52,6 +82,7 @@ Features:
 ```txt
 GET /admin/activity/timeline -> 401 without token
 GET /admin/activity/timeline?page=1&take=1 -> 200 with ADMIN_TOKEN
+GET /admin/activity/timeline?page=1&take=1&type=AUDIT&search=admin -> 200 with ADMIN_TOKEN
 ```
 
 ## QA checklist
@@ -63,13 +94,19 @@ pnpm build:api
 pnpm build:web-admin
 ```
 
-2. Open admin page
+2. Seed permissions
+
+```bash
+pnpm db:seed:access
+```
+
+3. Open admin page
 
 ```txt
 /activity
 ```
 
-3. Verify
+4. Verify
 
 - page loads
 - ALL filter works
@@ -77,10 +114,15 @@ pnpm build:web-admin
 - LEDGER filter works
 - TOPUP filter works
 - WITHDRAWAL filter works
+- Search works
+- Actor filter works
+- Member ID filter works
+- Ref type/ref ID filters work
+- From/To date filters work
 - Previous/Next works
 - quick links open related pages
 
-4. Smoke test
+5. Smoke test
 
 ```bash
 API_URL="https://api-service.up.railway.app" \
