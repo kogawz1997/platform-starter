@@ -3,16 +3,20 @@ import { PrismaService } from '../../database/prisma.service';
 
 const MEMBER_STATUSES = ['ACTIVE', 'SUSPENDED', 'LOCKED', 'CLOSED'] as const;
 
+type ListMembersQuery = { search?: string; status?: string; page?: string; take?: string };
+
 @Injectable()
 export class AdminMembersService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async listMembers(search?: string, status?: string) {
-    const q = search?.trim();
+  async listMembers(query: ListMembersQuery) {
+    const q = query.search?.trim();
+    const page = Math.max(Number(query.page ?? 1) || 1, 1);
+    const take = Math.min(Math.max(Number(query.take ?? 50) || 50, 1), 100);
     const where: any = {};
-    if (status && status !== 'ALL') {
-      if (!MEMBER_STATUSES.includes(status as any)) throw new BadRequestException('Invalid member status');
-      where.status = status;
+    if (query.status && query.status !== 'ALL') {
+      if (!MEMBER_STATUSES.includes(query.status as any)) throw new BadRequestException('Invalid member status');
+      where.status = query.status;
     }
     if (q) {
       where.OR = [
@@ -22,8 +26,11 @@ export class AdminMembersService {
         ...(q.length >= 8 ? [{ id: { startsWith: q } }] : []),
       ];
     }
-    const items = await this.prisma.user.findMany({ where, include: { profile: true, wallet: true }, orderBy: { createdAt: 'desc' }, take: 200 });
-    return { items: items.map((user) => ({ id: user.id, shortId: user.id.slice(0, 8), username: user.username, phone: user.phone, email: user.email, status: user.status, displayName: user.profile?.displayName ?? null, balance: user.wallet?.balance?.toString?.() ?? '0', lockedBalance: user.wallet?.lockedBalance?.toString?.() ?? '0', availableBalance: user.wallet ? user.wallet.balance.minus(user.wallet.lockedBalance).toString() : '0', createdAt: user.createdAt, lastLoginAt: user.lastLoginAt })) };
+    const [items, total] = await this.prisma.$transaction([
+      this.prisma.user.findMany({ where, include: { profile: true, wallet: true }, orderBy: { createdAt: 'desc' }, skip: (page - 1) * take, take }),
+      this.prisma.user.count({ where }),
+    ]);
+    return { items: items.map((user) => this.formatMember(user)), page, take, total, pageCount: Math.max(Math.ceil(total / take), 1) };
   }
 
   async getMemberDetail(id: string) {
@@ -53,5 +60,9 @@ export class AdminMembersService {
     const updated = await this.prisma.user.update({ where: { id }, data: { status: status as any } });
     await this.prisma.adminAuditLog.create({ data: { adminUserId: admin?.id, module: 'members', action: 'UPDATE_MEMBER_STATUS', targetId: id, oldData: { status: existing.status }, newData: { status: updated.status, reason: reason ?? null }, ipAddress: meta?.ipAddress, userAgent: meta?.userAgent } });
     return { user: { id: updated.id, username: updated.username, status: updated.status, updatedAt: updated.updatedAt } };
+  }
+
+  private formatMember(user: any) {
+    return { id: user.id, shortId: user.id.slice(0, 8), username: user.username, phone: user.phone, email: user.email, status: user.status, displayName: user.profile?.displayName ?? null, balance: user.wallet?.balance?.toString?.() ?? '0', lockedBalance: user.wallet?.lockedBalance?.toString?.() ?? '0', availableBalance: user.wallet ? user.wallet.balance.minus(user.wallet.lockedBalance).toString() : '0', createdAt: user.createdAt, lastLoginAt: user.lastLoginAt };
   }
 }
