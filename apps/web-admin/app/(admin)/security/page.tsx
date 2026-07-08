@@ -167,7 +167,7 @@ export default function AdminSecurityPage() {
     </AdminCard>}
 
     <AdminCard title="Regenerate Recovery Codes" description="สร้าง recovery codes ชุดใหม่ ชุดเก่าจะใช้ไม่ได้ทันที">
-      <div style={copyRowStyle}><input value={regenerateCode} onChange={(event) => setRegenerateCode(event.target.value)} placeholder="ใส่ TOTP code หรือ recovery code ปัจจุบัน" style={inputStyle} /><AdminButton disabled={loading} tone="warning" onClick={regenerateRecoveryCodes}>Regenerate</AdminButton></div>
+      <div style={copyRowStyle}><input value={regenerateCode} onChange={(event) => setRegenerateCode(event.target.value)} placeholder="ใส่ TOTP code หรือ recovery code ปัจจุบัน" style={inputStyle} /><AdminButton disabled={loading} tone="secondary" onClick={regenerateRecoveryCodes}>Regenerate</AdminButton></div>
     </AdminCard>
 
     <AdminCard title="Admin Sessions" description="รายการ session ล่าสุดของบัญชีแอดมินนี้">
