@@ -23,6 +23,7 @@ export function AdminMetricGrid({ children }: { children: ReactNode }) { return 
 export function AdminGrid({ children }: { children: ReactNode }) { return <div style={gridStyle}>{children}</div>; }
 export function AdminStack({ children }: { children: ReactNode }) { return <div style={stackStyle}>{children}</div>; }
 export function AdminRow({ children }: { children: ReactNode }) { return <div style={rowStyle}>{children}</div>; }
+export function AdminSectionRow({ children }: { children: ReactNode }) { return <div style={sectionRowStyle}>{children}</div>; }
 export function AdminToolbar({ children }: { children: ReactNode }) { return <div style={toolbarStyle}>{children}</div>; }
 export function AdminNotice({ children }: { children: ReactNode }) { return <div style={noticeStyle}>{children}</div>; }
 export function AdminEmpty({ children }: { children: ReactNode }) { return <div style={emptyStyle}>{children}</div>; }
@@ -62,6 +63,7 @@ const metricHelperStyle = { display: 'block', color: '#94a3b8', fontSize: 12, ma
 const gridStyle = { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(320px, 100%), 1fr))', gap: 14, minWidth: 0 };
 const stackStyle = { display: 'grid', gap: 10, minWidth: 0 };
 const rowStyle = { display: 'flex', justifyContent: 'space-between', gap: 14, border: '1px solid rgba(148,163,184,.18)', borderRadius: 14, padding: 12, background: 'rgba(148,163,184,.045)', flexWrap: 'wrap' as const, minWidth: 0, overflow: 'hidden' as const };
+const sectionRowStyle = { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(260px, 100%), 1fr))', gap: 12, border: '1px solid rgba(148,163,184,.18)', borderRadius: 14, padding: 12, background: 'rgba(148,163,184,.045)', minWidth: 0, overflow: 'hidden' as const };
 const toolbarStyle = { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(220px, 100%), 1fr))', gap: 10, border: '1px solid rgba(148,163,184,.18)', borderRadius: 18, padding: 14, background: '#111a24', marginBottom: 16, minWidth: 0 };
 const noticeStyle = { border: '1px solid rgba(148,163,184,.18)', borderRadius: 14, padding: 12, background: 'rgba(148,163,184,.06)', color: '#94a3b8', overflowWrap: 'anywhere' as const };
 const emptyStyle = { border: '1px solid rgba(148,163,184,.18)', borderRadius: 14, padding: 14, background: 'rgba(148,163,184,.06)', color: '#94a3b8', textAlign: 'center' as const };
