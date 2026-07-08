@@ -12,6 +12,11 @@ export class ReportsController {
     return this.reportsService.getDailySummary(query);
   }
 
+  @Get('trends')
+  getTrends(@Query() query: { days?: string }) {
+    return this.reportsService.getTrends(query);
+  }
+
   @Get('reconciliation')
   getReconciliation(@Query() query: { limit?: string }) {
     return this.reportsService.getReconciliation(query);
