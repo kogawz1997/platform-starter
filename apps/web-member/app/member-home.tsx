@@ -67,15 +67,6 @@ export default function MemberHome(props: MemberHomeProps) {
 
   return (
     <section className="member-shell member-home-shell">
-      <section className="member-market-hero" style={{ background: `radial-gradient(circle at top right, ${props.primaryColor}33, transparent 34%), linear-gradient(150deg, ${props.cardColor}, rgba(255,255,255,.045))`, color: props.textColor }}>
-        <div>
-          <p className="member-eyebrow">ยินดีต้อนรับ</p>
-          <h1>{props.siteName}</h1>
-          <p>{props.description}</p>
-        </div>
-        <span className="member-market-badge">พร้อมใช้งาน</span>
-      </section>
-
       {props.showBalanceHeader && <WalletCard primaryColor={props.primaryColor} cardColor={props.cardColor} showButtons={props.showButtons && isLoggedIn} />}
 
       {isLoggedIn && <section className="member-quick-panel">
@@ -92,11 +83,6 @@ export default function MemberHome(props: MemberHomeProps) {
         <SummaryCard label="รายการล่าสุด" value={latestLedger ? ledgerTypeLabel(latestLedger.type) : 'ยังไม่มี'} tone={latestLedger ? 'normal' : 'calm'} />
       </section>}
 
-      {props.showPromotion && <section className="member-promo-strip">
-        <div><strong>ตรวจสอบรายการให้ครบก่อนยืนยัน</strong><span>ทุกคำขอจะเข้าสู่ขั้นตอนรอตรวจสอบจากแอดมิน</span></div>
-        <a href="/transactions">ดูประวัติ</a>
-      </section>}
-
       {isLoggedIn && pendingCount > 0 && <section className="member-info-card" style={alertCardStyle}>
         <div style={sectionHeadStyle}><div><p>รอดำเนินการ</p><h2>{pendingCount} รายการ</h2></div><a href="/transactions" style={{ color: props.primaryColor, fontWeight: 900, textDecoration: 'none' }}>ดูทั้งหมด</a></div>
         <div style={pendingListStyle}>
@@ -104,8 +90,6 @@ export default function MemberHome(props: MemberHomeProps) {
           {pendingWithdrawals.map((item) => <ActivityRow key={item.id} title="ถอนเงิน" href="/withdraw" item={item} />)}
         </div>
       </section>}
-
-      {isLoggedIn && pendingCount === 0 && !isActivityLoading && !activityMessage && <EmptyState title="ไม่มีรายการรอตรวจสอบ" description="ฝาก ถอน และประวัติอยู่ในเมนูล่างแล้ว เริ่มทำรายการได้ทันที" actionHref="/deposit" actionLabel="ฝาก" />}
 
       {isLoggedIn && <section className="member-info-card">
         <div style={sectionHeadStyle}><h2>ล่าสุด</h2><a href="/transactions" style={{ color: props.primaryColor, fontWeight: 900, textDecoration: 'none' }}>ทั้งหมด</a></div>
