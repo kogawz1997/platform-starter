@@ -50,10 +50,10 @@ export default function WalletCard({ primaryColor, cardColor, showButtons }: { p
 
       {showButtons && (
         <div style={actionRowStyle}>
-          <a href="/deposit" style={{ ...actionStyle, background: primaryColor, color: '#111', borderColor: primaryColor }}>เติมเงิน</a>
+          <a href="/deposit" style={{ ...actionStyle, background: primaryColor, color: '#111', borderColor: primaryColor }}>ฝาก</a>
           <a href="/withdraw" style={actionStyle}>ถอนเงิน</a>
-          <a href="/transactions" style={actionStyle}>เงินเข้า-ออก</a>
-          <a href="/bank-accounts" style={actionStyle}>บัญชีรับเงิน</a>
+          <a href="/transactions" style={actionStyle}>ประวัติ</a>
+          <a href="/bank-accounts" style={actionStyle}>การจัดการบัญชีธนาคาร</a>
         </div>
       )}
     </section>
