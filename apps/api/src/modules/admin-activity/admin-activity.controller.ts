@@ -8,7 +8,7 @@ export class AdminActivityController {
   constructor(private readonly service: AdminActivityService) {}
 
   @Get('timeline')
-  timeline(@Query() query: { page?: string; take?: string; type?: string }) {
+  timeline(@Query() query: { page?: string; take?: string; type?: string; from?: string; to?: string; search?: string; actor?: string; memberId?: string; refType?: string; refId?: string }) {
     return this.service.timeline(query);
   }
 }
