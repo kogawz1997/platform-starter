@@ -64,11 +64,21 @@ jobs:
         env:
           API_URL: ${{ inputs.api_url }}
           ADMIN_TOKEN: ${{ secrets.PROD_ADMIN_TOKEN }}
-        run: ./scripts/smoke-api.sh
+        run: |
+          if [[ -z "$ADMIN_TOKEN" ]]; then
+            echo "Skipping admin smoke checks because PROD_ADMIN_TOKEN is not set."
+            exit 0
+          fi
+          ./scripts/smoke-api.sh
 
       - name: Run member smoke checks
         if: ${{ inputs.run_member_checks }}
         env:
           API_URL: ${{ inputs.api_url }}
           MEMBER_TOKEN: ${{ secrets.PROD_MEMBER_TOKEN }}
-        run: ./scripts/smoke-api.sh
+        run: |
+          if [[ -z "$MEMBER_TOKEN" ]]; then
+            echo "Skipping member smoke checks because PROD_MEMBER_TOKEN is not set."
+            exit 0
+          fi
+          ./scripts/smoke-api.sh
