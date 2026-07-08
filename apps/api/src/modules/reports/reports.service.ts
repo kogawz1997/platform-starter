@@ -51,6 +51,77 @@ export class ReportsService {
     };
   }
 
+  async getTrends(query: ReportQuery = {}) {
+    const days = Math.min(Math.max(Number(query.days ?? 7) || 7, 1), 31);
+    const now = new Date();
+    const todayStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 0, 0, 0, 0));
+    const from = new Date(todayStart);
+    from.setUTCDate(from.getUTCDate() - (days - 1));
+    const to = new Date(todayStart);
+    to.setUTCDate(to.getUTCDate() + 1);
+    to.setUTCMilliseconds(-1);
+
+    const [topUps, withdrawals] = await Promise.all([
+      this.prisma.topUpRequest.findMany({
+        where: { status: 'APPROVED', reviewedAt: { gte: from, lte: to } },
+        select: { amount: true, reviewedAt: true },
+        orderBy: { reviewedAt: 'asc' },
+      }),
+      this.prisma.withdrawalRequest.findMany({
+        where: { status: 'COMPLETED', reviewedAt: { gte: from, lte: to } },
+        select: { amount: true, reviewedAt: true },
+        orderBy: { reviewedAt: 'asc' },
+      }),
+    ]);
+
+    const daily = Array.from({ length: days }, (_, index) => {
+      const date = new Date(from);
+      date.setUTCDate(from.getUTCDate() + index);
+      return {
+        date: date.toISOString().slice(0, 10),
+        topUpAmount: '0',
+        topUpCount: 0,
+        withdrawalAmount: '0',
+        withdrawalCount: 0,
+        netFlow: '0',
+      };
+    });
+    const byDate = new Map(daily.map((item) => [item.date, item]));
+
+    for (const item of topUps) {
+      const date = item.reviewedAt?.toISOString().slice(0, 10);
+      const row = date ? byDate.get(date) : null;
+      if (!row) continue;
+      row.topUpCount += 1;
+      row.topUpAmount = this.addDecimal(row.topUpAmount, item.amount);
+      row.netFlow = this.addDecimal(row.netFlow, item.amount);
+    }
+
+    for (const item of withdrawals) {
+      const date = item.reviewedAt?.toISOString().slice(0, 10);
+      const row = date ? byDate.get(date) : null;
+      if (!row) continue;
+      row.withdrawalCount += 1;
+      row.withdrawalAmount = this.addDecimal(row.withdrawalAmount, item.amount);
+      row.netFlow = this.subtractDecimal(row.netFlow, item.amount);
+    }
+
+    const totals = daily.reduce((acc, row) => ({
+      topUpAmount: this.addDecimal(acc.topUpAmount, row.topUpAmount),
+      topUpCount: acc.topUpCount + row.topUpCount,
+      withdrawalAmount: this.addDecimal(acc.withdrawalAmount, row.withdrawalAmount),
+      withdrawalCount: acc.withdrawalCount + row.withdrawalCount,
+      netFlow: this.addDecimal(acc.netFlow, row.netFlow),
+    }), { topUpAmount: '0', topUpCount: 0, withdrawalAmount: '0', withdrawalCount: 0, netFlow: '0' });
+
+    return {
+      range: { days, from: from.toISOString(), to: to.toISOString() },
+      totals,
+      daily,
+      generatedAt: new Date().toISOString(),
+    };
+  }
+
   async getReconciliation(query: ReportQuery = {}) {
     const safeLimit = Math.min(Math.max(Number(query.limit) || 100, 1), 500);
     const wallets = await this.prisma.wallet.findMany({ orderBy: { updatedAt: 'desc' }, take: safeLimit, include: { user: { select: { id: true, username: true, email: true, phone: true } } } });
@@ -90,6 +161,17 @@ export class ReportsService {
   private formatGroup(item: any) {
     return { status: item.status, count: item._count._all, amount: item._sum.amount?.toString() ?? '0' };
   }
+
+  private addDecimal(a: any, b: any) {
+    if (a?.plus) return a.plus(b).toString();
+    if (b?.plus) return b.plus(a).toString();
+    return String(Number(a ?? 0) + Number(b ?? 0));
+  }
+
+  private subtractDecimal(a: any, b: any) {
+    if (a?.minus) return a.minus(b).toString();
+    return String(Number(a ?? 0) - Number(b ?? 0));
+  }
 }
 
-type ReportQuery = { from?: string; to?: string; limit?: string };
+type ReportQuery = { from?: string; to?: string; limit?: string; days?: string | number };
