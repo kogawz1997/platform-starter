@@ -74,6 +74,19 @@ Set:
 run_env_verification = true
 ```
 
+## Token check behavior
+
+Admin/member token checks are safe to leave enabled.
+
+If the matching token secret is missing, the workflow prints a skip message and exits that step successfully:
+
+```txt
+Skipping admin smoke checks because PROD_ADMIN_TOKEN is not set.
+Skipping member smoke checks because PROD_MEMBER_TOKEN is not set.
+```
+
+If the token secret is set but expired or invalid, the smoke check runs and should fail. Refresh the token secret and rerun the workflow.
+
 ## Required repository secrets
 
 ใช้ได้ทั้งแบบครบ production verification หรือใส่เฉพาะ token สำหรับ smoke check
