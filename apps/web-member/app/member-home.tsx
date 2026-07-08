@@ -54,14 +54,44 @@ export default function MemberHome(props: MemberHomeProps) {
   const pendingTopups = useMemo(() => topups.filter((item) => item.status === 'PENDING').slice(0, 3), [topups]);
   const pendingWithdrawals = useMemo(() => withdrawals.filter((item) => item.status === 'PENDING').slice(0, 3), [withdrawals]);
   const pendingCount = pendingTopups.length + pendingWithdrawals.length;
+  const completedTopups = useMemo(() => topups.filter((item) => ['APPROVED', 'COMPLETED'].includes(item.status)).length, [topups]);
+  const completedWithdrawals = useMemo(() => withdrawals.filter((item) => ['APPROVED', 'COMPLETED'].includes(item.status)).length, [withdrawals]);
+  const latestLedger = ledgers[0];
 
   return (
     <section className="member-shell member-home-shell">
+      <section className="member-market-hero" style={{ background: `radial-gradient(circle at top right, ${props.primaryColor}33, transparent 34%), linear-gradient(150deg, ${props.cardColor}, rgba(255,255,255,.045))`, color: props.textColor }}>
+        <div>
+          <p className="member-eyebrow">ยินดีต้อนรับ</p>
+          <h1>{props.siteName}</h1>
+          <p>{props.description}</p>
+        </div>
+        <span className="member-market-badge">พร้อมใช้งาน</span>
+      </section>
+
       {props.showBalanceHeader && <WalletCard primaryColor={props.primaryColor} cardColor={props.cardColor} showButtons={props.showButtons && isLoggedIn} />}
 
+      {isLoggedIn && <section className="member-quick-panel">
+        <a href="/deposit" className="member-quick-action primary" style={{ background: props.primaryColor, color: '#111', borderColor: props.primaryColor }}><strong>ฝาก</strong><span>เติมยอดเข้ากระเป๋า</span></a>
+        <a href="/withdraw" className="member-quick-action"><strong>ถอนเงิน</strong><span>ส่งคำขอถอน</span></a>
+        <a href="/transactions" className="member-quick-action"><strong>ประวัติ</strong><span>เช็กรายการล่าสุด</span>{pendingCount > 0 && <em>{pendingCount}</em>}</a>
+        <a href="/bank-accounts" className="member-quick-action"><strong>บัญชี</strong><span>จัดการบัญชีธนาคาร</span></a>
+      </section>}
+
+      {isLoggedIn && <section className="member-summary-grid">
+        <SummaryCard label="รอดำเนินการ" value={`${pendingCount} รายการ`} tone={pendingCount > 0 ? 'hot' : 'calm'} />
+        <SummaryCard label="ฝากสำเร็จ" value={`${completedTopups} รายการ`} />
+        <SummaryCard label="ถอนสำเร็จ" value={`${completedWithdrawals} รายการ`} />
+        <SummaryCard label="รายการล่าสุด" value={latestLedger ? ledgerTypeLabel(latestLedger.type) : 'ยังไม่มี'} />
+      </section>}
+
+      {props.showPromotion && <section className="member-promo-strip">
+        <div><strong>ตรวจสอบรายการให้ครบก่อนยืนยัน</strong><span>ทุกคำขอจะเข้าสู่ขั้นตอนรอตรวจสอบจากแอดมิน</span></div>
+        <a href="/transactions">ดูประวัติ</a>
+      </section>}
+
       {isLoggedIn && pendingCount > 0 && <section className="member-info-card" style={alertCardStyle}>
-        <p>รอดำเนินการ</p>
-        <h2>{pendingCount} รายการ</h2>
+        <div style={sectionHeadStyle}><div><p>รอดำเนินการ</p><h2>{pendingCount} รายการ</h2></div><a href="/transactions" style={{ color: props.primaryColor, fontWeight: 900, textDecoration: 'none' }}>ดูทั้งหมด</a></div>
         <div style={pendingListStyle}>
           {pendingTopups.map((item) => <ActivityRow key={item.id} title="ฝาก" href="/deposit" item={item} />)}
           {pendingWithdrawals.map((item) => <ActivityRow key={item.id} title="ถอนเงิน" href="/withdraw" item={item} />)}
@@ -78,6 +108,10 @@ export default function MemberHome(props: MemberHomeProps) {
       </section>}
     </section>
   );
+}
+
+function SummaryCard({ label, value, tone = 'normal' }: { label: string; value: string; tone?: 'normal' | 'hot' | 'calm' }) {
+  return <div className={`member-summary-card ${tone}`}><span>{label}</span><strong>{value}</strong></div>;
 }
 
 function ActivityRow({ title, href, item }: { title: string; href: string; item: MoneyRequest }) {
@@ -98,7 +132,7 @@ function ledgerTypeLabel(type: string) {
 
 function statusLabel(status: string) {
   const upper = status.toUpperCase();
-  if (upper === 'PENDING') return 'รอ';
+  if (upper === 'PENDING') return 'รอตรวจสอบ';
   if (upper === 'APPROVED' || upper === 'COMPLETED') return 'สำเร็จ';
   if (upper === 'REJECTED') return 'ไม่อนุมัติ';
   return status;
