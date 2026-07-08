@@ -1,24 +1,35 @@
 'use client';
 
-import { ReactNode, useEffect, useState } from 'react';
+import { ReactNode, useEffect, useMemo, useState } from 'react';
 import { usePathname } from 'next/navigation';
-import { API_URL, clearMemberSession, refreshMemberToken } from './member-api';
+import { API_URL, clearMemberSession, memberApiFetch, refreshMemberToken } from './member-api';
 
 const menuItems = [
-  ['หน้าหลัก', '/'],
-  ['ฝาก', '/deposit'],
-  ['ถอนเงิน', '/withdraw'],
-  ['ประวัติ', '/transactions'],
-  ['การจัดการบัญชีธนาคาร', '/bank-accounts'],
+  { title: 'หน้าหลัก', href: '/', icon: '⌂' },
+  { title: 'ฝาก', href: '/deposit', icon: '＋' },
+  { title: 'ถอนเงิน', href: '/withdraw', icon: '−' },
+  { title: 'ประวัติ', href: '/transactions', icon: '≡', badge: true },
+  { title: 'การจัดการบัญชีธนาคาร', shortTitle: 'บัญชี', href: '/bank-accounts', icon: '◉' },
 ];
+
+type MoneyRequest = { status: string };
 
 export default function MemberChrome({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const [ready, setReady] = useState(false);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [pendingCount, setPendingCount] = useState(0);
 
   const isAuthPage = pathname.startsWith('/login') || pathname.startsWith('/register');
+
+  const activeHref = useMemo(() => {
+    if (pathname.startsWith('/deposit')) return '/deposit';
+    if (pathname.startsWith('/withdraw')) return '/withdraw';
+    if (pathname.startsWith('/transactions')) return '/transactions';
+    if (pathname.startsWith('/bank-accounts')) return '/bank-accounts';
+    return '/';
+  }, [pathname]);
 
   useEffect(() => {
     let cancelled = false;
@@ -37,6 +48,25 @@ export default function MemberChrome({ children }: { children: ReactNode }) {
     checkAuth();
     return () => { cancelled = true; };
   }, [pathname, isAuthPage]);
+
+  useEffect(() => {
+    if (!isLoggedIn || isAuthPage) return;
+    let cancelled = false;
+    async function loadPendingCount() {
+      const [topupRes, withdrawalRes] = await Promise.all([
+        memberApiFetch('/member/topups'),
+        memberApiFetch('/member/withdrawals'),
+      ]).catch(() => [] as Response[]);
+      if (!topupRes || !withdrawalRes || cancelled) return;
+      const topupData = await topupRes.json().catch(() => null);
+      const withdrawalData = await withdrawalRes.json().catch(() => null);
+      const topups = Array.isArray(topupData?.items) ? topupData.items as MoneyRequest[] : [];
+      const withdrawals = Array.isArray(withdrawalData?.items) ? withdrawalData.items as MoneyRequest[] : [];
+      setPendingCount([...topups, ...withdrawals].filter((item) => item.status === 'PENDING').length);
+    }
+    loadPendingCount();
+    return () => { cancelled = true; };
+  }, [isLoggedIn, isAuthPage]);
 
   useEffect(() => {
     if (!menuOpen) return;
@@ -67,10 +97,19 @@ export default function MemberChrome({ children }: { children: ReactNode }) {
       {menuOpen && <button type="button" className="member-menu-backdrop" onClick={() => setMenuOpen(false)} aria-label="ปิดเมนู" />}
       <aside className={menuOpen ? 'member-drawer open' : 'member-drawer'} aria-hidden={!menuOpen}>
         <div className="member-drawer-head"><div><strong>ศูนย์สมาชิก</strong></div><button type="button" onClick={() => setMenuOpen(false)} aria-label="ปิดเมนู">×</button></div>
-        <nav className="member-drawer-nav">{menuItems.map(([title, href]) => <a key={href} href={href} onClick={() => setMenuOpen(false)} className={pathname === href ? 'active' : ''}>{title}</a>)}</nav>
+        <nav className="member-drawer-nav">{menuItems.map((item) => <a key={item.href} href={item.href} onClick={() => setMenuOpen(false)} className={activeHref === item.href ? 'active' : ''}>{item.title}{item.badge && pendingCount > 0 && <span>{pendingCount}</span>}</a>)}</nav>
         <button type="button" className="member-logout-button" onClick={logout}>ออกจากระบบ</button>
       </aside>
       {children}
+      <nav className="member-bottom-nav" aria-label="เมนูหลัก">
+        {menuItems.map((item) => (
+          <a key={item.href} href={item.href} className={activeHref === item.href ? 'active' : ''}>
+            <span className="member-bottom-icon">{item.icon}</span>
+            <span>{item.shortTitle ?? item.title}</span>
+            {item.badge && pendingCount > 0 && <em>{pendingCount}</em>}
+          </a>
+        ))}
+      </nav>
     </>
   );
 }
