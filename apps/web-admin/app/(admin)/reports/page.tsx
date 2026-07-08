@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { adminApiFetch } from '../../admin-api';
-import { AdminBadge, AdminButton, AdminCard, AdminEmpty, AdminGrid, AdminLinkButton, AdminMetric, AdminMetricGrid, AdminNotice, AdminPage, AdminRow, AdminStack, formatMoney } from '../_components/admin-ui';
+import { AdminBadge, AdminButton, AdminCard, AdminEmpty, AdminGrid, AdminLinkButton, AdminMetric, AdminMetricGrid, AdminNotice, AdminPage, AdminRow, AdminSectionRow, AdminStack, formatMoney } from '../_components/admin-ui';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000';
 
@@ -82,7 +82,7 @@ export default function ReportsPage() {
           <AdminMetric title="Over 60m" value={aging.summary.over60Minutes.toLocaleString('th-TH')} />
           <AdminMetric title="Over 24h" value={aging.summary.over24Hours.toLocaleString('th-TH')} />
         </AdminMetricGrid>
-        <AdminStack>{aging.oldest.map((item) => <AdminRow key={`${item.type}-${item.id}`}><div><AdminBadge tone={item.type === 'TOPUP' ? 'warning' : 'danger'}>{item.type}</AdminBadge><strong style={{ display: 'block', marginTop: 8 }}>{item.username}</strong><p>{new Date(item.createdAt).toLocaleString('th-TH')} · age {item.ageLabel}</p></div><div style={{ textAlign: 'right' }}><strong>{formatMoney(item.amount)}</strong><p>{item.currency}</p><AdminLinkButton href={item.type === 'TOPUP' ? '/topups' : '/withdrawals'}>Open queue</AdminLinkButton></div></AdminRow>)}{aging.oldest.length === 0 && <AdminEmpty>ไม่มีคิว pending</AdminEmpty>}</AdminStack>
+        <AdminStack>{aging.oldest.map((item) => <AdminSectionRow key={`${item.type}-${item.id}`}><div style={queueInfoStyle}><div style={badgeRowStyle}><AdminBadge tone={item.type === 'TOPUP' ? 'warning' : 'danger'}>{item.type}</AdminBadge><AdminBadge>{item.ageLabel}</AdminBadge></div><strong>{item.username}</strong><p>{new Date(item.createdAt).toLocaleString('th-TH')} · User {item.userId}</p></div><div style={queueActionStyle}><strong>{formatMoney(item.amount)}</strong><p>{item.currency}</p><AdminLinkButton href={item.type === 'TOPUP' ? '/topups' : '/withdrawals'}>Open queue</AdminLinkButton></div></AdminSectionRow>)}{aging.oldest.length === 0 && <AdminEmpty>ไม่มีคิว pending</AdminEmpty>}</AdminStack>
       </AdminCard>}
 
       {trends && <AdminCard title="Finance Trend" description={`${trends.range.days} days · ${new Date(trends.range.from).toLocaleDateString('th-TH')} - ${new Date(trends.range.to).toLocaleDateString('th-TH')}`} action={<div style={toolbarStyle}>{[7, 14, 30].map((item) => <AdminButton key={item} tone={trendDays === item ? 'primary' : 'secondary'} disabled={loading} onClick={() => changeTrendDays(item)}>{item}d</AdminButton>)}<AdminButton tone="secondary" onClick={() => downloadCsv(`/admin/exports/report-trends.csv?days=${trendDays}`, `report-trends-${trendDays}d.csv`)}>Export CSV</AdminButton></div>}>
@@ -95,7 +95,7 @@ export default function ReportsPage() {
       </AdminCard>}
 
       {daily && <AdminCard title="Daily Summary" description={`${new Date(daily.range.from).toLocaleDateString('th-TH')} - ${new Date(daily.range.to).toLocaleDateString('th-TH')}`}><AdminGrid><GroupCard title="Top-ups" items={daily.topUps} /><GroupCard title="Withdrawals" items={daily.withdrawals} /><GroupCard title="Adjustments" items={daily.adjustments.map((item) => ({ status: item.direction, count: item.count, amount: item.amount }))} /></AdminGrid></AdminCard>}
-      {recon && <AdminCard title="Reconciliation" description={`Mismatch: ${recon.mismatchCount} · Generated ${new Date(recon.generatedAt).toLocaleString('th-TH')}`} action={<AdminButton tone="secondary" onClick={() => downloadCsv('/admin/exports/reconciliation.csv?limit=1000', 'reconciliation.csv')}>Export CSV</AdminButton>}><AdminStack>{recon.items.slice(0, 20).map((item) => <AdminRow key={item.walletId}><div><strong>{item.username ?? item.shortUserId}</strong><p>Wallet: {item.shortUserId}</p></div><div style={{ textAlign: 'right' }}><strong>{item.status}</strong><p>Actual {formatMoney(item.actualBalance)} / Ledger {formatMoney(item.latestLedgerBalance)}</p>{item.availableBalance && <p>Available {formatMoney(item.availableBalance)}</p>}</div></AdminRow>)}{recon.items.length === 0 && <AdminEmpty>ไม่มี mismatch</AdminEmpty>}</AdminStack></AdminCard>}
+      {recon && <AdminCard title="Reconciliation" description={`Mismatch: ${recon.mismatchCount} · Generated ${new Date(recon.generatedAt).toLocaleString('th-TH')}`} action={<AdminButton tone="secondary" onClick={() => downloadCsv('/admin/exports/reconciliation.csv?limit=1000', 'reconciliation.csv')}>Export CSV</AdminButton>}><AdminStack>{recon.items.slice(0, 20).map((item) => <AdminSectionRow key={item.walletId}><div style={reconInfoStyle}><AdminBadge tone={item.status === 'MATCHED' ? 'success' : 'danger'}>{item.status}</AdminBadge><strong>{item.username ?? item.shortUserId}</strong><p>Wallet: {item.shortUserId}</p></div><div style={reconAmountGridStyle}><ReconAmount label="Actual" value={item.actualBalance} /><ReconAmount label="Ledger" value={item.latestLedgerBalance} /><ReconAmount label="Locked" value={item.lockedBalance} />{item.availableBalance && <ReconAmount label="Available" value={item.availableBalance} />}</div></AdminSectionRow>)}{recon.items.length === 0 && <AdminEmpty>ไม่มี mismatch</AdminEmpty>}</AdminStack></AdminCard>}
     </AdminPage>
   );
 }
@@ -108,7 +108,17 @@ function TrendAmount({ label, value, tone }: { label: string; value: string; ton
   return <div style={trendAmountItemStyle}><AdminBadge tone={tone}>{label}</AdminBadge><strong>{formatMoney(value)}</strong></div>;
 }
 
+function ReconAmount({ label, value }: { label: string; value: string }) {
+  return <div style={reconAmountStyle}><span>{label}</span><strong>{formatMoney(value)}</strong></div>;
+}
+
 const toolbarStyle = { display: 'flex', gap: 8, flexWrap: 'wrap' as const };
+const badgeRowStyle = { display: 'flex', gap: 8, flexWrap: 'wrap' as const };
+const queueInfoStyle = { display: 'grid', gap: 7, minWidth: 0 };
+const queueActionStyle = { display: 'grid', gap: 8, alignContent: 'start', minWidth: 0 };
+const reconInfoStyle = { display: 'grid', gap: 7, minWidth: 0 };
+const reconAmountGridStyle = { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(150px, 100%), 1fr))', gap: 10, minWidth: 0 };
+const reconAmountStyle = { display: 'grid', gap: 5, border: '1px solid rgba(148,163,184,.14)', borderRadius: 12, padding: 10, background: 'rgba(15,23,42,.34)', minWidth: 0 };
 const trendRowStyle = { display: 'grid', gridTemplateColumns: 'minmax(0, 1fr)', gap: 12, border: '1px solid rgba(148,163,184,.18)', borderRadius: 14, padding: 12, background: 'rgba(148,163,184,.045)', minWidth: 0, overflow: 'hidden' as const };
 const trendDateStyle = { display: 'grid', gap: 4, minWidth: 0 };
 const trendAmountStyle = { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(150px, 100%), 1fr))', gap: 10, textAlign: 'left' as const, minWidth: 0, width: '100%' };
