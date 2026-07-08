@@ -24,6 +24,18 @@ export class ExportsController {
   ledgers(@Query() query: ExportQuery) {
     return this.exportsService.exportLedgers(query);
   }
+
+  @Get('report-trends.csv')
+  @Header('Content-Type', 'text/csv; charset=utf-8')
+  reportTrends(@Query() query: ExportQuery) {
+    return this.exportsService.exportReportTrends(query);
+  }
+
+  @Get('reconciliation.csv')
+  @Header('Content-Type', 'text/csv; charset=utf-8')
+  reconciliation(@Query() query: ExportQuery) {
+    return this.exportsService.exportReconciliation(query);
+  }
 }
 
-type ExportQuery = { status?: string; from?: string; to?: string; limit?: string };
+type ExportQuery = { status?: string; from?: string; to?: string; limit?: string; days?: string };
