@@ -15,13 +15,6 @@ const METHODS: Record<MethodCode, { label: string; numberLabel: string }> = {
   wallet: { label: 'วอเลต', numberLabel: 'วอเลต' },
   other: { label: 'อื่น ๆ', numberLabel: 'รายละเอียด' },
 };
-const STEP_ITEMS = [
-  { title: 'เลือกยอด', caption: 'จำนวนเงิน' },
-  { title: 'เลือกช่องทาง', caption: 'บัญชีธนาคาร' },
-  { title: 'โอนเงิน', caption: 'โอนให้ตรงยอด' },
-  { title: 'แนบสลิป', caption: 'ตรวจสอบก่อนส่ง' },
-  { title: 'รอตรวจสอบ', caption: 'ติดตามสถานะ' },
-];
 
 export default function DepositClient() {
   const [step, setStep] = useState<DepositStep>('select');
@@ -41,7 +34,6 @@ export default function DepositClient() {
   const parsedAmount = useMemo(() => Number(amount.replace(/,/g, '').trim()), [amount]);
   const usable = useMemo(() => accounts.filter((account) => matchAmount(account, parsedAmount)), [accounts, parsedAmount]);
   const availableMethods = useMemo(() => Array.from(new Set(usable.map(accountType))) as MethodCode[], [usable]);
-  const currentStepIndex = step === 'waiting' ? 4 : step === 'transfer' ? (slipImageData ? 3 : 2) : method ? 1 : 0;
 
   useEffect(() => { loadInitial(); }, []);
   useEffect(() => { if (availableMethods.length > 0 && !availableMethods.includes(method)) setMethod(availableMethods[0]); }, [availableMethods, method]);
@@ -105,34 +97,24 @@ export default function DepositClient() {
   return (
     <main style={pageStyle}>
       <a href="/" style={backStyle}>← หน้าแรก</a>
-      <section style={heroStyle}>
-        <div>
-          <p style={mutedStyle}>ฝากเข้ากระเป๋า</p>
-          <h1 style={titleStyle}>ฝาก</h1>
-        </div>
-        <span style={heroBadgeStyle}>รอตรวจสอบโดยแอดมิน</span>
-      </section>
-      <StepProgress currentIndex={currentStepIndex} />
       {message && <div style={noticeStyle}>{message}</div>}
 
       {step === 'select' && (
         <form onSubmit={nextStep} style={cardStyle}>
-          <div style={cardHeaderStyle}><span>ขั้นตอนที่ 1-2</span><h2 style={sectionHeadingStyle}>เลือกยอดและช่องทาง</h2><p style={mutedStyle}>เลือกยอดที่ต้องการฝาก แล้วระบบจะแสดงบัญชีธนาคารที่รองรับยอดนี้</p></div>
+          <div style={cardHeaderStyle}><h2 style={sectionHeadingStyle}>เลือกยอดและช่องทาง</h2><p style={mutedStyle}>เลือกยอดที่ต้องการฝาก แล้วระบบจะแสดงบัญชีธนาคารที่รองรับยอดนี้</p></div>
           <div style={amountGridStyle}>{AMOUNTS.map((value) => <button key={value} type="button" onClick={() => setAmount(String(value))} style={amountButtonStyle(Number(amount) === value)}>฿{value.toLocaleString('th-TH')}</button>)}</div>
           <label style={labelStyle}>จำนวนเงิน<input value={amount} onChange={(e) => setAmount(e.target.value)} inputMode="decimal" style={inputStyle} /></label>
           <div style={methodGridStyle}>{(['bank_transfer', 'promptpay', 'wallet', 'other'] as MethodCode[]).map((code) => { const enabled = usable.some((account) => accountType(account) === code); return <button key={code} type="button" disabled={!enabled} onClick={() => enabled && setMethod(code)} style={methodStyle(method === code, enabled)}><strong>{METHODS[code].label}</strong><span>{enabled ? 'พร้อมใช้งาน' : 'ยังไม่เปิดใช้งาน'}</span></button>; })}</div>
           {!initialLoading && accounts.length === 0 && <EmptyAction title="ยังไม่มีบัญชีธนาคาร" description="ยังไม่มีช่องทางสำหรับรับฝากตอนนี้ กรุณาลองใหม่ภายหลังหรือติดต่อผู้ดูแล" />}
           {!initialLoading && accounts.length > 0 && availableMethods.length === 0 && <EmptyAction title="ไม่พบช่องทางที่รองรับยอดนี้" description="ลองเปลี่ยนยอดฝาก หรือเลือกยอดที่อยู่ในช่วงที่ระบบเปิดรับ" />}
-          <WarningBox text="โอนเงินให้ตรงยอดที่เลือก และใช้บัญชีธนาคารที่ระบบแสดงเท่านั้น เพื่อให้ตรวจสอบได้เร็ว" />
           <button type="submit" disabled={loading || availableMethods.length === 0} style={primaryButtonStyle}>{loading ? 'กำลังเตรียม...' : 'ถัดไป'}</button>
         </form>
       )}
 
       {step === 'transfer' && selected && (
         <section style={cardStyle}>
-          <div style={cardHeaderStyle}><span>ขั้นตอนที่ 3-4</span><h2 style={sectionHeadingStyle}>โอนเงินและแนบสลิป</h2><p style={mutedStyle}>โอนยอดให้ตรงกับรายการ แล้วแนบสลิปก่อนส่งตรวจสอบ</p></div>
+          <div style={cardHeaderStyle}><h2 style={sectionHeadingStyle}>โอนเงินและแนบสลิป</h2><p style={mutedStyle}>โอนยอดให้ตรงกับรายการ แล้วแนบสลิปก่อนส่งตรวจสอบ</p></div>
           <section style={transferSummaryStyle}><span>ยอดฝาก</span><strong>฿{parsedAmount.toLocaleString('th-TH', { minimumFractionDigits: 2 })}</strong><em>{METHODS[method].label}</em></section>
-          <WarningBox text="อย่ากดส่งรายการถ้ายังไม่ได้โอนเงินจริง หรือสลิปไม่ใช่รายการเดียวกับยอดนี้" />
           <section style={boxStyle}>
             <InfoRow label="ชื่อบัญชี" value={selected.accountName} />
             <InfoRow label={METHODS[method].numberLabel} value={selected.accountNumber} action={<button type="button" onClick={() => copyText(selected.accountNumber, METHODS[method].numberLabel)} style={copyButtonStyle}>คัดลอก</button>} />
@@ -148,7 +130,7 @@ export default function DepositClient() {
 
       {step === 'waiting' && (
         <section style={cardStyle}>
-          <div style={cardHeaderStyle}><span>ขั้นตอนที่ 5</span><h2 style={sectionHeadingStyle}>รอตรวจสอบ</h2><p style={mutedStyle}>ระบบรับรายการแล้ว รอแอดมินตรวจสอบสลิปและปรับยอดเข้ากระเป๋า</p></div>
+          <div style={cardHeaderStyle}><h2 style={sectionHeadingStyle}>รอตรวจสอบ</h2><p style={mutedStyle}>ระบบรับรายการแล้ว รอแอดมินตรวจสอบสลิปและปรับยอดเข้ากระเป๋า</p></div>
           <div style={successBoxStyle}>รายการฝากถูกส่งแล้ว</div>
           <div style={actionRowStyle}><a href="/transactions" style={secondaryLinkStyle}>ดูประวัติ</a><button type="button" onClick={() => setStep('select')} style={primaryButtonStyle}>ฝากอีกครั้ง</button></div>
         </section>
@@ -160,7 +142,6 @@ export default function DepositClient() {
         <InfoRow label="บัญชีธนาคาร" value={`${selected.accountName} / ${selected.accountNumber}`} />
         {slipImageName && <InfoRow label="สลิป" value={slipImageName} />}
         {note && <InfoRow label="หมายเหตุ" value={note} />}
-        <WarningBox text="หลังส่งรายการแล้ว ระบบจะรอแอดมินตรวจสอบ กรุณาตรวจยอดและบัญชีให้ถูกต้องก่อนยืนยัน" />
       </SummaryModal>}
 
       <section style={historySectionStyle}>
@@ -172,11 +153,7 @@ export default function DepositClient() {
   );
 }
 
-function StepProgress({ currentIndex }: { currentIndex: number }) {
-  return <section style={stepperStyle}>{STEP_ITEMS.map((item, index) => <div key={item.title} style={stepItemStyle(index <= currentIndex)}><strong>{index + 1}</strong><div><span>{item.title}</span><small>{item.caption}</small></div></div>)}</section>;
-}
 function InfoRow({ label, value, action }: { label: string; value: string; action?: React.ReactNode }) { return <div style={infoRowStyle}><div style={{ minWidth: 0 }}><span>{label}</span><strong>{value}</strong></div>{action}</div>; }
-function WarningBox({ text }: { text: string }) { return <div style={warningStyle}>⚠️ {text}</div>; }
 function EmptyAction({ title, description }: { title: string; description: string }) { return <div style={emptyStyle}><strong>{title}</strong><span>{description}</span></div>; }
 function SummaryModal({ title, children, onClose, onConfirm, loading, confirmLabel }: { title: string; children: React.ReactNode; onClose: () => void; onConfirm: () => void; loading: boolean; confirmLabel: string }) { return <div style={modalBackdropStyle}><section style={modalStyle}><div style={historyHeadStyle}><h2 style={sectionHeadingStyle}>{title}</h2><button type="button" onClick={onClose} style={closeButtonStyle}>×</button></div>{children}<div style={actionRowStyle}><button type="button" onClick={onClose} style={secondaryButtonStyle}>แก้ไข</button><button type="button" onClick={onConfirm} disabled={loading} style={primaryButtonStyle}>{loading ? 'กำลังส่ง...' : confirmLabel}</button></div></section></div>; }
 function accountType(account: ReceivingAccount): MethodCode { if (account.bankName === 'พร้อมเพย์') return 'promptpay'; if (account.bankName === 'วอเลต') return 'wallet'; if (account.bankName === 'อื่น ๆ') return 'other'; return 'bank_transfer'; }
@@ -187,10 +164,7 @@ function resizeImage(file: File, maxSize: number, quality: number) { return new 
 
 const pageStyle = { minHeight: '100vh', background: '#080808', color: '#fff', padding: '18px 12px calc(120px + env(safe-area-inset-bottom))', display: 'grid', gap: 14, width: '100%', maxWidth: 920, margin: '0 auto', overflowX: 'hidden' as const } as const;
 const backStyle = { color: '#f5c542', textDecoration: 'none', fontWeight: 900 } as const;
-const titleStyle = { margin: 0, fontSize: 'clamp(34px,11vw,58px)', lineHeight: 0.98, overflowWrap: 'anywhere' as const };
 const mutedStyle = { margin: 0, opacity: 0.76, lineHeight: 1.55, overflowWrap: 'anywhere' as const } as const;
-const heroStyle = { border: '1px solid rgba(255,255,255,.12)', borderRadius: 28, padding: 16, background: 'radial-gradient(circle at top right, rgba(245,197,66,.18), transparent 34%), #181818', display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'flex-start', minWidth: 0, overflow: 'hidden' as const } as const;
-const heroBadgeStyle = { border: '1px solid rgba(245,197,66,.32)', borderRadius: 999, padding: '8px 10px', background: 'rgba(245,197,66,.12)', color: '#f5c542', fontSize: 12, fontWeight: 950, whiteSpace: 'nowrap' as const };
 const cardStyle = { border: '1px solid rgba(255,255,255,.12)', borderRadius: 24, padding: 16, background: '#181818', display: 'grid', gap: 12, minWidth: 0, overflow: 'hidden' as const };
 const cardHeaderStyle = { display: 'grid', gap: 5, minWidth: 0 } as const;
 const sectionHeadingStyle = { margin: 0, fontSize: 'clamp(22px,7vw,30px)', lineHeight: 1.1 } as const;
@@ -204,7 +178,6 @@ const secondaryButtonStyle = { padding: 14, minHeight: 48, borderRadius: 16, cur
 const secondaryLinkStyle = { ...secondaryButtonStyle, textDecoration: 'none', display: 'grid', placeItems: 'center' } as const;
 const actionRowStyle = { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(150px, 100%), 1fr))', gap: 10 } as const;
 const noticeStyle = { border: '1px solid rgba(255,255,255,.12)', borderRadius: 16, padding: 12, background: 'rgba(255,255,255,.07)', overflowWrap: 'anywhere' as const };
-const warningStyle = { border: '1px solid rgba(245,197,66,.30)', borderRadius: 16, padding: 12, background: 'rgba(245,197,66,.10)', color: '#fde68a', fontWeight: 850, lineHeight: 1.5 } as const;
 const emptyStyle = { border: '1px dashed rgba(255,255,255,.18)', borderRadius: 18, padding: 14, background: 'rgba(255,255,255,.04)', display: 'grid', gap: 5, color: 'rgba(255,255,255,.82)' } as const;
 const boxStyle = { border: '1px solid rgba(255,255,255,.10)', borderRadius: 20, padding: 14, background: 'rgba(255,255,255,.04)', overflow: 'hidden' as const, display: 'grid', gap: 10 };
 const transferSummaryStyle = { border: '1px solid rgba(245,197,66,.24)', borderRadius: 22, padding: 14, background: 'rgba(245,197,66,.10)', display: 'grid', gap: 5, minWidth: 0 } as const;
@@ -217,12 +190,10 @@ const historySectionStyle = { display: 'grid', gap: 10, minWidth: 0 } as const;
 const historyHeadStyle = { display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10 } as const;
 const historyCardStyle = { border: '1px solid rgba(255,255,255,.10)', borderRadius: 20, padding: 14, background: '#151515', display: 'grid', gap: 8, minWidth: 0, overflow: 'hidden' as const };
 const historyTopStyle = { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(160px, 100%), 1fr))', gap: 8, alignItems: 'center' } as const;
-const stepperStyle = { border: '1px solid rgba(255,255,255,.10)', borderRadius: 22, padding: 8, background: 'rgba(255,255,255,.045)', display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(min(120px,100%),1fr))', gap: 6, minWidth: 0 } as const;
 const successBoxStyle = { border: '1px solid rgba(101,217,139,.30)', borderRadius: 18, padding: 14, background: 'rgba(101,217,139,.10)', color: '#a9ffc4', fontWeight: 950 } as const;
 const modalBackdropStyle = { position: 'fixed' as const, inset: 0, zIndex: 90, background: 'rgba(0,0,0,.68)', display: 'grid', placeItems: 'end center', padding: 12 };
 const modalStyle = { width: '100%', maxWidth: 560, maxHeight: '90dvh', overflowY: 'auto' as const, border: '1px solid rgba(255,255,255,.14)', borderRadius: 26, padding: 16, background: '#151515', color: '#fff', display: 'grid', gap: 12, boxShadow: '0 24px 90px rgba(0,0,0,.55)' };
 const closeButtonStyle = { width: 42, height: 42, borderRadius: 14, border: '1px solid rgba(255,255,255,.14)', background: 'rgba(255,255,255,.08)', color: '#fff', fontSize: 24, cursor: 'pointer' } as const;
-function stepItemStyle(active: boolean) { return { border: '1px solid rgba(255,255,255,.10)', borderRadius: 16, padding: 10, background: active ? 'rgba(245,197,66,.16)' : 'rgba(255,255,255,.04)', display: 'grid', gap: 5, color: active ? '#f5c542' : 'rgba(255,255,255,.68)', minWidth: 0 }; }
 function amountButtonStyle(active: boolean) { return { padding: 14, minHeight: 52, borderRadius: 18, border: active ? '2px solid #f5c542' : '1px solid rgba(255,255,255,.14)', background: active ? 'rgba(245,197,66,.18)' : 'rgba(255,255,255,.08)', color: active ? '#f5c542' : '#fff', fontWeight: 900, width: '100%' }; }
 function methodStyle(active: boolean, enabled: boolean) { return { display: 'grid', gap: 4, textAlign: 'left' as const, padding: 14, minHeight: 58, borderRadius: 18, border: active ? '2px solid #f5c542' : '1px solid rgba(255,255,255,.14)', background: active ? 'rgba(245,197,66,.18)' : 'rgba(255,255,255,.08)', color: active ? '#f5c542' : '#fff', opacity: enabled ? 1 : 0.45, width: '100%' }; }
 function statusBadgeStyle(status: string) { return { width: 'fit-content', borderRadius: 999, padding: '6px 10px', background: status === 'APPROVED' || status === 'COMPLETED' ? 'rgba(80,255,140,.14)' : status === 'REJECTED' ? 'rgba(255,80,80,.14)' : 'rgba(245,197,66,.14)', border: '1px solid rgba(255,255,255,.12)', fontSize: 12, fontWeight: 900 }; }
