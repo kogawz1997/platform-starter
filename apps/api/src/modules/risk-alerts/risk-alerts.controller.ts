@@ -9,8 +9,16 @@ export class RiskAlertsController {
   constructor(private readonly riskAlertsService: RiskAlertsService) {}
 
   @Get()
-  list(@Query('status') status?: string, @Query('severity') severity?: string, @Query('type') type?: string, @Query('createdFrom') createdFrom?: string, @Query('createdTo') createdTo?: string) {
-    return this.riskAlertsService.list({ status, severity, type, createdFrom, createdTo });
+  list(
+    @Query('status') status?: string,
+    @Query('severity') severity?: string,
+    @Query('type') type?: string,
+    @Query('createdFrom') createdFrom?: string,
+    @Query('createdTo') createdTo?: string,
+    @Query('page') page?: string,
+    @Query('take') take?: string,
+  ) {
+    return this.riskAlertsService.list({ status, severity, type, createdFrom, createdTo, page, take });
   }
 
   @Get(':id')
