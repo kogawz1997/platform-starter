@@ -7,6 +7,11 @@ on:
         description: API base URL
         required: true
         default: https://api-service.up.railway.app
+      run_env_verification:
+        description: Run production env verification with repository secrets
+        required: true
+        type: boolean
+        default: false
       run_admin_checks:
         description: Run admin-token checks when secret is available
         required: true
@@ -29,6 +34,7 @@ jobs:
         run: chmod +x scripts/smoke-api.sh scripts/verify-production-env.sh
 
       - name: Run production env verification
+        if: ${{ inputs.run_env_verification }}
         env:
           API_URL: ${{ inputs.api_url }}
           DATABASE_URL: ${{ secrets.PROD_DATABASE_URL }}
