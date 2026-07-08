@@ -29,8 +29,10 @@ export class WalletController {
     @Query('type') type?: string,
     @Query('direction') direction?: string,
     @Query('limit') limit?: string,
+    @Query('page') page?: string,
+    @Query('take') take?: string,
   ) {
-    return this.walletService.getAdminLedgers({ userId, identifier, type, direction, limit });
+    return this.walletService.getAdminLedgers({ userId, identifier, type, direction, limit, page, take });
   }
 
   @UseGuards(AdminAuthGuard)
