@@ -216,8 +216,8 @@ model Permission {
   name        String   @db.VarChar(120)
   module      String   @db.VarChar(80)
   description String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
 
   roles RolePermission[]
 
