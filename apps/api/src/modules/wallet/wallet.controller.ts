@@ -37,8 +37,8 @@ export class WalletController {
 
   @UseGuards(AdminAuthGuard)
   @Get('admin/wallets')
-  getAdminWallets(@Query('search') search?: string, @Query('limit') limit?: string) {
-    return this.walletService.getAdminWallets({ search, limit });
+  getAdminWallets(@Query('search') search?: string, @Query('limit') limit?: string, @Query('page') page?: string, @Query('take') take?: string) {
+    return this.walletService.getAdminWallets({ search, limit, page, take });
   }
 
   @UseGuards(AdminAuthGuard)
