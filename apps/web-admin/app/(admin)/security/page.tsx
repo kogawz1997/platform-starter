@@ -193,7 +193,7 @@ export default function AdminSecurityPage() {
 
     <AdminCard title="Admin Sessions" description="รายการ session ล่าสุดของบัญชีแอดมินนี้">
       <div style={sessionToolbarStyle}><AdminButton disabled={loading || otherActiveCount === 0} onClick={logoutOtherDevices}>Logout other devices</AdminButton><AdminButton disabled={loading || activeCount === 0} tone="danger" onClick={endEverySession}>End all sessions</AdminButton></div>
-      <AdminStack>{sessions.map((session) => <section key={session.id} style={sessionBoxStyle}><div style={sessionTopStyle}><div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}><AdminBadge tone={session.active ? 'success' : 'neutral'}>{session.active ? 'ACTIVE' : 'ENDED'}</AdminBadge>{session.current && <AdminBadge tone="warning">CURRENT</AdminBadge>}</div>{session.active && <AdminButton disabled={loading} tone="danger" onClick={() => revokeSession(session)}>Revoke</AdminButton>}</div><strong>{session.deviceId || 'Unknown device'}</strong><p>IP: {session.ipAddress || '-'}</p><p style={agentStyle}>UA: {session.userAgent || '-'}</p><p>Created: {new Date(session.createdAt).toLocaleString('th-TH')}</p><p>Expires: {new Date(session.expiresAt).toLocaleString('th-TH')}</p>{session.revokedAt && <p>Ended: {new Date(session.revokedAt).toLocaleString('th-TH')}</p>}</section>)}{sessions.length === 0 && <AdminNotice>ยังไม่มี session ให้แสดง</AdminNotice>}</AdminStack>
+      <AdminStack>{sessions.map((session) => <section key={session.id} style={sessionBoxStyle}><div style={sessionTopStyle}><div style={badgeRowStyle}><AdminBadge tone={session.active ? 'success' : 'neutral'}>{session.active ? 'ACTIVE' : 'ENDED'}</AdminBadge>{session.current && <AdminBadge tone="warning">CURRENT</AdminBadge>}</div>{session.active && <AdminButton disabled={loading} tone="danger" onClick={() => revokeSession(session)}>Revoke</AdminButton>}</div><strong>{session.deviceId || 'Unknown device'}</strong><p>IP: {session.ipAddress || '-'}</p><p style={agentStyle}>UA: {session.userAgent || '-'}</p><p>Created: {new Date(session.createdAt).toLocaleString('th-TH')}</p><p>Expires: {new Date(session.expiresAt).toLocaleString('th-TH')}</p>{session.revokedAt && <p>Ended: {new Date(session.revokedAt).toLocaleString('th-TH')}</p>}</section>)}{sessions.length === 0 && <AdminNotice>ยังไม่มี session ให้แสดง</AdminNotice>}</AdminStack>
     </AdminCard>
   </AdminPage>;
 }
@@ -201,14 +201,15 @@ export default function AdminSecurityPage() {
 const infoStyle = { border: '1px solid rgba(34,197,94,.28)', borderRadius: 16, padding: 12, background: 'rgba(34,197,94,.08)', display: 'grid', gap: 8 } as const;
 const setupBoxStyle = { display: 'grid', gap: 12, minWidth: 0 } as const;
 const labelStyle = { display: 'grid', gap: 7, fontWeight: 850, minWidth: 0 } as const;
-const copyRowStyle = { display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) auto', gap: 8, minWidth: 0 } as const;
-const inputStyle = { minHeight: 44, borderRadius: 12, border: '1px solid rgba(148,163,184,.22)', background: '#0b1220', color: '#f8fafc', padding: '0 12px', minWidth: 0, width: '100%', boxSizing: 'border-box' as const };
-const copyButtonStyle = { border: '1px solid rgba(245,197,66,.35)', borderRadius: 12, padding: '0 12px', background: 'rgba(245,197,66,.14)', color: '#f5c542', fontWeight: 900, cursor: 'pointer' } as const;
-const qrBoxStyle = { border: '1px solid rgba(148,163,184,.18)', borderRadius: 16, padding: 14, display: 'grid', justifyItems: 'center', gap: 10, background: '#0b1220' } as const;
+const copyRowStyle = { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(220px, 100%), 1fr))', gap: 8, minWidth: 0 } as const;
+const inputStyle = { minHeight: 44, borderRadius: 12, border: '1px solid rgba(148,163,184,.22)', background: '#0b1220', color: '#f8fafc', padding: '0 12px', minWidth: 0, width: '100%', boxSizing: 'border-box' as const, overflow: 'hidden' as const, textOverflow: 'ellipsis' as const };
+const copyButtonStyle = { minHeight: 44, border: '1px solid rgba(245,197,66,.35)', borderRadius: 12, padding: '0 12px', background: 'rgba(245,197,66,.14)', color: '#f5c542', fontWeight: 900, cursor: 'pointer' } as const;
+const qrBoxStyle = { border: '1px solid rgba(148,163,184,.18)', borderRadius: 16, padding: 14, display: 'grid', justifyItems: 'center', gap: 10, background: '#0b1220', minWidth: 0 } as const;
 const qrImageStyle = { width: 220, height: 220, maxWidth: '100%', borderRadius: 12, background: '#fff', padding: 8 } as const;
-const recoveryGridStyle = { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 8, margin: '12px 0' } as const;
-const recoveryCodeStyle = { border: '1px solid rgba(245,197,66,.24)', borderRadius: 12, padding: 10, background: 'rgba(245,197,66,.08)', color: '#f5c542', fontWeight: 900, textAlign: 'center' as const, letterSpacing: 1 };
-const sessionBoxStyle = { border: '1px solid rgba(148,163,184,.18)', borderRadius: 16, padding: 12, display: 'grid', gap: 6, minWidth: 0 } as const;
-const sessionTopStyle = { display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'center', flexWrap: 'wrap' as const };
-const sessionToolbarStyle = { display: 'flex', gap: 10, flexWrap: 'wrap' as const, marginBottom: 12 };
+const recoveryGridStyle = { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(150px, 100%), 1fr))', gap: 8, margin: '12px 0' } as const;
+const recoveryCodeStyle = { border: '1px solid rgba(245,197,66,.24)', borderRadius: 12, padding: 10, background: 'rgba(245,197,66,.08)', color: '#f5c542', fontWeight: 900, textAlign: 'center' as const, letterSpacing: 1, overflowWrap: 'anywhere' as const };
+const sessionBoxStyle = { border: '1px solid rgba(148,163,184,.18)', borderRadius: 16, padding: 12, display: 'grid', gap: 6, minWidth: 0, background: 'rgba(148,163,184,.045)' } as const;
+const sessionTopStyle = { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(160px, 100%), 1fr))', gap: 10, alignItems: 'center', minWidth: 0 } as const;
+const sessionToolbarStyle = { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(190px, 100%), 1fr))', gap: 10, marginBottom: 12 } as const;
+const badgeRowStyle = { display: 'flex', gap: 8, flexWrap: 'wrap' as const };
 const agentStyle = { overflowWrap: 'anywhere' as const, color: '#94a3b8' };
