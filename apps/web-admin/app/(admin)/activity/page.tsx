@@ -1,42 +1,132 @@
 'use client';
 
-import { FormEvent, useEffect, useState } from 'react';
-import { AdminBadge, AdminButton, AdminCard, AdminEmpty, AdminNotice, AdminPage, AdminRow, AdminStack, AdminToolbar } from '../_components/admin-ui';
+import { useEffect, useState } from 'react';
+import { adminApiFetch } from '../../admin-api';
+import { AdminBadge, AdminButton, AdminCard, AdminEmpty, AdminLinkButton, AdminMetric, AdminMetricGrid, AdminNotice, AdminPage, AdminRow, AdminStack, formatMoney } from '../_components/admin-ui';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000';
+type ActivityType = 'ALL' | 'AUDIT' | 'LEDGER' | 'TOPUP' | 'WITHDRAWAL';
+type ActivityItem = {
+  id: string;
+  type: Exclude<ActivityType, 'ALL'>;
+  title: string;
+  description?: string | null;
+  actor?: string | null;
+  memberId?: string | null;
+  refType?: string | null;
+  refId?: string | null;
+  amount?: string | null;
+  status?: string | null;
+  createdAt: string;
+};
+type TimelineResponse = {
+  items: ActivityItem[];
+  page: number;
+  take: number;
+  total: number;
+  pageCount: number;
+  summary: { audit: number; ledger: number; topup: number; withdrawal: number };
+  generatedAt: string;
+};
 
-type ActivityItem = { id: string; action: string; module: string; targetId?: string | null; oldData?: unknown; newData?: unknown; ipAddress?: string | null; userAgent?: string | null; createdAt: string; adminUser?: { username: string; email: string } | null };
+const PAGE_SIZE = 30;
+const filters: ActivityType[] = ['ALL', 'AUDIT', 'LEDGER', 'TOPUP', 'WITHDRAWAL'];
 
 export default function ActivityPage() {
-  const [items, setItems] = useState<ActivityItem[]>([]);
-  const [moduleName, setModuleName] = useState('');
-  const [action, setAction] = useState('');
+  const [data, setData] = useState<TimelineResponse | null>(null);
+  const [page, setPage] = useState(1);
+  const [type, setType] = useState<ActivityType>('ALL');
+  const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
 
-  useEffect(() => { loadItems(); }, []);
+  useEffect(() => { loadTimeline(1, type); }, []);
 
-  async function loadItems(event?: FormEvent<HTMLFormElement>) {
-    event?.preventDefault();
-    const token = window.localStorage.getItem('admin_access_token');
-    if (!token) { setMessage('กรุณา login admin ก่อน'); return; }
-    const params = new URLSearchParams();
-    params.set('limit', '120');
-    if (moduleName.trim()) params.set('module', moduleName.trim());
-    if (action.trim()) params.set('action', action.trim());
-    setMessage('กำลังโหลด activity...');
-    const res = await fetch(`${API_URL}/admin/operations/history?${params.toString()}`, { headers: { Authorization: `Bearer ${token}` } });
-    const data = await res.json().catch(() => null);
-    if (!res.ok) { setMessage(data?.message ?? 'โหลด activity ไม่สำเร็จ'); return; }
-    setItems(data.items ?? []); setMessage('');
+  async function loadTimeline(nextPage = page, nextType = type) {
+    setLoading(true);
+    setMessage('กำลังโหลด activity timeline...');
+    const res = await adminApiFetch(`/admin/activity/timeline?page=${nextPage}&take=${PAGE_SIZE}&type=${nextType}`);
+    const json = await res.json().catch(() => null);
+    setLoading(false);
+    if (!res.ok) { setMessage(json?.message ?? 'โหลด activity ไม่สำเร็จ'); return; }
+    setData(json);
+    setPage(json.page ?? nextPage);
+    setMessage('');
   }
 
-  return (
-    <AdminPage eyebrow="Operations History" title="Activity" description="ตรวจย้อนหลังว่าแอดมินทำอะไรกับระบบการเงินและการตั้งค่า">
-      <form onSubmit={loadItems}><AdminToolbar><input value={moduleName} onChange={(e) => setModuleName(e.target.value)} placeholder="module เช่น topups / withdrawals / wallets" /><input value={action} onChange={(e) => setAction(e.target.value)} placeholder="action เช่น APPROVE_TOP_UP" /><AdminButton type="submit">Filter</AdminButton></AdminToolbar></form>
-      {message && <AdminNotice>{message}</AdminNotice>}
-      <AdminStack>{items.map((item) => <AdminCard key={item.id}><AdminRow><div><AdminBadge>{item.module}</AdminBadge><h2 style={{ margin: '10px 0 4px', fontSize: 26 }}>{item.action}</h2><p>Admin: {item.adminUser?.username ?? item.adminUser?.email ?? '-'}</p><p>Target: {item.targetId ?? '-'}</p></div><div style={{ textAlign: 'right' }}><strong>{new Date(item.createdAt).toLocaleString('th-TH')}</strong><p>IP: {item.ipAddress ?? '-'}</p></div></AdminRow><details style={{ marginTop: 12 }}><summary>ดูข้อมูลเปลี่ยนแปลง</summary><pre style={preStyle}>{JSON.stringify({ oldData: item.oldData, newData: item.newData }, null, 2)}</pre></details></AdminCard>)}{items.length === 0 && <AdminEmpty>ยังไม่มีรายการ</AdminEmpty>}</AdminStack>
-    </AdminPage>
-  );
+  function changeType(nextType: ActivityType) {
+    setType(nextType);
+    setPage(1);
+    loadTimeline(1, nextType);
+  }
+
+  function go(nextPage: number) {
+    setPage(nextPage);
+    loadTimeline(nextPage, type);
+  }
+
+  return <AdminPage eyebrow="Operations" title="Activity Timeline" description="รวมเหตุการณ์จาก audit logs, wallet ledgers, topups และ withdrawals" actions={<AdminButton disabled={loading} onClick={() => loadTimeline(page, type)}>Refresh</AdminButton>}>
+    {message && <AdminNotice>{message}</AdminNotice>}
+
+    {data && <AdminMetricGrid>
+      <AdminMetric title="Loaded" value={data.items.length.toLocaleString('th-TH')} helper={`${data.total.toLocaleString('th-TH')} fetched`} />
+      <AdminMetric title="Page" value={`${data.page}/${data.pageCount}`} helper={`${data.take} per page`} />
+      <AdminMetric title="Audit" value={data.summary.audit.toLocaleString('th-TH')} helper="admin events" />
+      <AdminMetric title="Ledger" value={data.summary.ledger.toLocaleString('th-TH')} helper="money movements" />
+      <AdminMetric title="Requests" value={(data.summary.topup + data.summary.withdrawal).toLocaleString('th-TH')} helper={`${data.summary.topup} topups · ${data.summary.withdrawal} withdrawals`} />
+    </AdminMetricGrid>}
+
+    <AdminCard title="Filters" description="เลือกชนิด event ที่อยากดู">
+      <div style={toolbarStyle}>{filters.map((item) => <AdminButton key={item} disabled={loading} tone={type === item ? 'primary' : 'secondary'} onClick={() => changeType(item)}>{item}</AdminButton>)}</div>
+    </AdminCard>
+
+    <AdminCard title="Timeline" description={data ? `Generated ${new Date(data.generatedAt).toLocaleString('th-TH')}` : 'recent activity'}>
+      <AdminStack>
+        {data?.items.map((item) => <AdminRow key={`${item.type}-${item.id}`}>
+          <div style={leftStyle}>
+            <div style={badgeRowStyle}><AdminBadge tone={typeTone(item.type)}>{item.type}</AdminBadge>{item.status && <AdminBadge tone={statusTone(item.status)}>{item.status}</AdminBadge>}</div>
+            <strong>{item.title}</strong>
+            <p>{item.description ?? '-'} · {new Date(item.createdAt).toLocaleString('th-TH')}</p>
+            {item.actor && <p>Actor: {item.actor}</p>}
+          </div>
+          <div style={rightStyle}>
+            {item.amount && <strong>{formatMoney(item.amount)}</strong>}
+            <div style={actionRowStyle}>
+              {item.memberId && <AdminLinkButton href={`/members/${item.memberId}`}>Member</AdminLinkButton>}
+              {item.type === 'TOPUP' && <AdminLinkButton href="/topups">Top-ups</AdminLinkButton>}
+              {item.type === 'WITHDRAWAL' && <AdminLinkButton href="/withdrawals">Withdrawals</AdminLinkButton>}
+              {item.type === 'LEDGER' && <AdminLinkButton href="/ledgers">Ledgers</AdminLinkButton>}
+              {item.type === 'AUDIT' && <AdminLinkButton href="/audit">Audit</AdminLinkButton>}
+            </div>
+          </div>
+        </AdminRow>)}
+        {data && data.items.length === 0 && <AdminEmpty>ยังไม่มี activity ใน filter นี้</AdminEmpty>}
+        {!data && !loading && <AdminEmpty>ยังไม่มีข้อมูล</AdminEmpty>}
+      </AdminStack>
+      {data && <div style={pagerStyle}>
+        <AdminButton disabled={loading || page <= 1} onClick={() => go(page - 1)}>Previous</AdminButton>
+        <AdminButton disabled={loading || page >= data.pageCount} onClick={() => go(page + 1)}>Next</AdminButton>
+      </div>}
+    </AdminCard>
+  </AdminPage>;
 }
 
-const preStyle = { whiteSpace: 'pre-wrap' as const, overflowWrap: 'anywhere' as const, border: '1px solid rgba(148,163,184,.18)', borderRadius: 14, padding: 12, background: 'rgba(148,163,184,.06)', color: '#cbd5e1' } as const;
+function typeTone(type: ActivityItem['type']) {
+  if (type === 'AUDIT') return 'neutral';
+  if (type === 'LEDGER') return 'success';
+  if (type === 'TOPUP') return 'warning';
+  return 'danger';
+}
+
+function statusTone(status: string) {
+  const upper = status.toUpperCase();
+  if (['APPROVED', 'COMPLETED', 'CREDIT', 'OK'].includes(upper)) return 'success';
+  if (['PENDING', 'REVIEWING', 'DEBIT'].includes(upper)) return 'warning';
+  if (['REJECTED', 'CANCELLED', 'MISMATCH', 'FAILED'].includes(upper)) return 'danger';
+  return 'neutral';
+}
+
+const toolbarStyle = { display: 'flex', gap: 8, flexWrap: 'wrap' as const };
+const badgeRowStyle = { display: 'flex', gap: 8, flexWrap: 'wrap' as const };
+const leftStyle = { display: 'grid', gap: 6, minWidth: 0 };
+const rightStyle = { display: 'grid', gap: 8, textAlign: 'right' as const, justifyItems: 'end' };
+const actionRowStyle = { display: 'flex', gap: 8, flexWrap: 'wrap' as const, justifyContent: 'flex-end' };
+const pagerStyle = { display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 16, flexWrap: 'wrap' as const };
