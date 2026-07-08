@@ -131,6 +131,7 @@ docs/
   github-actions-smoke.md
   playwright-smoke.md
   production-verification.md
+  member-ux-qa.md
 ```
 
 ## Quick Start
@@ -262,6 +263,7 @@ pnpm test:e2e:smoke
 - [ ] Run E2E smoke
 - [ ] Verify `/reports` on mobile
 - [ ] Verify `/activity` on mobile
+- [ ] Verify `/deposit`, `/withdraw`, `/transactions`, and `/bank-accounts` on mobile
 - [ ] Verify CSV exports
 - [ ] Verify Redis rate limit if enabled
 - [ ] Verify R2/S3 slip upload and admin preview if enabled
@@ -271,6 +273,7 @@ pnpm test:e2e:smoke
 | Document | Purpose |
 |---|---|
 | [`docs/final-qa-checklist.md`](docs/final-qa-checklist.md) | Final QA and production verification checklist |
+| [`docs/member-ux-qa.md`](docs/member-ux-qa.md) | Member mobile UX and production integration QA |
 | [`docs/reports-analytics.md`](docs/reports-analytics.md) | Reports, queue aging, and CSV export guide |
 | [`docs/activity-timeline.md`](docs/activity-timeline.md) | Activity timeline filters, permissions, and QA |
 | [`docs/github-actions-smoke.md`](docs/github-actions-smoke.md) | Smoke API workflow guide |
