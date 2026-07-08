@@ -1,9 +1,8 @@
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { randomUUID } from 'crypto';
-import { mkdir, readFile, writeFile } from 'fs/promises';
-import { join } from 'path';
 import { Decimal } from '@prisma/client/runtime/library';
 import { PrismaService } from '../../database/prisma.service';
+import { StorageService } from '../storage/storage.service';
 import { CreateTopUpRequestDto } from './dto/create-top-up-request.dto';
 import { ReviewTopUpRequestDto } from './dto/review-top-up-request.dto';
 
@@ -11,7 +10,7 @@ const CLAIM_TIMEOUT_MS = 15 * 60 * 1000;
 
 @Injectable()
 export class TopUpsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaService, private readonly storage: StorageService) {}
 
   async createMemberRequest(userId: string, dto: CreateTopUpRequestDto) {
     const amount = new Decimal(dto.amount ?? 0);
@@ -31,11 +30,10 @@ export class TopUpsService {
     if (!buffer.length) throw new BadRequestException('Slip image is empty');
     if (buffer.length > 1_500_000) throw new BadRequestException('Slip image is too large');
     const ext = match[2] === 'jpeg' ? 'jpg' : match[2];
-    const id = `${new Date().toISOString().slice(0, 10)}-${randomUUID()}`;
-    const dir = this.privateSlipDir();
-    await mkdir(dir, { recursive: true });
-    await writeFile(join(dir, `${id}.${ext}`), buffer);
-    return { slipFileId: id, slipImageName: dto.slipImageName ?? 'slip', contentType: match[1] };
+    const date = new Date().toISOString().slice(0, 10);
+    const key = `slips/${date}/${randomUUID()}.${ext}`;
+    await this.storage.put(key, buffer, match[1]);
+    return { slipFileId: key, slipImageName: dto.slipImageName ?? 'slip', contentType: match[1] };
   }
 
   async getAdminSlip(id: string) {
@@ -43,12 +41,18 @@ export class TopUpsService {
     if (!request) throw new NotFoundException('Top up request not found');
     const proof = this.parseProof(request.note);
     if (!proof.slipFileId) throw new NotFoundException('Slip file not found');
-    const dir = this.privateSlipDir();
+    const key = String(proof.slipFileId);
+    if (key.includes('/')) {
+      const contentType = proof.contentType ?? this.contentTypeFromKey(key);
+      const stored = await this.storage.get(key, contentType);
+      return { dataUrl: `data:${stored.contentType};base64,${stored.data.toString('base64')}`, slipImageName: proof.slipImageName ?? 'slip' };
+    }
     for (const ext of ['jpg', 'png', 'webp', 'jpeg']) {
       try {
-        const buffer = await readFile(join(dir, `${proof.slipFileId}.${ext}`));
+        const legacyKey = `${key}.${ext}`;
         const contentType = ext === 'jpg' || ext === 'jpeg' ? 'image/jpeg' : `image/${ext}`;
-        return { dataUrl: `data:${contentType};base64,${buffer.toString('base64')}`, slipImageName: proof.slipImageName ?? 'slip' };
+        const stored = await this.storage.get(legacyKey, contentType);
+        return { dataUrl: `data:${stored.contentType};base64,${stored.data.toString('base64')}`, slipImageName: proof.slipImageName ?? 'slip' };
       } catch {}
     }
     throw new NotFoundException('Slip file not found');
@@ -158,9 +162,14 @@ export class TopUpsService {
     await this.prisma.topUpRequest.updateMany({ where: { status: 'PENDING', claimedBy: { not: null }, claimedAt: { lt: staleSince } }, data: { claimedBy: null, claimedAt: null } });
   }
 
+  private contentTypeFromKey(key: string) {
+    if (key.endsWith('.png')) return 'image/png';
+    if (key.endsWith('.webp')) return 'image/webp';
+    return 'image/jpeg';
+  }
+
   private accountType(bankName: string) { if (bankName === 'พร้อมเพย์') return 'promptpay'; if (bankName === 'วอเลต') return 'wallet'; if (bankName === 'อื่น ๆ') return 'other'; return 'bank_transfer'; }
   private audit(adminUserId: string, action: string, targetId: string, oldData: any, newData: any, meta: RequestMeta) { return this.prisma.adminAuditLog.create({ data: { adminUserId, action, module: 'topups', targetId, oldData, newData, ipAddress: meta.ipAddress, userAgent: meta.userAgent } }).catch(() => null); }
-  private privateSlipDir() { return process.env.PRIVATE_MEDIA_DIR || '/tmp/platform-private-media/topup-slips'; }
   private parseProof(value?: string | null) { if (!value) return {} as any; try { return JSON.parse(value); } catch { return {} as any; } }
   private formatRequest(item: any) { return { id: item.id, userId: item.userId, amount: item.amount.toString(), currency: item.currency, status: item.status, method: item.method, referenceCode: item.referenceCode, note: item.note, adminNote: item.adminNote, reviewedBy: item.reviewedBy, reviewedAt: item.reviewedAt, claimedBy: item.claimedBy, claimedAt: item.claimedAt, createdAt: item.createdAt, updatedAt: item.updatedAt }; }
 }
