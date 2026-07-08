@@ -7,6 +7,7 @@ export class AdminAuditService {
   constructor(private readonly prisma: PrismaService) {}
 
   async list(query: AuditLogQuery) {
+    const page = Math.max(Number(query.page ?? 1) || 1, 1);
     const take = Math.min(Math.max(Number(query.take ?? 50), 1), 100);
     const where: Prisma.AdminAuditLogWhereInput = {};
 
@@ -24,13 +25,14 @@ export class AdminAuditService {
       this.prisma.adminAuditLog.findMany({
         where,
         orderBy: { createdAt: 'desc' },
+        skip: (page - 1) * take,
         take,
         include: { adminUser: { select: { id: true, username: true, email: true } } },
       }),
       this.prisma.adminAuditLog.count({ where }),
     ]);
 
-    return { items, total, take };
+    return { items, total, page, take, pageCount: Math.max(Math.ceil(total / take), 1) };
   }
 }
 
@@ -40,5 +42,6 @@ export type AuditLogQuery = {
   adminUserId?: string;
   from?: string;
   to?: string;
+  page?: string | number;
   take?: string | number;
 };
