@@ -20,20 +20,36 @@ export class WalletService {
   }
 
   async getAdminLedgers(query: AdminLedgerQuery) {
-    const safeLimit = Math.min(Math.max(Number(query.limit) || 100, 1), 200);
+    const page = Math.max(Number(query.page ?? 1) || 1, 1);
+    const take = Math.min(Math.max(Number(query.take ?? query.limit ?? 100) || 100, 1), 100);
     const identifier = (query.identifier || query.userId || '').trim();
     const where: any = {};
     if (query.type) where.type = query.type;
     if (query.direction) where.direction = query.direction;
 
-    const items = await this.prisma.walletLedger.findMany({
-      where,
-      include: { user: { select: { id: true, username: true, phone: true, email: true } }, wallet: { select: { id: true, userId: true, currency: true, balance: true, lockedBalance: true, status: true, updatedAt: true } }, createdByAdmin: { select: { id: true, username: true, email: true } } },
-      orderBy: { createdAt: 'desc' },
-      take: identifier ? 500 : safeLimit,
-    });
-    const filtered = identifier ? items.filter((item) => this.matchesIdentifier(identifier, item.user, item.userId)) : items;
-    return { items: filtered.slice(0, safeLimit).map((item) => ({ ...this.formatLedger(item), shortUserId: this.shortId(item.userId), user: item.user ? { ...item.user, shortId: this.shortId(item.user.id) } : null, wallet: item.wallet ? this.formatWallet(item.wallet) : null, createdByAdmin: item.createdByAdmin })) };
+    if (identifier) {
+      const items = await this.prisma.walletLedger.findMany({
+        where,
+        include: { user: { select: { id: true, username: true, phone: true, email: true } }, wallet: { select: { id: true, userId: true, currency: true, balance: true, lockedBalance: true, status: true, updatedAt: true } }, createdByAdmin: { select: { id: true, username: true, email: true } } },
+        orderBy: { createdAt: 'desc' },
+        take: 500,
+      });
+      const filtered = items.filter((item) => this.matchesIdentifier(identifier, item.user, item.userId));
+      const pageItems = filtered.slice((page - 1) * take, page * take);
+      return { items: pageItems.map((item) => this.formatAdminLedger(item)), page, take, total: filtered.length, pageCount: Math.max(Math.ceil(filtered.length / take), 1) };
+    }
+
+    const [items, total] = await this.prisma.$transaction([
+      this.prisma.walletLedger.findMany({
+        where,
+        include: { user: { select: { id: true, username: true, phone: true, email: true } }, wallet: { select: { id: true, userId: true, currency: true, balance: true, lockedBalance: true, status: true, updatedAt: true } }, createdByAdmin: { select: { id: true, username: true, email: true } } },
+        orderBy: { createdAt: 'desc' },
+        skip: (page - 1) * take,
+        take,
+      }),
+      this.prisma.walletLedger.count({ where }),
+    ]);
+    return { items: items.map((item) => this.formatAdminLedger(item)), page, take, total, pageCount: Math.max(Math.ceil(total / take), 1) };
   }
 
   async getAdminWallets(query: AdminWalletQuery) {
@@ -114,6 +130,10 @@ export class WalletService {
 
   private shortId(id?: string | null) { return id ? id.slice(0, 8) : null; }
 
+  private formatAdminLedger(item: any) {
+    return { ...this.formatLedger(item), shortUserId: this.shortId(item.userId), user: item.user ? { ...item.user, shortId: this.shortId(item.user.id) } : null, wallet: item.wallet ? this.formatWallet(item.wallet) : null, createdByAdmin: item.createdByAdmin };
+  }
+
   private formatWallet(wallet: any) {
     return { id: wallet.id, userId: wallet.userId, shortUserId: this.shortId(wallet.userId), currency: wallet.currency, balance: wallet.balance.toString(), lockedBalance: wallet.lockedBalance.toString(), availableBalance: wallet.balance.minus(wallet.lockedBalance).toString(), status: wallet.status, updatedAt: wallet.updatedAt };
   }
@@ -123,6 +143,6 @@ export class WalletService {
   }
 }
 
-type AdminLedgerQuery = { userId?: string; identifier?: string; type?: string; direction?: string; limit?: string };
+type AdminLedgerQuery = { userId?: string; identifier?: string; type?: string; direction?: string; limit?: string; page?: string; take?: string };
 type AdminWalletQuery = { search?: string; limit?: string };
 type RequestMeta = { ipAddress?: string; userAgent?: string };
