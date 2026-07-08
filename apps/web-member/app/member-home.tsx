@@ -61,27 +61,10 @@ export default function MemberHome(props: MemberHomeProps) {
   const pendingTopups = useMemo(() => topups.filter((item) => item.status === 'PENDING').slice(0, 3), [topups]);
   const pendingWithdrawals = useMemo(() => withdrawals.filter((item) => item.status === 'PENDING').slice(0, 3), [withdrawals]);
   const pendingCount = pendingTopups.length + pendingWithdrawals.length;
-  const completedTopups = useMemo(() => topups.filter((item) => ['APPROVED', 'COMPLETED'].includes(item.status)).length, [topups]);
-  const completedWithdrawals = useMemo(() => withdrawals.filter((item) => ['APPROVED', 'COMPLETED'].includes(item.status)).length, [withdrawals]);
-  const latestLedger = ledgers[0];
 
   return (
     <section className="member-shell member-home-shell">
       {props.showBalanceHeader && <WalletCard primaryColor={props.primaryColor} cardColor={props.cardColor} showButtons={props.showButtons && isLoggedIn} />}
-
-      {isLoggedIn && <section className="member-quick-panel">
-        <a href="/deposit" className="member-quick-action primary" style={{ background: props.primaryColor, color: '#111', borderColor: props.primaryColor }}><strong>ฝาก</strong><span>เติมยอดเข้ากระเป๋า</span></a>
-        <a href="/withdraw" className="member-quick-action"><strong>ถอนเงิน</strong><span>ส่งคำขอถอน</span></a>
-        <a href="/transactions" className="member-quick-action"><strong>ประวัติ</strong><span>เช็กรายการล่าสุด</span>{pendingCount > 0 && <em>{pendingCount}</em>}</a>
-        <a href="/bank-accounts" className="member-quick-action"><strong>บัญชี</strong><span>จัดการบัญชีธนาคาร</span></a>
-      </section>}
-
-      {isLoggedIn && <section className="member-summary-grid">
-        <SummaryCard label="รอดำเนินการ" value={`${pendingCount} รายการ`} tone={pendingCount > 0 ? 'hot' : 'calm'} />
-        <SummaryCard label="ฝากสำเร็จ" value={`${completedTopups} รายการ`} />
-        <SummaryCard label="ถอนสำเร็จ" value={`${completedWithdrawals} รายการ`} />
-        <SummaryCard label="รายการล่าสุด" value={latestLedger ? ledgerTypeLabel(latestLedger.type) : 'ยังไม่มี'} tone={latestLedger ? 'normal' : 'calm'} />
-      </section>}
 
       {isLoggedIn && pendingCount > 0 && <section className="member-info-card" style={alertCardStyle}>
         <div style={sectionHeadStyle}><div><p>รอดำเนินการ</p><h2>{pendingCount} รายการ</h2></div><a href="/transactions" style={{ color: props.primaryColor, fontWeight: 900, textDecoration: 'none' }}>ดูทั้งหมด</a></div>
@@ -102,10 +85,6 @@ export default function MemberHome(props: MemberHomeProps) {
       </section>}
     </section>
   );
-}
-
-function SummaryCard({ label, value, tone = 'normal' }: { label: string; value: string; tone?: 'normal' | 'hot' | 'calm' }) {
-  return <div className={`member-summary-card ${tone}`}><span>{label}</span><strong>{value}</strong></div>;
 }
 
 function EmptyState({ title, description, actionHref, actionLabel, compact = false }: { title: string; description: string; actionHref: string; actionLabel: string; compact?: boolean }) {
