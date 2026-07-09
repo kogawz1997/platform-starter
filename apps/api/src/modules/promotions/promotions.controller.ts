@@ -25,6 +25,12 @@ export class PromotionsController {
     return this.promotions.createClaim(user, body);
   }
 
+  @UseGuards(MemberAuthGuard)
+  @Get('member/bonus-ledgers')
+  listMemberBonusLedgers(@CurrentUser() user: any) {
+    return this.promotions.listMemberBonusLedgers(user);
+  }
+
   @UseGuards(AdminAuthGuard)
   @Get('admin/promotion-claims')
   listAdminClaims(@Query('status') status?: string) {
@@ -35,5 +41,17 @@ export class PromotionsController {
   @Patch('admin/promotion-claims/:id/review')
   reviewClaim(@CurrentUser() user: any, @Param('id') id: string, @Body() body: any) {
     return this.promotions.reviewClaim(user, id, body);
+  }
+
+  @UseGuards(AdminAuthGuard)
+  @Get('admin/bonus-ledgers')
+  listAdminBonusLedgers(@Query('status') status?: string) {
+    return this.promotions.listAdminBonusLedgers({ status });
+  }
+
+  @UseGuards(AdminAuthGuard)
+  @Patch('admin/bonus-ledgers/:id/turnover-progress')
+  addTurnoverProgress(@CurrentUser() user: any, @Param('id') id: string, @Body() body: any) {
+    return this.promotions.addTurnoverProgress(user, id, body);
   }
 }
