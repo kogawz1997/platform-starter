@@ -1,8 +1,10 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { memberApiFetch } from '../../member-api';
+
+type Transfer = { id: string; type: string; status: string; amount: string; currency: string; providerTransactionId?: string | null; createdAt: string };
 
 export default function DemoLaunchPage() {
   const params = useSearchParams();
@@ -11,6 +13,16 @@ export default function DemoLaunchPage() {
   const [amount, setAmount] = useState('100');
   const [message, setMessage] = useState('');
   const [busy, setBusy] = useState('');
+  const [transfers, setTransfers] = useState<Transfer[]>([]);
+
+  useEffect(() => { loadTransfers(); }, [session]);
+
+  async function loadTransfers() {
+    if (!session || session === '-') return;
+    const res = await memberApiFetch(`/member/game-sessions/${session}/transfers`);
+    const data = await res.json().catch(() => null);
+    if (res.ok) setTransfers(data?.items ?? []);
+  }
 
   async function transfer(type: 'transfer-in' | 'transfer-out') {
     if (!session || session === '-') { setMessage('ไม่พบ session สำหรับ transfer'); return; }
@@ -21,6 +33,7 @@ export default function DemoLaunchPage() {
     setBusy('');
     if (!res.ok || !data?.ok) { setMessage(data?.message ?? data?.errorMessage ?? 'transfer dry-run ไม่สำเร็จ'); return; }
     setMessage(`${type === 'transfer-in' ? 'Transfer In' : 'Transfer Out'} สำเร็จ: ${data.transfer.amount} ${data.transfer.currency}`);
+    await loadTransfers();
   }
 
   return <main style={pageStyle}>
@@ -38,6 +51,11 @@ export default function DemoLaunchPage() {
           <button type="button" style={secondaryButtonStyle} disabled={Boolean(busy)} onClick={() => transfer('transfer-out')}>{busy === 'transfer-out' ? 'กำลังโอน...' : 'Transfer Out'}</button>
         </div>
         {message && <div style={noticeStyle}>{message}</div>}
+      </section>
+      <section style={panelStyle}>
+        <strong>ประวัติ transfer ของ session</strong>
+        {transfers.map((item) => <div key={item.id} style={historyRowStyle}><div><strong>{item.type}</strong><p style={mutedStyle}>{item.amount} {item.currency} · {item.providerTransactionId ?? '-'}</p></div><em style={statusStyle}>{item.status}</em></div>)}
+        {transfers.length === 0 && <p style={mutedStyle}>ยังไม่มี transfer ใน session นี้</p>}
       </section>
       <a href="/games" style={linkButtonStyle}>กลับไปหน้าเกม</a>
     </section>
@@ -58,3 +76,5 @@ const buttonStyle = { minHeight: 48, borderRadius: 16, display: 'grid', placeIte
 const secondaryButtonStyle = { ...buttonStyle, background: '#334155', color: '#e2e8f0' } as const;
 const linkButtonStyle = { minHeight: 48, borderRadius: 16, display: 'grid', placeItems: 'center', background: '#f5c542', color: '#111827', fontWeight: 950, textDecoration: 'none' } as const;
 const noticeStyle = { padding: 12, borderRadius: 14, border: '1px solid rgba(148,163,184,.18)', background: 'rgba(15,23,42,.75)', color: '#e2e8f0' } as const;
+const historyRowStyle = { display: 'flex', justifyContent: 'space-between', gap: 10, border: '1px solid rgba(148,163,184,.18)', borderRadius: 14, padding: 12, background: 'rgba(15,23,42,.55)' } as const;
+const statusStyle = { color: '#facc15', fontStyle: 'normal', fontWeight: 950 } as const;
