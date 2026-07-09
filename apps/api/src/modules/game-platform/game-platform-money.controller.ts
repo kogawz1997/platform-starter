@@ -61,7 +61,7 @@ export class AdminGameMoneyController {
 
   @RequirePermission('game.providers.manage')
   @Post('game-sessions/:sessionId/reconcile')
-  reconcileSession(@Param('sessionId') sessionId: string) { return this.moneyService.reconcileSession(sessionId); }
+  reconcileSession(@Param('sessionId') sessionId: string, @CurrentUser() user: any) { return this.moneyService.reconcileSession(sessionId, user); }
 
   @RequirePermission('game.providers.view')
   @Get('provider-wallet-snapshots')
