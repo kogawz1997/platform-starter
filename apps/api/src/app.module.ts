@@ -20,6 +20,7 @@ import { GamePlatformModule } from './modules/game-platform/game-platform.module
 import { MoneyOpsModule } from './modules/money-ops/money-ops.module';
 import { SupportModule } from './modules/support/support.module';
 import { PromotionsModule } from './modules/promotions/promotions.module';
+import { AffiliatesModule } from './modules/affiliates/affiliates.module';
 import { HealthModule } from './modules/health/health.module';
 
 @Module({
@@ -45,6 +46,7 @@ import { HealthModule } from './modules/health/health.module';
     MoneyOpsModule,
     SupportModule,
     PromotionsModule,
+    AffiliatesModule,
     HealthModule,
   ],
 })
