@@ -2,9 +2,24 @@ export const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000
 
 export type CmsContent = {
   banners: Array<{ title: string; subtitle: string; imageUrl: string; href: string; enabled: boolean }>;
-  popup: { title: string; message: string; ctaLabel: string; href: string; enabled: boolean };
+  popup: { title: string; message: string; ctaLabel: string; href: string; enabled: boolean; version?: string };
   announcements: Array<{ title: string; message: string; enabled: boolean }>;
   faqs: Array<{ question: string; answer: string; enabled: boolean }>;
+};
+
+export type PromotionCampaign = {
+  id: string;
+  title: string;
+  description: string;
+  enabled: boolean;
+  bonusType: 'fixed' | 'percent';
+  bonusValue: number;
+  minDeposit: number;
+  maxBonus: number;
+  turnoverMultiplier: number;
+  claimMode: 'manual_review' | 'auto_pending';
+  startsAt?: string;
+  endsAt?: string;
 };
 
 export type PublicSiteSettings = {
@@ -20,10 +35,14 @@ export type PublicSiteSettings = {
 
 export const defaultCmsContent: CmsContent = {
   banners: [{ title: 'พร้อมเล่นทุกเกม', subtitle: 'ฝาก ถอน เล่นเกม และดูประวัติได้ในมือถือเครื่องเดียว', imageUrl: '', href: '/games', enabled: true }],
-  popup: { title: 'ประกาศ', message: 'ยินดีต้อนรับ', ctaLabel: 'ดูเกม', href: '/games', enabled: false },
+  popup: { title: 'ประกาศ', message: 'ยินดีต้อนรับ', ctaLabel: 'ดูเกม', href: '/games', enabled: false, version: 'v1' },
   announcements: [{ title: 'ระบบพร้อมใช้งาน', message: 'ฝาก ถอน และเกมเปิดให้บริการตามปกติ', enabled: true }],
   faqs: [{ question: 'ฝากใช้เวลานานไหม', answer: 'หลังแนบสลิป แอดมินจะตรวจและอนุมัติให้เร็วที่สุด', enabled: true }],
 };
+
+export const defaultPromotionCampaigns: PromotionCampaign[] = [
+  { id: 'welcome-bonus', title: 'โบนัสต้อนรับ', description: 'รับโบนัสสำหรับรายการฝากแรกตามเงื่อนไขที่กำหนด', enabled: false, bonusType: 'percent', bonusValue: 10, minDeposit: 100, maxBonus: 500, turnoverMultiplier: 3, claimMode: 'manual_review' },
+];
 
 export const defaultSettings: PublicSiteSettings = {
   website: {
@@ -61,6 +80,7 @@ export const defaultSettings: PublicSiteSettings = {
     withdraw_enabled: true,
     promotion_enabled: true,
     cms_content: defaultCmsContent,
+    promotion_campaigns: defaultPromotionCampaigns,
   },
 };
 
@@ -95,4 +115,23 @@ export function cmsContentSetting(settings: PublicSiteSettings): CmsContent {
     announcements: Array.isArray(data.announcements) ? data.announcements.map((item: any) => ({ title: String(item.title ?? ''), message: String(item.message ?? ''), enabled: item.enabled !== false })) : defaultCmsContent.announcements,
     faqs: Array.isArray(data.faqs) ? data.faqs.map((item: any) => ({ question: String(item.question ?? ''), answer: String(item.answer ?? ''), enabled: item.enabled !== false })) : defaultCmsContent.faqs,
   };
+}
+
+export function promotionCampaignsSetting(settings: PublicSiteSettings): PromotionCampaign[] {
+  const value = settings.features?.promotion_campaigns;
+  if (!Array.isArray(value)) return defaultPromotionCampaigns;
+  return value.map((item: any, index) => ({
+    id: String(item.id ?? `promotion-${index + 1}`),
+    title: String(item.title ?? 'Promotion'),
+    description: String(item.description ?? ''),
+    enabled: item.enabled !== false,
+    bonusType: item.bonusType === 'fixed' ? 'fixed' : 'percent',
+    bonusValue: Number(item.bonusValue ?? 0),
+    minDeposit: Number(item.minDeposit ?? 0),
+    maxBonus: Number(item.maxBonus ?? 0),
+    turnoverMultiplier: Number(item.turnoverMultiplier ?? 0),
+    claimMode: item.claimMode === 'auto_pending' ? 'auto_pending' : 'manual_review',
+    startsAt: typeof item.startsAt === 'string' ? item.startsAt : undefined,
+    endsAt: typeof item.endsAt === 'string' ? item.endsAt : undefined,
+  }));
 }
