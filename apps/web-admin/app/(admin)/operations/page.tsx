@@ -11,6 +11,7 @@ const groups = [
   { title: 'Game Platform', description: 'ค่ายเกม เกม และการโยกเงิน', items: [
     ['Provider Setup Wizard v2', '/provider-setup-wizard', 'ตั้งค่าค่ายเกมแบบ step flow'],
     ['Provider Presets Preview/Edit', '/provider-presets', 'preview endpoint/credential ก่อน apply'],
+    ['Credential Management', '/provider-credentials', 'rotate / enable / disable secret'],
     ['Adapter Test Harness', '/adapter-test', 'ทดสอบ adapter ทีละ method'],
     ['Mock Webhook Test', '/webhook-test', 'ยิง webhook จำลอง'],
     ['ค่ายเกม', '/game-providers', 'provider profile'],
