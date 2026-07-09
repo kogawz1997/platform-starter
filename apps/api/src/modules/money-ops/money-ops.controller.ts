@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Post, Query, Req, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, Post, Query, Req, UseGuards } from '@nestjs/common';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { RequirePermission } from '../../common/decorators/require-permission.decorator';
 import { AdminAuthGuard } from '../../common/guards/admin-auth.guard';
@@ -37,6 +37,14 @@ export class MoneyOpsController {
   @RequirePermission('game.providers.manage')
   @Post('alert-rules/scan')
   scanAlertRules(@CurrentUser() user: any, @Req() req: any) { return this.moneyOps.scanAlertRules(user, this.meta(req)); }
+
+  @RequirePermission('game.providers.manage')
+  @Patch('risk-alerts/:id/resolve')
+  resolveRiskAlert(@Param('id') id: string, @Body() body: any, @CurrentUser() user: any, @Req() req: any) { return this.moneyOps.resolveRiskAlert(id, user, this.meta(req), body?.note); }
+
+  @RequirePermission('game.providers.manage')
+  @Patch('risk-alerts/:id/dismiss')
+  dismissRiskAlert(@Param('id') id: string, @Body() body: any, @CurrentUser() user: any, @Req() req: any) { return this.moneyOps.dismissRiskAlert(id, user, this.meta(req), body?.note); }
 
   @RequirePermission('game.providers.view')
   @Get('provider-simulator/scenarios')
