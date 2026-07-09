@@ -8,6 +8,7 @@ const items = [
   { href: '/withdraw', label: 'ถอนเงิน', icon: '↗' },
   { href: '/games', label: 'เกม', icon: '🎮' },
   { href: '/bonus', label: 'โบนัส', icon: '★' },
+  { href: '/affiliate', label: 'ตัวแทน', icon: '↔' },
   { href: '/support', label: 'ช่วยเหลือ', icon: '✉' },
   { href: '/transactions', label: 'ประวัติ', icon: '≡' },
 ];
