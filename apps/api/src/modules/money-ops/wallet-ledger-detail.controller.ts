@@ -23,17 +23,17 @@ export class WalletLedgerDetailController {
     if (!item) throw new NotFoundException('Wallet ledger not found');
 
     const [gameTransfer, deposit, withdrawal, riskAlerts, auditLogs] = await Promise.all([
-      item.referenceId
+      item.referenceId && item.referenceType?.includes('GAME')
         ? this.prisma.gameTransfer.findFirst({
-            where: { OR: [{ id: item.referenceId }, { walletLedgerId: item.id }, { walletDebitLedgerId: item.id }, { walletRollbackLedgerId: item.id }] },
+            where: { id: item.referenceId },
             include: {
               provider: { select: { id: true, name: true, code: true } },
               session: { select: { id: true, providerSessionId: true, game: { select: { name: true, providerGameCode: true } } } },
             },
           })
         : null,
-      item.referenceId ? this.prisma.topUpRequest.findFirst({ where: { OR: [{ id: item.referenceId }, { walletLedgerId: item.id }] } }).catch(() => null) : null,
-      item.referenceId ? this.prisma.withdrawalRequest.findFirst({ where: { OR: [{ id: item.referenceId }, { walletLedgerId: item.id }] } }).catch(() => null) : null,
+      item.referenceId && item.referenceType?.includes('DEPOSIT') ? this.prisma.topUpRequest.findFirst({ where: { id: item.referenceId } }) : null,
+      item.referenceId && item.referenceType?.includes('WITHDRAW') ? this.prisma.withdrawalRequest.findFirst({ where: { id: item.referenceId } }) : null,
       this.prisma.riskAlert.findMany({
         where: {
           OR: [
