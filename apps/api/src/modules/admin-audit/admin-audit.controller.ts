@@ -10,6 +10,12 @@ export class AdminAuditController {
   constructor(private readonly service: AdminAuditService) {}
 
   @RequirePermission('admin.access.view')
+  @Get('risk-summary')
+  riskSummary(@Query() query: AuditLogQuery) {
+    return this.service.riskSummary(query);
+  }
+
+  @RequirePermission('admin.access.view')
   @Get()
   list(@Query() query: AuditLogQuery) {
     return this.service.list(query);
