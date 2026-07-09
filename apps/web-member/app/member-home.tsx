@@ -62,19 +62,9 @@ export default function MemberHome(props: MemberHomeProps) {
   const pendingTopups = useMemo(() => topups.filter((item) => item.status === 'PENDING').slice(0, 3), [topups]);
   const pendingWithdrawals = useMemo(() => withdrawals.filter((item) => item.status === 'PENDING').slice(0, 3), [withdrawals]);
   const pendingCount = pendingTopups.length + pendingWithdrawals.length;
-  const completedCount = topups.filter((item) => ['APPROVED', 'COMPLETED'].includes(item.status)).length + withdrawals.filter((item) => ['APPROVED', 'COMPLETED'].includes(item.status)).length;
 
   return (
     <section className="member-shell member-home-shell">
-      <section className="member-market-hero" style={{ background: `linear-gradient(135deg, ${props.primaryColor}22, rgba(255,255,255,.045)), ${props.cardColor}` }}>
-        <div>
-          <span className="member-eyebrow">ยินดีต้อนรับ</span>
-          <h1>{props.siteName}</h1>
-          <p>{props.description}</p>
-        </div>
-        <span className="member-market-badge">พร้อมใช้งาน</span>
-      </section>
-
       {props.showBalanceHeader && <WalletCard primaryColor={props.primaryColor} cardColor={props.cardColor} showButtons={props.showButtons && isLoggedIn} />}
 
       <section className="member-quick-panel">
@@ -82,13 +72,6 @@ export default function MemberHome(props: MemberHomeProps) {
         <QuickAction href="/withdraw" title="ถอนเงิน" subtitle="ส่งคำขอ" />
         <QuickAction href="/games" title="เกม" subtitle="เข้าเล่น" />
         <QuickAction href="/bank-accounts" title="บัญชี" subtitle="จัดการ" />
-      </section>
-
-      <section className="member-summary-grid">
-        <SummaryCard label="รอดำเนินการ" value={`${pendingCount} รายการ`} hot={pendingCount > 0} />
-        <SummaryCard label="สำเร็จ" value={`${completedCount} รายการ`} calm />
-        <SummaryCard label="ล่าสุด" value={`${ledgers.length} รายการ`} />
-        <SummaryCard label="สถานะ" value="ACTIVE" calm />
       </section>
 
       {isLoggedIn && pendingCount > 0 && <section className="member-info-card" style={alertCardStyle}>
@@ -116,9 +99,6 @@ export default function MemberHome(props: MemberHomeProps) {
 
 function QuickAction({ href, title, subtitle }: { href: string; title: string; subtitle: string }) {
   return <a href={href} className="member-quick-action"><strong>{title}</strong><span>{subtitle}</span></a>;
-}
-function SummaryCard({ label, value, hot = false, calm = false }: { label: string; value: string; hot?: boolean; calm?: boolean }) {
-  return <div className={`member-summary-card ${hot ? 'hot' : ''} ${calm ? 'calm' : ''}`}><span>{label}</span><strong>{value}</strong></div>;
 }
 function EmptyState({ title, description, actionHref, actionLabel, compact = false }: { title: string; description: string; actionHref: string; actionLabel: string; compact?: boolean }) {
   return <div style={compact ? compactEmptyStyle : emptyStyle}><div><strong>{title}</strong><span>{description}</span></div><a href={actionHref}>{actionLabel}</a></div>;
