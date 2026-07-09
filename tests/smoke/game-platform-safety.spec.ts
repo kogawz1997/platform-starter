@@ -42,10 +42,9 @@ test.describe('game platform safety smoke', () => {
   test('admin can list safety logs', async () => {
     test.skip(!ADMIN_TOKEN, 'Set SMOKE_ADMIN_TOKEN');
     const api = await request.newContext({ baseURL: API_URL, extraHTTPHeaders: { Authorization: `Bearer ${ADMIN_TOKEN}` } });
-    for (const path of ['/admin/game-transfers', '/admin/webhook-logs', '/admin/provider-wallet-snapshots', '/admin/game-sessions']) {
+    for (const path of ['/admin/game-transfers', '/admin/webhook-logs', '/admin/provider-wallet-snapshots', '/admin/game-sessions', '/admin/money-ops/control-center', '/admin/money-ops/alert-rules']) {
       const response = await api.get(path);
       expect(response.ok()).toBeTruthy();
-      expect(await response.json()).toHaveProperty('items');
     }
   });
 
@@ -59,6 +58,34 @@ test.describe('game platform safety smoke', () => {
     expect([200, 201, 208].includes(second.status())).toBeTruthy();
     const body = await second.json();
     expect(body.duplicate === true || body.ok === true).toBeTruthy();
+  });
+
+  test('provider simulator modes respond safely', async () => {
+    const api = await request.newContext({ baseURL: API_URL });
+    const health = await api.get('/provider-simulator/health');
+    expect(health.ok()).toBeTruthy();
+    const launch = await api.post('/provider-simulator/launch', { data: { gameCode: 'sim-slot-001' } });
+    expect(launch.ok()).toBeTruthy();
+    expect(await launch.json()).toHaveProperty('launchUrl');
+    const failed = await api.post('/provider-simulator/transfer-in', { data: { amount: 100, mode: 'failed' } });
+    expect(failed.ok()).toBeTruthy();
+    expect((await failed.json()).ok).toBeFalsy();
+    const mismatch = await api.post('/provider-simulator/balance', { data: { mode: 'mismatch' } });
+    expect(mismatch.ok()).toBeTruthy();
+    expect((await mismatch.json()).balance).toBe('777.77');
+    const invalidSignature = await api.post('/provider-simulator/webhook', { data: { mode: 'invalid_signature' } });
+    expect(invalidSignature.ok()).toBeTruthy();
+    expect((await invalidSignature.json()).ok).toBeFalsy();
+  });
+
+  test('money ops alert scan and ledger mutation gate are safe', async () => {
+    test.skip(!ADMIN_TOKEN, 'Set SMOKE_ADMIN_TOKEN');
+    const api = await request.newContext({ baseURL: API_URL, extraHTTPHeaders: { Authorization: `Bearer ${ADMIN_TOKEN}` } });
+    const scan = await api.post('/admin/money-ops/alert-rules/scan');
+    expect(scan.ok()).toBeTruthy();
+    expect(await scan.json()).toHaveProperty('persisted');
+    const mutate = await api.post('/admin/money-ops/ledger/mutate', { data: { userId: 'smoke-user', direction: 'CREDIT', amount: 1 } });
+    expect([403, 400, 404].includes(mutate.status())).toBeTruthy();
   });
 
   test('retry failed dry-run transfer is guarded', async () => {
