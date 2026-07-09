@@ -21,21 +21,38 @@ type MemberHomeProps = {
 
 type MoneyRequest = { id: string; amount: string; currency: string; status: string; method?: string | null; createdAt: string };
 type LedgerItem = { id: string; type: string; direction: string; amount: string; balanceAfter: string; createdAt: string };
+type GameMedia = { type: string; sourceUrl?: string | null; cachedUrl?: string | null };
+type Game = { id: string; providerGameCode: string; name: string; category: string; isFeatured?: boolean; isNew?: boolean; isPopular?: boolean; provider?: { name?: string | null; code?: string | null } | null; media?: GameMedia[] };
+type LobbyPayload = { items?: Game[]; featured?: Game[]; newest?: Game[]; popular?: Game[]; categories?: string[] };
+
+const FAVORITES_KEY = 'member_favorite_game_ids';
+const RECENT_KEY = 'member_recent_game_ids';
 
 export default function MemberHome(props: MemberHomeProps) {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [topups, setTopups] = useState<MoneyRequest[]>([]);
   const [withdrawals, setWithdrawals] = useState<MoneyRequest[]>([]);
   const [ledgers, setLedgers] = useState<LedgerItem[]>([]);
+  const [lobby, setLobby] = useState<LobbyPayload>({});
+  const [favoriteIds, setFavoriteIds] = useState<string[]>([]);
+  const [recentIds, setRecentIds] = useState<string[]>([]);
   const [activityMessage, setActivityMessage] = useState('');
   const [isActivityLoading, setIsActivityLoading] = useState(false);
 
   useEffect(() => {
     const ok = Boolean(window.localStorage.getItem('member_access_token') || window.localStorage.getItem('member_refresh_token'));
     setIsLoggedIn(ok);
+    setFavoriteIds(readIds(FAVORITES_KEY));
+    setRecentIds(readIds(RECENT_KEY));
+    loadGames();
     if (ok) loadActivity();
   }, []);
 
+  async function loadGames() {
+    const res = await memberApiFetch('/member/games');
+    const data = await res.json().catch(() => null);
+    if (res.ok) setLobby(data ?? {});
+  }
   async function loadActivity() {
     setIsActivityLoading(true);
     setActivityMessage('');
@@ -62,9 +79,16 @@ export default function MemberHome(props: MemberHomeProps) {
   const pendingTopups = useMemo(() => topups.filter((item) => item.status === 'PENDING').slice(0, 3), [topups]);
   const pendingWithdrawals = useMemo(() => withdrawals.filter((item) => item.status === 'PENDING').slice(0, 3), [withdrawals]);
   const pendingCount = pendingTopups.length + pendingWithdrawals.length;
+  const games = lobby.items ?? [];
+  const featured = (lobby.featured?.length ? lobby.featured : games.filter((game) => game.isFeatured)).slice(0, 8);
+  const popular = (lobby.popular?.length ? lobby.popular : games.filter((game) => game.isPopular)).slice(0, 8);
+  const recentGames = recentIds.map((id) => games.find((game) => game.id === id)).filter(Boolean) as Game[];
+  const favoriteGames = favoriteIds.map((id) => games.find((game) => game.id === id)).filter(Boolean) as Game[];
 
   return (
     <section className="member-shell member-home-shell">
+      {props.showPromotion && <section style={bannerStyle}><div><span style={eyebrowStyle}>พร้อมเล่น</span><h1 style={bannerTitleStyle}>{props.siteName}</h1><p style={mutedStyle}>{props.description || 'เลือกเกมที่ชอบ ฝาก ถอน และดูประวัติได้จากมือถือเครื่องเดียว'}</p></div><a href="/games" style={{ ...bannerButtonStyle, background: props.primaryColor }}>เข้าเล่นเกม</a></section>}
+
       {props.showBalanceHeader && <WalletCard primaryColor={props.primaryColor} cardColor={props.cardColor} showButtons={props.showButtons && isLoggedIn} />}
 
       <section className="member-quick-panel">
@@ -81,6 +105,13 @@ export default function MemberHome(props: MemberHomeProps) {
           {pendingWithdrawals.map((item) => <ActivityRow key={item.id} title="ถอนเงิน" href="/withdraw" item={item} />)}
         </div>
       </section>}
+
+      {props.showRecommended && <GameRail title="เกมแนะนำ" href="/games" items={featured} primaryColor={props.primaryColor} />}
+      {recentGames.length > 0 && <GameRail title="เล่นล่าสุด" href="/games" items={recentGames} primaryColor={props.primaryColor} />}
+      {favoriteGames.length > 0 && <GameRail title="เกมโปรด" href="/games" items={favoriteGames} primaryColor={props.primaryColor} />}
+      {popular.length > 0 && <GameRail title="ยอดนิยม" href="/games" items={popular} primaryColor={props.primaryColor} />}
+
+      {props.showCategories && <section className="member-info-card"><div style={sectionHeadStyle}><h2>หมวดเกม</h2><a href="/games" style={{ color: props.primaryColor, fontWeight: 900, textDecoration: 'none' }}>ดูทั้งหมด</a></div><div style={categoryGridStyle}>{(lobby.categories ?? []).slice(0, 8).map((item) => <a key={item} href={`/games?category=${encodeURIComponent(item)}`} style={categoryPillStyle}>{categoryLabel(item)}</a>)}{(lobby.categories ?? []).length === 0 && <span style={mutedStyle}>ยังไม่มีหมวดเกม</span>}</div></section>}
 
       {isLoggedIn && <section className="member-info-card">
         <div style={sectionHeadStyle}><h2>ล่าสุด</h2><a href="/transactions" style={{ color: props.primaryColor, fontWeight: 900, textDecoration: 'none' }}>ทั้งหมด</a></div>
@@ -100,6 +131,7 @@ export default function MemberHome(props: MemberHomeProps) {
 function QuickAction({ href, title, subtitle }: { href: string; title: string; subtitle: string }) {
   return <a href={href} className="member-quick-action"><strong>{title}</strong><span>{subtitle}</span></a>;
 }
+function GameRail({ title, href, items, primaryColor }: { title: string; href: string; items: Game[]; primaryColor: string }) { if (items.length === 0) return null; return <section className="member-info-card"><div style={sectionHeadStyle}><h2>{title}</h2><a href={href} style={{ color: primaryColor, fontWeight: 900, textDecoration: 'none' }}>ดูทั้งหมด</a></div><div style={gameRailStyle}>{items.slice(0, 8).map((game) => <a key={game.id} href="/games" style={gameTileStyle}>{pickImage(game) ? <img src={pickImage(game) ?? ''} alt="" style={gameImageStyle} /> : <div style={gameFallbackStyle}>{game.name.slice(0, 2).toUpperCase()}</div>}<strong>{game.name}</strong><span>{game.provider?.name ?? game.providerGameCode}</span></a>)}</div></section>; }
 function EmptyState({ title, description, actionHref, actionLabel, compact = false }: { title: string; description: string; actionHref: string; actionLabel: string; compact?: boolean }) {
   return <div style={compact ? compactEmptyStyle : emptyStyle}><div><strong>{title}</strong><span>{description}</span></div><a href={actionHref}>{actionLabel}</a></div>;
 }
@@ -113,6 +145,8 @@ function ledgerTypeLabel(type: string) {
   const upper = type.toUpperCase();
   if (upper.includes('DEPOSIT') || upper.includes('TOPUP')) return 'ฝาก';
   if (upper.includes('WITHDRAW')) return 'ถอนเงิน';
+  if (upper.includes('TRANSFER')) return 'โยกเงิน';
+  if (upper.includes('REVERSAL')) return 'คืนเงิน';
   if (upper.includes('ADJUST')) return 'ปรับยอด';
   return 'รายการ';
 }
@@ -123,9 +157,16 @@ function statusLabel(status: string) {
   if (upper === 'REJECTED') return 'ไม่อนุมัติ';
   return status;
 }
+function pickImage(game: Game) { const media = game.media ?? []; return media.find((item) => item.type === 'COVER')?.cachedUrl ?? media.find((item) => item.type === 'COVER')?.sourceUrl ?? media.find((item) => item.type === 'ICON')?.cachedUrl ?? media.find((item) => item.type === 'ICON')?.sourceUrl ?? null; }
+function categoryLabel(value: string) { const map: Record<string, string> = { slot: 'สล็อต', casino: 'คาสิโน', sport: 'กีฬา', fishing: 'ยิงปลา', popular: 'ยอดนิยม', new: 'ใหม่' }; return map[value?.toLowerCase?.()] ?? value; }
+function readIds(key: string) { try { return JSON.parse(window.localStorage.getItem(key) ?? '[]') as string[]; } catch { return []; } }
 function formatMoney(value: string | number, currency: string) {
   return `${currency} ${Number(value).toLocaleString('th-TH', { minimumFractionDigits: 2 })}`;
 }
+const bannerStyle = { border: '1px solid rgba(245,197,66,.26)', borderRadius: 28, padding: 18, background: 'radial-gradient(circle at top left, rgba(245,197,66,.24), transparent 38%), rgba(255,255,255,.05)', display: 'flex', justifyContent: 'space-between', gap: 14, alignItems: 'center', flexWrap: 'wrap' as const } as const;
+const eyebrowStyle = { color: '#facc15', fontWeight: 950, fontSize: 12, letterSpacing: '.1em', textTransform: 'uppercase' as const } as const;
+const bannerTitleStyle = { margin: '4px 0 6px', fontSize: 30, lineHeight: 1.05 } as const;
+const bannerButtonStyle = { minHeight: 44, borderRadius: 14, padding: '0 16px', display: 'inline-flex', alignItems: 'center', color: '#111827', fontWeight: 950, textDecoration: 'none' } as const;
 const alertCardStyle = { borderColor: 'rgba(245,197,66,.32)', background: 'linear-gradient(180deg, rgba(245,197,66,.13), rgba(255,255,255,.04))' } as const;
 const pendingListStyle = { display: 'grid', gap: 10, marginTop: 12, minWidth: 0 } as const;
 const sectionHeadStyle = { display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, flexWrap: 'wrap' as const, minWidth: 0 };
@@ -136,3 +177,10 @@ const noticeStyle = { border: '1px solid rgba(255,255,255,.12)', borderRadius: 1
 const retryButtonStyle = { justifySelf: 'start', border: '1px solid rgba(255,255,255,.16)', borderRadius: 999, padding: '8px 12px', background: 'rgba(255,255,255,.08)', color: '#fff', cursor: 'pointer' } as const;
 const emptyStyle = { border: '1px dashed rgba(245,197,66,.34)', borderRadius: 24, padding: 16, background: 'rgba(245,197,66,.07)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap' as const } as const;
 const compactEmptyStyle = { ...emptyStyle, borderColor: 'rgba(255,255,255,.16)', background: 'rgba(255,255,255,.04)' } as const;
+const mutedStyle = { margin: 0, color: '#cbd5e1', lineHeight: 1.55 } as const;
+const gameRailStyle = { display: 'grid', gridAutoFlow: 'column', gridAutoColumns: 'minmax(132px, 38%)', gap: 12, overflowX: 'auto' as const, paddingTop: 12 } as const;
+const gameTileStyle = { color: 'inherit', textDecoration: 'none', border: '1px solid rgba(255,255,255,.10)', borderRadius: 18, overflow: 'hidden', background: 'rgba(15,23,42,.65)', display: 'grid', gap: 6, paddingBottom: 10 } as const;
+const gameImageStyle = { width: '100%', aspectRatio: '4 / 3', objectFit: 'cover' as const, display: 'block' };
+const gameFallbackStyle = { aspectRatio: '4 / 3', display: 'grid', placeItems: 'center', background: 'rgba(245,197,66,.12)', color: '#facc15', fontSize: 26, fontWeight: 950 } as const;
+const categoryGridStyle = { display: 'flex', gap: 10, overflowX: 'auto' as const, paddingTop: 12 } as const;
+const categoryPillStyle = { border: '1px solid rgba(255,255,255,.14)', borderRadius: 999, padding: '10px 14px', color: '#fff', background: 'rgba(255,255,255,.06)', textDecoration: 'none', whiteSpace: 'nowrap' as const, fontWeight: 900 } as const;
