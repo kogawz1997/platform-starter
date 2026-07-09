@@ -1,17 +1,54 @@
-import { AdminBadge, AdminCard, AdminGrid, AdminMetric, AdminMetricGrid, AdminNotice, AdminPage, AdminRow, AdminStack } from '../_components/admin-ui';
+'use client';
 
-const contentTypes = [
-  ['Banner', 'หน้าแรก/member lobby, ลำดับ, รูปมือถือ'],
-  ['Popup', 'ข้อความแจ้งเตือน, ช่วงเวลาแสดง, ปุ่ม CTA'],
-  ['Announcement', 'ประกาศระบบ, แจ้งปิดปรับปรุง, ข่าวโปร'],
-  ['FAQ', 'คำถามฝาก ถอน สมัคร เล่นเกม'],
-  ['Game ordering', 'จัดเรียงหมวด/เกมแนะนำ'],
-];
+import { useEffect, useMemo, useState } from 'react';
+import { adminApiFetch } from '../../admin-api';
+import { AdminBadge, AdminButton, AdminCard, AdminGrid, AdminMetric, AdminMetricGrid, AdminNotice, AdminPage, AdminRow, AdminStack, AdminToolbar } from '../_components/admin-ui';
+
+type CmsContent = {
+  banners: Array<{ title: string; subtitle: string; imageUrl: string; href: string; enabled: boolean }>;
+  popup: { title: string; message: string; ctaLabel: string; href: string; enabled: boolean };
+  announcements: Array<{ title: string; message: string; enabled: boolean }>;
+  faqs: Array<{ question: string; answer: string; enabled: boolean }>;
+};
+
+const defaultContent: CmsContent = {
+  banners: [{ title: 'พร้อมเล่นทุกเกม', subtitle: 'ฝาก ถอน เล่นเกม และดูประวัติได้ในมือถือเครื่องเดียว', imageUrl: '', href: '/games', enabled: true }],
+  popup: { title: 'ประกาศ', message: 'ยินดีต้อนรับ', ctaLabel: 'ดูเกม', href: '/games', enabled: false },
+  announcements: [{ title: 'ระบบพร้อมใช้งาน', message: 'ฝาก ถอน และเกมเปิดให้บริการตามปกติ', enabled: true }],
+  faqs: [{ question: 'ฝากใช้เวลานานไหม', answer: 'หลังแนบสลิป แอดมินจะตรวจและอนุมัติให้เร็วที่สุด', enabled: true }],
+};
 
 export default function ContentCenterPage() {
-  return <AdminPage eyebrow="Content" title="CMS / Banner / Popup" description="ศูนย์จัดการคอนเทนต์สำหรับหน้าเว็บและประกาศ ยังเป็น scaffold ก่อนต่อ DB จริง">
-    <AdminNotice>เริ่มจาก content config ที่ไม่แตะเงินก่อน ปลอดภัยและเห็นผลไวกว่าไปสร้างโบนัสซับซ้อนแบบมนุษย์ใจร้อน</AdminNotice>
-    <AdminMetricGrid><AdminMetric tone="success" title="Banner" value="Ready" helper="เริ่มออกแบบได้" /><AdminMetric tone="warning" title="Popup" value="Pending" helper="ต้องมี scheduling" /><AdminMetric tone="neutral" title="FAQ" value="Pending" helper="รอ content model" /></AdminMetricGrid>
-    <AdminGrid><AdminCard title="Content modules" tone="success"><AdminStack>{contentTypes.map(([title, desc]) => <AdminRow key={title}><strong>{title}</strong><span>{desc}</span></AdminRow>)}</AdminStack></AdminCard><AdminCard title="Next build"><AdminStack><AdminRow><strong>SiteSetting-backed content</strong><AdminBadge tone="success">เหมาะเริ่มก่อน</AdminBadge></AdminRow><AdminRow><strong>Image upload</strong><AdminBadge tone="warning">รอ storage policy</AdminBadge></AdminRow><AdminRow><strong>Preview บนมือถือ</strong><AdminBadge tone="warning">ควรทำ</AdminBadge></AdminRow></AdminStack></AdminCard></AdminGrid>
+  const [content, setContent] = useState<CmsContent>(defaultContent);
+  const [message, setMessage] = useState('กำลังโหลด CMS...');
+  const [saving, setSaving] = useState(false);
+  useEffect(() => { load(); }, []);
+  const stats = useMemo(() => ({ banners: content.banners.filter((item) => item.enabled).length, announcements: content.announcements.filter((item) => item.enabled).length, faqs: content.faqs.filter((item) => item.enabled).length, popup: content.popup.enabled ? 1 : 0 }), [content]);
+  async function load() { const res = await adminApiFetch('/admin/settings/features'); const data = await res.json().catch(() => null); if (!res.ok) { setMessage(data?.message ?? 'โหลด CMS ไม่สำเร็จ'); return; } setContent(normalizeContent(data?.settings?.cms_content)); setMessage(''); }
+  async function save() { setSaving(true); setMessage('กำลังบันทึก CMS...'); const res = await adminApiFetch('/admin/settings/features', { method: 'PUT', body: JSON.stringify({ cms_content: content }) }); const data = await res.json().catch(() => null); setSaving(false); if (!res.ok) { setMessage(data?.message ?? 'บันทึก CMS ไม่สำเร็จ'); return; } setMessage('บันทึก CMS แล้ว'); }
+  return <AdminPage eyebrow="Content" title="CMS / Banner / Popup" description="จัดการ banner, popup, announcement และ FAQ ผ่าน SiteSetting โดยไม่ต้องเพิ่ม schema ใหม่ให้ระบบปวดหัวฟรี" actions={<><AdminButton onClick={load} tone="secondary">รีเฟรช</AdminButton><AdminButton onClick={save} disabled={saving}>{saving ? 'กำลังบันทึก...' : 'บันทึก'}</AdminButton></>}>
+    {message && <AdminNotice>{message}</AdminNotice>}
+    <AdminMetricGrid><AdminMetric tone="success" title="Banner เปิดอยู่" value={String(stats.banners)} helper={`${content.banners.length} รายการ`} /><AdminMetric tone={stats.popup ? 'success' : 'neutral'} title="Popup" value={stats.popup ? 'เปิด' : 'ปิด'} helper="แสดงบน member ได้ภายหลัง" /><AdminMetric tone="success" title="Announcement" value={String(stats.announcements)} helper="ประกาศที่เปิด" /><AdminMetric tone="neutral" title="FAQ" value={String(stats.faqs)} helper="คำถามที่เปิด" /></AdminMetricGrid>
+    <AdminGrid><AdminCard title="Banner หน้าแรก" tone="success"><AdminStack>{content.banners.map((item, index) => <EditorCard key={index} title={`Banner ${index + 1}`} enabled={item.enabled} onToggle={() => patchBanner(index, { enabled: !item.enabled }, setContent)} onRemove={() => setContent((current) => ({ ...current, banners: current.banners.filter((_, i) => i !== index) }))}><Field label="หัวข้อ" value={item.title} onChange={(value) => patchBanner(index, { title: value }, setContent)} /><Field label="ข้อความรอง" value={item.subtitle} onChange={(value) => patchBanner(index, { subtitle: value }, setContent)} /><Field label="ลิงก์รูป" value={item.imageUrl} onChange={(value) => patchBanner(index, { imageUrl: value }, setContent)} /><Field label="ลิงก์ปุ่ม" value={item.href} onChange={(value) => patchBanner(index, { href: value }, setContent)} /></EditorCard>)}<AdminButton tone="secondary" onClick={() => setContent((current) => ({ ...current, banners: [...current.banners, { title: 'Banner ใหม่', subtitle: '', imageUrl: '', href: '/games', enabled: true }] }))}>เพิ่ม Banner</AdminButton></AdminStack></AdminCard>
+    <AdminCard title="Popup" tone={content.popup.enabled ? 'warning' : 'neutral'}><AdminStack><EditorCard title="Popup หลัก" enabled={content.popup.enabled} onToggle={() => setContent((current) => ({ ...current, popup: { ...current.popup, enabled: !current.popup.enabled } }))}><Field label="หัวข้อ" value={content.popup.title} onChange={(value) => patchPopup({ title: value }, setContent)} /><Field label="ข้อความ" value={content.popup.message} onChange={(value) => patchPopup({ message: value }, setContent)} textarea /><Field label="ปุ่ม" value={content.popup.ctaLabel} onChange={(value) => patchPopup({ ctaLabel: value }, setContent)} /><Field label="ลิงก์" value={content.popup.href} onChange={(value) => patchPopup({ href: value }, setContent)} /></EditorCard></AdminStack></AdminCard></AdminGrid>
+    <AdminGrid><AdminCard title="Announcement" tone="warning"><AdminStack>{content.announcements.map((item, index) => <EditorCard key={index} title={`ประกาศ ${index + 1}`} enabled={item.enabled} onToggle={() => patchAnnouncement(index, { enabled: !item.enabled }, setContent)} onRemove={() => setContent((current) => ({ ...current, announcements: current.announcements.filter((_, i) => i !== index) }))}><Field label="หัวข้อ" value={item.title} onChange={(value) => patchAnnouncement(index, { title: value }, setContent)} /><Field label="ข้อความ" value={item.message} onChange={(value) => patchAnnouncement(index, { message: value }, setContent)} textarea /></EditorCard>)}<AdminButton tone="secondary" onClick={() => setContent((current) => ({ ...current, announcements: [...current.announcements, { title: 'ประกาศใหม่', message: '', enabled: true }] }))}>เพิ่มประกาศ</AdminButton></AdminStack></AdminCard>
+    <AdminCard title="FAQ" tone="neutral"><AdminStack>{content.faqs.map((item, index) => <EditorCard key={index} title={`FAQ ${index + 1}`} enabled={item.enabled} onToggle={() => patchFaq(index, { enabled: !item.enabled }, setContent)} onRemove={() => setContent((current) => ({ ...current, faqs: current.faqs.filter((_, i) => i !== index) }))}><Field label="คำถาม" value={item.question} onChange={(value) => patchFaq(index, { question: value }, setContent)} /><Field label="คำตอบ" value={item.answer} onChange={(value) => patchFaq(index, { answer: value }, setContent)} textarea /></EditorCard>)}<AdminButton tone="secondary" onClick={() => setContent((current) => ({ ...current, faqs: [...current.faqs, { question: 'คำถามใหม่', answer: '', enabled: true }] }))}>เพิ่ม FAQ</AdminButton></AdminStack></AdminCard></AdminGrid>
+    <AdminToolbar><strong>Preview JSON</strong><span style={mutedStyle}>เก็บใน features.cms_content, public ได้ เพราะไม่ใช่ secret</span></AdminToolbar><pre style={preStyle}>{JSON.stringify(content, null, 2)}</pre>
   </AdminPage>;
 }
+
+function EditorCard({ title, enabled, onToggle, onRemove, children }: { title: string; enabled: boolean; onToggle: () => void; onRemove?: () => void; children: React.ReactNode }) { return <div style={editorStyle}><AdminRow><strong>{title}</strong><div style={rowActionsStyle}><AdminBadge tone={enabled ? 'success' : 'neutral'}>{enabled ? 'เปิด' : 'ปิด'}</AdminBadge><AdminButton tone="secondary" onClick={onToggle}>{enabled ? 'ปิด' : 'เปิด'}</AdminButton>{onRemove && <AdminButton tone="danger" onClick={onRemove}>ลบ</AdminButton>}</div></AdminRow><div style={fieldGridStyle}>{children}</div></div>; }
+function Field({ label, value, onChange, textarea = false }: { label: string; value: string; onChange: (value: string) => void; textarea?: boolean }) { return <label style={fieldStyle}><span>{label}</span>{textarea ? <textarea value={value} onChange={(event) => onChange(event.target.value)} style={textareaStyle} /> : <input value={value} onChange={(event) => onChange(event.target.value)} style={inputStyle} />}</label>; }
+function normalizeContent(value: unknown): CmsContent { const data = value && typeof value === 'object' && !Array.isArray(value) ? value as Partial<CmsContent> : {}; return { banners: Array.isArray(data.banners) ? data.banners.map((item: any) => ({ title: String(item.title ?? ''), subtitle: String(item.subtitle ?? ''), imageUrl: String(item.imageUrl ?? ''), href: String(item.href ?? '/games'), enabled: item.enabled !== false })) : defaultContent.banners, popup: { ...defaultContent.popup, ...(data.popup && typeof data.popup === 'object' ? data.popup : {}) } as CmsContent['popup'], announcements: Array.isArray(data.announcements) ? data.announcements.map((item: any) => ({ title: String(item.title ?? ''), message: String(item.message ?? ''), enabled: item.enabled !== false })) : defaultContent.announcements, faqs: Array.isArray(data.faqs) ? data.faqs.map((item: any) => ({ question: String(item.question ?? ''), answer: String(item.answer ?? ''), enabled: item.enabled !== false })) : defaultContent.faqs }; }
+function patchBanner(index: number, patch: Partial<CmsContent['banners'][number]>, setContent: React.Dispatch<React.SetStateAction<CmsContent>>) { setContent((current) => ({ ...current, banners: current.banners.map((item, i) => i === index ? { ...item, ...patch } : item) })); }
+function patchPopup(patch: Partial<CmsContent['popup']>, setContent: React.Dispatch<React.SetStateAction<CmsContent>>) { setContent((current) => ({ ...current, popup: { ...current.popup, ...patch } })); }
+function patchAnnouncement(index: number, patch: Partial<CmsContent['announcements'][number]>, setContent: React.Dispatch<React.SetStateAction<CmsContent>>) { setContent((current) => ({ ...current, announcements: current.announcements.map((item, i) => i === index ? { ...item, ...patch } : item) })); }
+function patchFaq(index: number, patch: Partial<CmsContent['faqs'][number]>, setContent: React.Dispatch<React.SetStateAction<CmsContent>>) { setContent((current) => ({ ...current, faqs: current.faqs.map((item, i) => i === index ? { ...item, ...patch } : item) })); }
+const mutedStyle = { color: '#94a3b8' } as const;
+const editorStyle = { border: '1px solid rgba(148,163,184,.14)', borderRadius: 16, padding: 12, background: 'rgba(255,255,255,.04)', display: 'grid', gap: 10 } as const;
+const rowActionsStyle = { display: 'flex', gap: 8, flexWrap: 'wrap' as const, alignItems: 'center' };
+const fieldGridStyle = { display: 'grid', gap: 10 } as const;
+const fieldStyle = { display: 'grid', gap: 6, fontWeight: 850 } as const;
+const inputStyle = { minHeight: 42, borderRadius: 12, border: '1px solid rgba(148,163,184,.22)', background: '#0b1220', color: '#f8fafc', padding: '0 12px', minWidth: 0 } as const;
+const textareaStyle = { ...inputStyle, minHeight: 86, padding: 12, resize: 'vertical' as const };
+const preStyle = { overflowX: 'auto' as const, whiteSpace: 'pre-wrap' as const, border: '1px solid rgba(148,163,184,.14)', borderRadius: 16, padding: 14, background: '#020617', color: '#cbd5e1' } as const;
