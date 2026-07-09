@@ -12,6 +12,11 @@ import { GamePlatformMoneyService } from './game-platform-money.service';
 export class MemberGameTransferController {
   constructor(private readonly moneyService: GamePlatformMoneyService) {}
 
+  @Get('game-sessions/:sessionId/transfers')
+  listSessionTransfers(@Param('sessionId') sessionId: string, @CurrentUser() user: any) {
+    return this.moneyService.listMemberSessionTransfers(sessionId, user);
+  }
+
   @Post('game-sessions/:sessionId/transfer-in')
   transferIn(@Param('sessionId') sessionId: string, @Body() body: CreateGameTransferDto, @CurrentUser() user: any, @Req() req: any) {
     return this.moneyService.transferDryRun(sessionId, user, 'TRANSFER_IN', normalizeTransferAmount(body), this.meta(req));
@@ -37,6 +42,18 @@ export class AdminGameMoneyController {
   @RequirePermission('game.providers.view')
   @Get('game-transfers/:id')
   getTransfer(@Param('id') id: string) { return this.moneyService.getTransfer(id); }
+
+  @RequirePermission('game.providers.manage')
+  @Post('game-sessions/:sessionId/reconcile')
+  reconcileSession(@Param('sessionId') sessionId: string) { return this.moneyService.reconcileSession(sessionId); }
+
+  @RequirePermission('game.providers.view')
+  @Get('provider-wallet-snapshots')
+  listSnapshots() { return this.moneyService.listSnapshots(); }
+
+  @RequirePermission('game.providers.view')
+  @Get('provider-wallet-snapshots/:id')
+  getSnapshot(@Param('id') id: string) { return this.moneyService.getSnapshot(id); }
 
   @RequirePermission('game.providers.view')
   @Get('webhook-logs')
