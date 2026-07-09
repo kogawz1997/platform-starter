@@ -20,6 +20,10 @@ export type PromotionCampaign = {
   maxBonus: number;
   turnoverMultiplier: number;
   claimMode: 'manual_review' | 'auto_pending';
+  imageUrl?: string;
+  iconUrl?: string;
+  badgeText?: string;
+  accentColor?: string;
   startsAt?: string;
   endsAt?: string;
 };
@@ -44,7 +48,7 @@ export const defaultCmsContent: CmsContent = {
 };
 
 export const defaultPromotionCampaigns: PromotionCampaign[] = [
-  { id: 'welcome-bonus', title: 'โบนัสต้อนรับ', description: 'รับโบนัสสำหรับรายการฝากแรกตามเงื่อนไขที่กำหนด', enabled: false, bonusType: 'percent', bonusValue: 10, minDeposit: 100, maxBonus: 500, turnoverMultiplier: 3, claimMode: 'manual_review' },
+  { id: 'welcome-bonus', title: 'โบนัสต้อนรับ', description: 'รับโบนัสสำหรับรายการฝากแรกตามเงื่อนไขที่กำหนด', enabled: false, bonusType: 'percent', bonusValue: 10, minDeposit: 100, maxBonus: 500, turnoverMultiplier: 3, claimMode: 'manual_review', badgeText: 'WELCOME', accentColor: '#f5c542' },
 ];
 
 export const defaultSettings: PublicSiteSettings = {
@@ -85,5 +89,22 @@ export function cmsAssetUrl(content: CmsContent, assetId?: string) { if (!assetI
 export function promotionCampaignsSetting(settings: PublicSiteSettings): PromotionCampaign[] {
   const value = settings.features?.promotion_campaigns;
   if (!Array.isArray(value)) return defaultPromotionCampaigns;
-  return value.map((item: any, index) => ({ id: String(item.id ?? `promotion-${index + 1}`), title: String(item.title ?? 'Promotion'), description: String(item.description ?? ''), enabled: item.enabled !== false, bonusType: item.bonusType === 'fixed' ? 'fixed' : 'percent', bonusValue: Number(item.bonusValue ?? 0), minDeposit: Number(item.minDeposit ?? 0), maxBonus: Number(item.maxBonus ?? 0), turnoverMultiplier: Number(item.turnoverMultiplier ?? 0), claimMode: item.claimMode === 'auto_pending' ? 'auto_pending' : 'manual_review', startsAt: typeof item.startsAt === 'string' ? item.startsAt : undefined, endsAt: typeof item.endsAt === 'string' ? item.endsAt : undefined }));
+  return value.map((item: any, index) => ({
+    id: String(item.id ?? `promotion-${index + 1}`),
+    title: String(item.title ?? 'Promotion'),
+    description: String(item.description ?? ''),
+    enabled: item.enabled !== false,
+    bonusType: item.bonusType === 'fixed' ? 'fixed' : 'percent',
+    bonusValue: Number(item.bonusValue ?? 0),
+    minDeposit: Number(item.minDeposit ?? 0),
+    maxBonus: Number(item.maxBonus ?? 0),
+    turnoverMultiplier: Number(item.turnoverMultiplier ?? 0),
+    claimMode: item.claimMode === 'auto_pending' ? 'auto_pending' : 'manual_review',
+    imageUrl: typeof item.imageUrl === 'string' ? item.imageUrl : '',
+    iconUrl: typeof item.iconUrl === 'string' ? item.iconUrl : '',
+    badgeText: typeof item.badgeText === 'string' ? item.badgeText : '',
+    accentColor: typeof item.accentColor === 'string' ? item.accentColor : '#f5c542',
+    startsAt: typeof item.startsAt === 'string' ? item.startsAt : undefined,
+    endsAt: typeof item.endsAt === 'string' ? item.endsAt : undefined,
+  }));
 }
