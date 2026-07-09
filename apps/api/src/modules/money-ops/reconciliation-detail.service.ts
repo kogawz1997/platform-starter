@@ -20,7 +20,7 @@ export class ReconciliationDetailService {
       sessionId ? this.prisma.gameSession.findUnique({ where: { id: sessionId }, include: { game: { select: { id: true, name: true, providerGameCode: true } }, provider: { select: { id: true, name: true, code: true } }, user: { select: { id: true, username: true, phone: true } } } }) : null,
       this.prisma.gameTransfer.findMany({ where: sessionId ? { sessionId } : { userId: snapshot.userId, providerId: snapshot.providerId }, orderBy: { createdAt: 'desc' }, take: 25, include: { user: { select: { id: true, username: true, phone: true } }, provider: { select: { id: true, name: true, code: true } }, session: { select: { id: true, providerSessionId: true, game: { select: { id: true, name: true, providerGameCode: true } } } } } }),
       this.prisma.riskAlert.findMany({ where: { refType: 'PROVIDER_WALLET_SNAPSHOT', refId: snapshot.id }, orderBy: { createdAt: 'desc' }, take: 25 }),
-      this.prisma.adminAuditLog.findMany({ where: { targetId: snapshot.id, module: { in: ['game_platform', 'game-platform', 'money_ops'] } }, orderBy: { createdAt: 'desc' }, take: 25, include: { adminUser: { select: { id: true, username: true, displayName: true } } } }),
+      this.prisma.adminAuditLog.findMany({ where: { targetId: snapshot.id, module: { in: ['game_platform', 'game-platform', 'money_ops'] } }, orderBy: { createdAt: 'desc' }, take: 25, include: { adminUser: { select: { id: true, username: true, email: true } } } }),
     ]);
 
     return {
