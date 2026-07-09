@@ -12,6 +12,6 @@ export class ProviderSimulatorAdminController {
   @RequirePermission('game.providers.manage')
   @Post('webhook-test')
   webhookTest(@Body() body: unknown) {
-    return this.moneyOps.simulatorWebhook(body as any);
+    return this.moneyOps.simulatorWebhookTest(body as any);
   }
 }
