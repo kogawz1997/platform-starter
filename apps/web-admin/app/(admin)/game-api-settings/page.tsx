@@ -1,8 +1,8 @@
 import { AdminBadge, AdminCard, AdminGrid, AdminLinkButton, AdminMetric, AdminMetricGrid, AdminNotice, AdminPage, AdminRow, AdminStack, AdminToolbar } from '../_components/admin-ui';
 
 const quickSteps = [
-  ['1', 'เลือกค่ายเกม', 'สร้างหรือเลือก Provider แล้วตั้งชื่อที่ทีมใช้งานจำง่าย', '/game-providers'],
-  ['2', 'ใส่ข้อมูลเชื่อมต่อ', 'กรอก Base URL, API Key, Secret, Agent/Merchant ID และ Webhook Secret เท่าที่จำเป็น', '/game-providers'],
+  ['1', 'เลือก Preset', 'เลือก template ค่ายเกมก่อนเริ่มตั้งค่า ไม่ต้องจำ endpoint เองทั้งหมด', '/provider-presets'],
+  ['2', 'Setup Wizard', 'ทำตาม wizard เพื่อสร้าง provider, credential, endpoint และ gate', '/provider-setup-wizard'],
   ['3', 'ตรวจพร้อมใช้งาน', 'เปิดหน้า Risk/Preflight เพื่อเช็ก endpoint, credential, transfer gate และเงินจริง', '/provider-risk'],
 ];
 
@@ -45,9 +45,9 @@ export default function GameApiSettingsPage() {
       eyebrow="Game Platform"
       title="ตั้งค่า API เกม"
       description="หน้าใช้งานจริงแบบตลาด: ตั้งค่าให้น้อยที่สุดก่อน แล้วค่อยเปิดขั้นสูงเมื่อต้อง map endpoint เฉพาะค่าย"
-      actions={<><AdminLinkButton href="/game-providers" tone="primary">ตั้งค่าค่ายเกม</AdminLinkButton><AdminLinkButton href="/provider-risk">ตรวจความพร้อม</AdminLinkButton></>}
+      actions={<><AdminLinkButton href="/provider-setup-wizard" tone="primary">Setup Wizard</AdminLinkButton><AdminLinkButton href="/operations">Operations Hub</AdminLinkButton></>}
     >
-      <AdminNotice>แนะนำ: เริ่มจาก Demo/Dry-run หรือ Transfer Wallet ก่อนเสมอ อย่าเปิดเงินจริงจนกว่า Preflight ผ่านครบทุกข้อ เพราะฐานข้อมูลไม่ได้ชอบความตื่นเต้นแบบนั้น</AdminNotice>
+      <AdminNotice>แนะนำ: เริ่มจาก Preset + Wizard แล้วเปิด Transfer Wallet ก่อนเสมอ อย่าเปิดเงินจริงจนกว่า Preflight ผ่านครบทุกข้อ เพราะฐานข้อมูลไม่ได้ชอบความตื่นเต้นแบบนั้น</AdminNotice>
 
       <AdminMetricGrid>
         <AdminMetric title="Setup mode" value="ง่าย" helper="ซ่อน endpoint ขั้นสูงไว้ก่อน" />
@@ -79,9 +79,11 @@ export default function GameApiSettingsPage() {
 
       <h2 style={sectionTitleStyle}>ทางลัดงานจริง</h2>
       <AdminGrid>
+        <AdminCard title="Provider Presets" description="เลือก template endpoint/credential ก่อนตั้งค่า" action={<AdminLinkButton href="/provider-presets">เปิด</AdminLinkButton>}><p style={mutedStyle}>เริ่มจาก preset แล้วค่อยกรอกค่าจริง</p></AdminCard>
         <AdminCard title="Provider Risk" description="เช็ก health, gate, preflight และ blocker ก่อนเปิดใช้งาน" action={<AdminLinkButton href="/provider-risk">เปิด</AdminLinkButton>}><p style={mutedStyle}>ใช้หน้านี้เป็นด่านสุดท้ายก่อนเปิดค่ายเกมจริง</p></AdminCard>
-        <AdminCard title="Game Transfers" description="ดู transfer-in/out และ retry dry-run" action={<AdminLinkButton href="/game-transfers">เปิด</AdminLinkButton>}><p style={mutedStyle}>เหมาะสำหรับไล่ปัญหาโยกเงินเข้าออกเกม</p></AdminCard>
-        <AdminCard title="Webhook Logs" description="ดู callback, duplicate, invalid signature" action={<AdminLinkButton href="/webhook-logs">เปิด</AdminLinkButton>}><p style={mutedStyle}>ใช้ตอนค่ายเกมบอกว่าส่งมาแล้ว แต่ระบบบอกไม่เห็น เหตุการณ์คลาสสิกระดับตำนาน</p></AdminCard>
+        <AdminCard title="Reconciliation Center" description="เทียบยอดระบบกับ provider และ resolve mismatch" action={<AdminLinkButton href="/reconciliation-center">เปิด</AdminLinkButton>}><p style={mutedStyle}>ใช้ตรวจยอดก่อน/หลัง transfer</p></AdminCard>
+        <AdminCard title="Webhook Settlement" description="ตรวจ callback ก่อนปล่อยให้ webhook settle wallet" action={<AdminLinkButton href="/webhook-settlement">เปิด</AdminLinkButton>}><p style={mutedStyle}>เปิดแบบ gated ไม่ให้ webhook เขียนเงินมั่ว</p></AdminCard>
+        <AdminCard title="Game Transfers" description="ดู transfer-in/out และ retry" action={<AdminLinkButton href="/game-transfers">เปิด</AdminLinkButton>}><p style={mutedStyle}>เหมาะสำหรับไล่ปัญหาโยกเงินเข้าออกเกม</p></AdminCard>
         <AdminCard title="Money Ops" description="ศูนย์รวม alert, scan, simulator และ safety gate" action={<AdminLinkButton href="/money-ops">เปิด</AdminLinkButton>}><p style={mutedStyle}>ใช้ตรวจภาพรวมก่อนเปิดเงินจริง</p></AdminCard>
       </AdminGrid>
     </AdminPage>
