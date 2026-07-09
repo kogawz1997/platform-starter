@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { GameProviderAdapter } from '../provider-adapter.interface';
 import { DemoProviderAdapter } from './demo-provider.adapter';
+import { SimulatorProviderAdapter } from './simulator-provider.adapter';
 
 @Injectable()
 export class ProviderAdapterRegistry {
@@ -8,6 +9,7 @@ export class ProviderAdapterRegistry {
 
   constructor() {
     this.register('demo-provider', new DemoProviderAdapter());
+    this.register('simulator-provider', new SimulatorProviderAdapter());
   }
 
   register(providerCode: string, adapter: GameProviderAdapter) {
