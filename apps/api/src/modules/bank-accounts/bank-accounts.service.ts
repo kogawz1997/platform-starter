@@ -65,6 +65,8 @@ export class BankAccountsService {
     this.requireBankFields(body);
     const existing = await this.prisma.memberBankAccount.findFirst({ where: { userId } });
     if (existing) throw new BadRequestException('สมาชิก 1 คนเพิ่มบัญชีถอนได้ 1 บัญชีเท่านั้น');
+    const duplicateActive = await this.prisma.memberBankAccount.findFirst({ where: { accountNumber: body.accountNumber!.trim(), status: { in: ['ACTIVE', 'PENDING_REVIEW'] } } });
+    if (duplicateActive) throw new BadRequestException('เลขบัญชีนี้ถูกใช้ในระบบแล้ว');
     const user = await this.prisma.user.findUnique({ where: { id: userId }, include: { profile: true } });
     if (!user) throw new NotFoundException('Member not found');
     const allowedNames = [user.profile?.displayName, user.username].filter(Boolean).map((value) => this.normalizeName(String(value)));
@@ -88,14 +90,47 @@ export class BankAccountsService {
     return { items: items.map((item) => ({ ...this.mapMemberBank(item), user: item.user })) };
   }
 
+  async kycSummary() {
+    const [pending, active, rejected, disabled, accounts, unverifiedPhones] = await Promise.all([
+      this.prisma.memberBankAccount.count({ where: { status: 'PENDING_REVIEW' } }),
+      this.prisma.memberBankAccount.count({ where: { status: 'ACTIVE' } }),
+      this.prisma.memberBankAccount.count({ where: { status: 'REJECTED' } }),
+      this.prisma.memberBankAccount.count({ where: { status: 'DISABLED' } }),
+      this.prisma.memberBankAccount.findMany({ take: 500, orderBy: { createdAt: 'desc' }, include: { user: { select: { id: true, username: true, phone: true, email: true, status: true, phoneVerifiedAt: true } } } }),
+      this.prisma.user.count({ where: { phone: { not: null }, phoneVerifiedAt: null } }),
+    ]);
+    const groups = new Map<string, any[]>();
+    for (const item of accounts) {
+      const key = item.accountNumber.replace(/\D/g, '') || item.accountNumber;
+      groups.set(key, [...(groups.get(key) ?? []), item]);
+    }
+    const duplicateGroups = Array.from(groups.entries()).filter(([, rows]) => rows.length > 1).map(([accountNumber, rows]) => ({ accountNumber, count: rows.length, items: rows.map((row) => ({ ...this.mapMemberBank(row), user: row.user })) }));
+    const riskyAccounts = accounts.filter((item) => item.status === 'PENDING_REVIEW' || item.user?.status !== 'ACTIVE' || item.user?.phoneVerifiedAt === null).slice(0, 50).map((item) => ({ ...this.mapMemberBank(item), user: item.user, flags: this.bankFlags(item, duplicateGroups) }));
+    return { summary: { pending, active, rejected, disabled, duplicateGroups: duplicateGroups.length, unverifiedPhones }, duplicateGroups, riskyAccounts };
+  }
+
   async reviewMemberBankAccount(id: string, body: BankBody, admin: any, meta: any) {
-    const existing = await this.prisma.memberBankAccount.findUnique({ where: { id } });
+    const existing = await this.prisma.memberBankAccount.findUnique({ where: { id }, include: { user: { select: { id: true, username: true, status: true } } } });
     if (!existing) throw new NotFoundException('Member bank account not found');
+    if (body.status === 'ACTIVE') {
+      const duplicate = await this.prisma.memberBankAccount.findFirst({ where: { id: { not: id }, accountNumber: existing.accountNumber, status: { in: ['ACTIVE', 'PENDING_REVIEW'] } } });
+      if (duplicate) throw new BadRequestException('เลขบัญชีนี้ซ้ำกับสมาชิกอื่น ต้องตรวจสอบก่อนอนุมัติ');
+      if (existing.user?.status !== 'ACTIVE') throw new BadRequestException('สมาชิกไม่ได้อยู่สถานะ ACTIVE ไม่ควรอนุมัติบัญชี');
+    }
     const item = await this.prisma.memberBankAccount.update({ where: { id }, data: { status: body.status ?? 'ACTIVE', adminNote: body.adminNote ?? undefined } });
     await this.audit(admin?.id, 'REVIEW_MEMBER_BANK_ACCOUNT', id, this.mapMemberBank(existing), this.mapMemberBank(item), meta);
     return { item: this.mapMemberBank(item) };
   }
 
+  private bankFlags(item: any, duplicateGroups: Array<{ accountNumber: string }>) {
+    const flags = [];
+    const normalized = item.accountNumber.replace(/\D/g, '') || item.accountNumber;
+    if (item.status === 'PENDING_REVIEW') flags.push('รอตรวจบัญชี');
+    if (duplicateGroups.some((group) => group.accountNumber === normalized)) flags.push('เลขบัญชีซ้ำ');
+    if (item.user?.status && item.user.status !== 'ACTIVE') flags.push('สมาชิกไม่ปกติ');
+    if (item.user?.phone && !item.user?.phoneVerifiedAt) flags.push('ยังไม่ยืนยันเบอร์');
+    return flags;
+  }
   private requireBankFields(body: BankBody) { if (!body.bankName?.trim() || !body.accountName?.trim() || !body.accountNumber?.trim()) throw new BadRequestException('bankName, accountName and accountNumber are required'); }
   private decimalOrNull(value: unknown) { if (value === null || value === undefined || value === '') return null; const next = Number(value); if (!Number.isFinite(next) || next < 0) throw new BadRequestException('Invalid amount limit'); return next; }
   private normalizeName(value: string) { return value.replace(/\s+/g, '').trim().toLowerCase(); }
