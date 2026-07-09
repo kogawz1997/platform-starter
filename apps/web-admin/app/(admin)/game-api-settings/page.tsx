@@ -1,56 +1,92 @@
-import { AdminBadge, AdminCard, AdminGrid, AdminMetric, AdminMetricGrid, AdminPage, AdminRow, AdminStack } from '../_components/admin-ui';
+import { AdminBadge, AdminCard, AdminGrid, AdminLinkButton, AdminMetric, AdminMetricGrid, AdminNotice, AdminPage, AdminRow, AdminStack, AdminToolbar } from '../_components/admin-ui';
 
-const credentialSettings = [
-  ['API Base URL', 'ปลายทางหลักของ provider API'],
-  ['API Key / Secret Key', 'ต้องเข้ารหัสและแสดงแบบ masked เท่านั้น'],
-  ['Merchant ID / Agent ID', 'รหัสร้านหรือ agent ที่ค่ายเกมออกให้'],
-  ['Webhook Secret', 'ใช้ตรวจ signature จาก callback'],
-  ['IP Whitelist', 'จำกัด source ที่เรียก callback ได้'],
+const quickSteps = [
+  ['1', 'เลือกค่ายเกม', 'สร้างหรือเลือก Provider แล้วตั้งชื่อที่ทีมใช้งานจำง่าย', '/game-providers'],
+  ['2', 'ใส่ข้อมูลเชื่อมต่อ', 'กรอก Base URL, API Key, Secret, Agent/Merchant ID และ Webhook Secret เท่าที่จำเป็น', '/game-providers'],
+  ['3', 'ตรวจพร้อมใช้งาน', 'เปิดหน้า Risk/Preflight เพื่อเช็ก endpoint, credential, transfer gate และเงินจริง', '/provider-risk'],
 ];
 
-const endpointSettings = [
-  'Launch game endpoint',
-  'Balance check endpoint',
-  'Transfer in endpoint',
-  'Transfer out endpoint',
-  'Game list endpoint',
-  'Bet history endpoint',
-  'Webhook / callback endpoint',
+const simpleFields = [
+  ['ชื่อค่าย', 'ชื่อที่แอดมินเห็น เช่น Demo Provider, PG Soft, Pragmatic', 'ต้องมี'],
+  ['โหมดกระเป๋า', 'ตลาดจริงส่วนใหญ่ใช้ Transfer Wallet ก่อนเปิดเงินจริง', 'TRANSFER'],
+  ['Base URL', 'URL หลักของ API จากค่ายเกม', 'ต้องมี'],
+  ['API Key / Secret', 'ข้อมูลลับจากค่ายเกม เก็บแบบ masked', 'ต้องมี'],
+  ['Agent / Merchant ID', 'รหัสร้านหรือ agent ที่ค่ายเกมออกให้', 'แล้วแต่ค่าย'],
+  ['Webhook Secret', 'ใช้ตรวจ callback/signature จากค่าย', 'แนะนำ'],
 ];
 
-const runtimeSettings = [
-  ['Timeout', 'ตัด connection เมื่อ provider ตอบช้าเกินกำหนด'],
-  ['Retry count', 'จำนวน retry สำหรับ request ที่ retry ได้อย่างปลอดภัย'],
-  ['Retry backoff', 'หน่วงเวลาระหว่าง retry กันยิงซ้ำเป็นปืนกล'],
-  ['Circuit breaker', 'พัก provider ชั่วคราวเมื่อ error ถี่ผิดปกติ'],
-  ['Health check', 'ตรวจสถานะ online / offline / invalid key / maintenance'],
+const marketPresets = [
+  ['Demo / Dry-run', 'ใช้ทดสอบ flow launch, transfer, webhook โดยไม่แตะเงินจริง', 'ปลอดภัยสุด', 'success'],
+  ['Transfer Wallet', 'สมาชิกโยกเงินเข้าออกเกม ระบบควบคุมยอดก่อนส่ง provider', 'ตลาดนิยม', 'warning'],
+  ['Seamless Wallet', 'Provider เรียกเช็กยอดกับระบบตลอด ต้องแข็งก่อนเปิดจริง', 'ขั้นสูง', 'danger'],
+];
+
+const advancedItems = [
+  ['Launch', 'เปิดเกม'],
+  ['Balance', 'เช็กยอด'],
+  ['Transfer In', 'โยกเงินเข้าเกม'],
+  ['Transfer Out', 'โยกเงินออกเกม'],
+  ['Game List', 'ดึงรายการเกม'],
+  ['Bet History', 'ดึงประวัติเดิมพัน'],
+  ['Webhook', 'รับ callback'],
+];
+
+const safetyChecklist = [
+  ['Provider ACTIVE', 'ค่ายเกมเปิดใช้งานแล้ว'],
+  ['Credential ครบ', 'API key/secret/webhook secret พร้อม'],
+  ['Endpoint ครบ', 'launch, balance, transfer-in/out, webhook มี mapping'],
+  ['Risk Preflight ผ่าน', 'ไม่มี blocker ก่อนเปิดใช้งาน'],
+  ['Real money gate ปิดไว้ก่อน', 'เปิดเฉพาะตอนพร้อม production จริง'],
 ];
 
 export default function GameApiSettingsPage() {
   return (
-    <AdminPage eyebrow="Game Platform" title="Game API Settings" description="โครงตั้งค่า credential, endpoint, webhook, timeout, retry และ health status ของ API ค่ายเกม">
+    <AdminPage
+      eyebrow="Game Platform"
+      title="ตั้งค่า API เกม"
+      description="หน้าใช้งานจริงแบบตลาด: ตั้งค่าให้น้อยที่สุดก่อน แล้วค่อยเปิดขั้นสูงเมื่อต้อง map endpoint เฉพาะค่าย"
+      actions={<><AdminLinkButton href="/game-providers" tone="primary">ตั้งค่าค่ายเกม</AdminLinkButton><AdminLinkButton href="/provider-risk">ตรวจความพร้อม</AdminLinkButton></>}
+    >
+      <AdminNotice>แนะนำ: เริ่มจาก Demo/Dry-run หรือ Transfer Wallet ก่อนเสมอ อย่าเปิดเงินจริงจนกว่า Preflight ผ่านครบทุกข้อ เพราะฐานข้อมูลไม่ได้ชอบความตื่นเต้นแบบนั้น</AdminNotice>
+
       <AdminMetricGrid>
-        <AdminMetric title="Credential groups" value={String(credentialSettings.length)} helper="base URL, keys, merchant, webhook, IP" />
-        <AdminMetric title="Endpoint mapping" value={String(endpointSettings.length)} helper="launch, balance, transfer, sync, webhook" />
-        <AdminMetric title="Runtime controls" value={String(runtimeSettings.length)} helper="timeout, retry, circuit breaker" />
+        <AdminMetric title="Setup mode" value="ง่าย" helper="ซ่อน endpoint ขั้นสูงไว้ก่อน" />
+        <AdminMetric title="Recommended" value="TRANSFER" helper="เหมือนตลาดทั่วไป เริ่มควบคุมง่าย" />
+        <AdminMetric title="Real money" value="ปิดก่อน" helper="เปิดหลัง preflight ผ่าน" />
+        <AdminMetric title="Advanced" value="แยกหน้า" helper="สำหรับ mapping รายค่าย" />
       </AdminMetricGrid>
 
+      <AdminToolbar>
+        <div><strong>Quick setup</strong><p style={mutedStyle}>ทำตาม 3 ขั้นนี้พอ ไม่ต้องไล่กรอกทุก endpoint ตั้งแต่แรกเหมือนทำข้อสอบราชการ</p></div>
+      </AdminToolbar>
+      <AdminGrid>{quickSteps.map(([step, title, description, href]) => <AdminCard key={step} title={`${step}. ${title}`} action={<AdminLinkButton href={href}>เปิด</AdminLinkButton>}><p style={mutedStyle}>{description}</p></AdminCard>)}</AdminGrid>
+
+      <h2 style={sectionTitleStyle}>Preset ที่ใช้ในตลาดจริง</h2>
+      <AdminGrid>{marketPresets.map(([title, description, badge, tone]) => <AdminCard key={title}><AdminRow><div><strong>{title}</strong><p style={mutedStyle}>{description}</p></div><AdminBadge tone={tone as any}>{badge}</AdminBadge></AdminRow></AdminCard>)}</AdminGrid>
+
+      <h2 style={sectionTitleStyle}>ข้อมูลที่แอดมินควรเห็นก่อน</h2>
+      <AdminCard title="Basic connection" description="ช่องหลักที่ต้องใช้ต่อค่ายเกมจริง ส่วน endpoint ลึก ๆ ให้ไปหน้า Advanced Mapping">
+        <AdminStack>{simpleFields.map(([title, description, badge]) => <AdminRow key={title}><div><strong>{title}</strong><p style={mutedStyle}>{description}</p></div><AdminBadge tone={badge === 'ต้องมี' ? 'warning' : badge === 'TRANSFER' ? 'success' : 'neutral'}>{badge}</AdminBadge></AdminRow>)}</AdminStack>
+      </AdminCard>
+
+      <h2 style={sectionTitleStyle}>Checklist ก่อนเปิดให้สมาชิกใช้</h2>
+      <AdminGrid>{safetyChecklist.map(([title, description], index) => <AdminCard key={title}><AdminRow><div><strong>{title}</strong><p style={mutedStyle}>{description}</p></div><AdminBadge tone={index < 3 ? 'warning' : 'danger'}>{index < 3 ? 'Required' : 'Safety'}</AdminBadge></AdminRow></AdminCard>)}</AdminGrid>
+
+      <h2 style={sectionTitleStyle}>ขั้นสูง: Endpoint Mapping</h2>
+      <AdminCard title="Advanced mapping" description="ซ่อนไว้ตรงนี้พอ ใช้เฉพาะตอนค่ายเกมให้เอกสาร API แยก endpoint มา ไม่ควรวางเป็นจุดเริ่มต้นของหน้า">
+        <AdminStack>{advancedItems.map(([title, description]) => <AdminRow key={title}><div><strong>{title}</strong><p style={mutedStyle}>{description}</p></div><AdminBadge>Advanced</AdminBadge></AdminRow>)}</AdminStack>
+      </AdminCard>
+
+      <h2 style={sectionTitleStyle}>ทางลัดงานจริง</h2>
       <AdminGrid>
-        <AdminCard title="Credential settings" description="ข้อมูลลับต้องเข้ารหัสใน backend และ audit ทุกครั้งที่แก้">
-          <AdminStack>{credentialSettings.map(([title, description]) => <AdminRow key={title}><div><strong>{title}</strong><p>{description}</p></div><AdminBadge tone="danger">Secret-safe</AdminBadge></AdminRow>)}</AdminStack>
-        </AdminCard>
-
-        <AdminCard title="Endpoint mapping" description="รองรับ provider แต่ละเจ้าที่ตั้งชื่อ endpoint ไม่เหมือนกัน เพราะโลกนี้ยังไม่รู้จักมาตรฐานร่วมกัน apparently">
-          <AdminStack>{endpointSettings.map((item) => <AdminRow key={item}><strong>{item}</strong><AdminBadge>Mapping</AdminBadge></AdminRow>)}</AdminStack>
-        </AdminCard>
+        <AdminCard title="Provider Risk" description="เช็ก health, gate, preflight และ blocker ก่อนเปิดใช้งาน" action={<AdminLinkButton href="/provider-risk">เปิด</AdminLinkButton>}><p style={mutedStyle}>ใช้หน้านี้เป็นด่านสุดท้ายก่อนเปิดค่ายเกมจริง</p></AdminCard>
+        <AdminCard title="Game Transfers" description="ดู transfer-in/out และ retry dry-run" action={<AdminLinkButton href="/game-transfers">เปิด</AdminLinkButton>}><p style={mutedStyle}>เหมาะสำหรับไล่ปัญหาโยกเงินเข้าออกเกม</p></AdminCard>
+        <AdminCard title="Webhook Logs" description="ดู callback, duplicate, invalid signature" action={<AdminLinkButton href="/webhook-logs">เปิด</AdminLinkButton>}><p style={mutedStyle}>ใช้ตอนค่ายเกมบอกว่าส่งมาแล้ว แต่ระบบบอกไม่เห็น เหตุการณ์คลาสสิกระดับตำนาน</p></AdminCard>
+        <AdminCard title="Money Ops" description="ศูนย์รวม alert, scan, simulator และ safety gate" action={<AdminLinkButton href="/money-ops">เปิด</AdminLinkButton>}><p style={mutedStyle}>ใช้ตรวจภาพรวมก่อนเปิดเงินจริง</p></AdminCard>
       </AdminGrid>
-
-      <h2 style={sectionTitleStyle}>Runtime / reliability</h2>
-      <AdminGrid>{runtimeSettings.map(([title, description]) => <AdminCard key={title}><div style={cardStackStyle}><AdminBadge tone="warning">Runtime</AdminBadge><h2 style={{ margin: 0 }}>{title}</h2><p style={mutedStyle}>{description}</p></div></AdminCard>)}</AdminGrid>
     </AdminPage>
   );
 }
 
 const sectionTitleStyle = { margin: '24px 0 12px', fontSize: 'clamp(24px, 7vw, 34px)', lineHeight: 1 } as const;
-const cardStackStyle = { display: 'grid', gap: 10 } as const;
 const mutedStyle = { margin: 0, color: '#94a3b8', lineHeight: 1.55 } as const;
