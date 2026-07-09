@@ -19,6 +19,7 @@ import { AdminActivityModule } from './modules/admin-activity/admin-activity.mod
 import { GamePlatformModule } from './modules/game-platform/game-platform.module';
 import { MoneyOpsModule } from './modules/money-ops/money-ops.module';
 import { SupportModule } from './modules/support/support.module';
+import { PromotionsModule } from './modules/promotions/promotions.module';
 import { HealthModule } from './modules/health/health.module';
 
 @Module({
@@ -43,6 +44,7 @@ import { HealthModule } from './modules/health/health.module';
     GamePlatformModule,
     MoneyOpsModule,
     SupportModule,
+    PromotionsModule,
     HealthModule,
   ],
 })
