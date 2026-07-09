@@ -3,7 +3,7 @@
 import { FormEvent, useEffect, useMemo, useState } from 'react';
 import { adminApiFetch } from '../../admin-api';
 import { AdminBadge, AdminButton, AdminCard, AdminEmpty, AdminMetric, AdminMetricGrid, AdminNotice, AdminPage, AdminRow, AdminStack, AdminToolbar } from '../_components/admin-ui';
-import { humanStatus, statusTone } from '../_components/human-labels';
+import { humanStatus } from '../_components/human-labels';
 
 type Provider = { id: string; name: string; code: string; status: string; walletMode?: string; currency?: string; adapterRegistered?: boolean };
 type MethodName = 'healthCheck' | 'launchGame' | 'getBalance' | 'transferIn' | 'transferOut' | 'syncGames' | 'getBetHistory' | 'validateWebhook' | 'parseWebhook';
