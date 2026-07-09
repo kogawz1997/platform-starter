@@ -63,6 +63,12 @@ export class BankAccountsController {
   }
 
   @UseGuards(AdminAuthGuard)
+  @Get('admin/member-bank-accounts/kyc-summary')
+  kycSummary() {
+    return this.bankAccountsService.kycSummary();
+  }
+
+  @UseGuards(AdminAuthGuard)
   @Patch('admin/member-bank-accounts/:id/review')
   reviewMemberBankAccount(@Param('id') id: string, @CurrentUser() user: any, @Body() body: any, @Req() req: any) {
     return this.bankAccountsService.reviewMemberBankAccount(id, body, user, this.meta(req));
