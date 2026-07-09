@@ -1,7 +1,7 @@
 export const navGroups = [
-  { title: 'Operation', items: [['Dashboard', '/dashboard'], ['Operations', '/operations'], ['ฝากรอตรวจ', '/topups'], ['ถอนเงิน', '/withdrawals'], ['Members', '/members'], ['Bank Accounts', '/bank-accounts']] },
-  { title: 'Money', items: [['Wallets', '/wallets'], ['Wallet Ledgers', '/wallet-ledgers'], ['Money Ops', '/money-ops'], ['Risk Alerts', '/risk-alerts'], ['Finance', '/finance'], ['Reports', '/reports']] },
-  { title: 'Game Platform', items: [['Provider Setup', '/provider-setup-wizard'], ['Provider Presets', '/provider-presets'], ['Adapter Test', '/adapter-test'], ['Game Providers', '/game-providers'], ['Provider Risk', '/provider-risk'], ['Game API Settings', '/game-api-settings'], ['Game Catalog', '/games'], ['Game Sessions', '/game-sessions'], ['Game Transfers', '/game-transfers'], ['Reconciliation', '/reconciliation-center'], ['Webhook Settlement', '/webhook-settlement'], ['Webhook Logs', '/webhook-logs'], ['Provider Adapters', '/provider-adapters']] },
-  { title: 'Risk / Security', items: [['Access Control', '/access'], ['Admin 2FA', '/security'], ['Audit Logs', '/audit-logs'], ['Activity', '/activity']] },
-  { title: 'Settings', items: [['Site Settings', '/settings']] },
+  { title: 'งานหลัก', items: [['งานแอดมิน', '/operations'], ['ตรวจฝาก', '/topups'], ['ตรวจถอน', '/withdrawals'], ['สมาชิก', '/members'], ['บัญชีธนาคาร', '/bank-accounts']] },
+  { title: 'การเงิน', items: [['วอเลต', '/wallets'], ['ประวัติเงิน', '/wallet-ledgers'], ['ปัญหาที่ต้องดู', '/risk-alerts'], ['รายงาน', '/reports']] },
+  { title: 'ค่ายเกม', items: [['ตั้งค่าง่าย', '/simple-game-settings'], ['เพิ่มค่ายใหม่', '/provider-setup-wizard'], ['แบบตั้งค่าค่าย', '/provider-presets'], ['ดูการโยกเงิน', '/game-transfers'], ['ตรวจยอดค่าย', '/reconciliation-center']] },
+  { title: 'ขั้นสูง', items: [['เปลี่ยน API Key', '/provider-credentials'], ['ทดสอบ API ค่าย', '/adapter-test'], ['Webhook', '/webhook-logs'], ['ตรวจค่ายละเอียด', '/provider-risk'], ['ตั้งค่า API เดิม', '/game-api-settings'], ['ค่ายทั้งหมด', '/game-providers'], ['เกมทั้งหมด', '/games'], ['Session เกม', '/game-sessions'], ['Audit Logs', '/audit-logs']] },
+  { title: 'ตั้งค่า', items: [['ตั้งค่าเว็บไซต์', '/settings'], ['ผู้ดูแลระบบ', '/admin-users'], ['ความปลอดภัย', '/security']] },
 ] as const;
