@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { ReactNode, useEffect, useMemo, useState } from 'react';
 import { adminApiFetch } from '../../admin-api';
 import { AdminBadge, AdminButton, AdminCard, AdminGrid, AdminLinkButton, AdminMetric, AdminMetricGrid, AdminNotice, AdminPage, AdminRow, AdminStack, AdminToolbar } from '../_components/admin-ui';
 
@@ -69,25 +69,8 @@ export default function OperationsPage() {
     {control.realLedgerMutationEnabled && <AdminNotice>REAL_LEDGER_MUTATION_ENABLED เปิดอยู่ ตรวจ permission/audit ให้ครบก่อนกดอะไรเกี่ยวกับยอดเงินจริง โลกมีปัญหาพอแล้วไม่ต้องเพิ่มเงินงอกเอง</AdminNotice>}
 
     <AdminGrid>
-      <AdminCard title="Action queues" description="ทางลัดไปงานที่ต้องจัดการทันที">
-        <AdminStack>
-          <QueueRow title="ฝากรอตรวจ" count={pendingTopUps} href="/topups" tone="warning" />
-          <QueueRow title="ถอนเงินรอดำเนินการ" count={pendingWithdrawals} href="/withdrawals" tone="warning" />
-          <QueueRow title="โยกเงินล้มเหลว" count={Number(summary.failedTransfers ?? 0)} href="/game-transfers" tone="danger" />
-          <QueueRow title="Risk Alert เปิดอยู่" count={Number(summary.openRiskAlerts ?? 0)} href="/risk-alerts" tone="danger" />
-          <QueueRow title="Reconciliation mismatch" count={Number(summary.mismatchSnapshots ?? 0)} href="/reconciliation-center" tone="danger" />
-          <QueueRow title="Webhook failed" count={Number(summary.webhookFailed ?? 0)} href="/webhook-logs" tone="warning" />
-        </AdminStack>
-      </AdminCard>
-
-      <AdminCard title="Provider tools" description="เครื่องมือก่อนต่อค่ายจริงและก่อนเปิดเงินจริง">
-        <AdminStack>
-          <ToolRow title="Adapter Test Harness" href="/adapter-test" description="ยิง health/launch/balance/transfer/webhook ทีละ method" />
-          <ToolRow title="Provider Setup Wizard" href="/provider-setup-wizard" description="สร้าง provider/endpoints/credentials จาก step flow" />
-          <ToolRow title="Provider Presets" href="/provider-presets" description="เลือก preset สำหรับ demo/simulator/generic-transfer" />
-          <ToolRow title="Provider Risk" href="/provider-risk" description="ตรวจ readiness/gates/preflight" />
-        </AdminStack>
-      </AdminCard>
+      <AdminCard title="Action queues" description="ทางลัดไปงานที่ต้องจัดการทันที"><AdminStack><QueueRow title="ฝากรอตรวจ" count={pendingTopUps} href="/topups" tone="warning" /><QueueRow title="ถอนเงินรอดำเนินการ" count={pendingWithdrawals} href="/withdrawals" tone="warning" /><QueueRow title="โยกเงินล้มเหลว" count={Number(summary.failedTransfers ?? 0)} href="/game-transfers" tone="danger" /><QueueRow title="Risk Alert เปิดอยู่" count={Number(summary.openRiskAlerts ?? 0)} href="/risk-alerts" tone="danger" /><QueueRow title="Reconciliation mismatch" count={Number(summary.mismatchSnapshots ?? 0)} href="/reconciliation-center" tone="danger" /><QueueRow title="Webhook failed" count={Number(summary.webhookFailed ?? 0)} href="/webhook-logs" tone="warning" /></AdminStack></AdminCard>
+      <AdminCard title="Provider tools" description="เครื่องมือก่อนต่อค่ายจริงและก่อนเปิดเงินจริง"><AdminStack><ToolRow title="Adapter Test Harness" href="/adapter-test" description="ยิง health/launch/balance/transfer/webhook ทีละ method" /><ToolRow title="Provider Setup Wizard" href="/provider-setup-wizard" description="สร้าง provider/endpoints/credentials จาก step flow" /><ToolRow title="Provider Presets" href="/provider-presets" description="เลือก preset สำหรับ demo/simulator/generic-transfer" /><ToolRow title="Provider Risk" href="/provider-risk" description="ตรวจ readiness/gates/preflight" /></AdminStack></AdminCard>
     </AdminGrid>
 
     <AdminToolbar><strong>Recent money activity</strong><span style={mutedStyle}>ดูรายการล่าสุดเพื่อจับกลิ่นความผิดปกติ ก่อนที่ระบบบัญชีจะกลายเป็นนิยายสืบสวน</span></AdminToolbar>
@@ -105,7 +88,7 @@ export default function OperationsPage() {
 
 function QueueRow({ title, count, href, tone }: { title: string; count: number; href: string; tone: 'warning' | 'danger' | 'success' | 'neutral' }) { return <AdminRow><div><strong>{title}</strong><p style={mutedStyle}>{count > 0 ? 'ต้องตรวจ' : 'ยังไม่มีงานค้าง'}</p></div><div style={rightStyle}><AdminBadge tone={count > 0 ? tone : 'success'}>{count}</AdminBadge><AdminLinkButton href={href}>เปิด</AdminLinkButton></div></AdminRow>; }
 function ToolRow({ title, description, href }: { title: string; description: string; href: string }) { return <AdminRow><div><strong>{title}</strong><p style={mutedStyle}>{description}</p></div><AdminLinkButton href={href}>เปิด</AdminLinkButton></AdminRow>; }
-function RecentCard({ title, items, render }: { title: string; items: any[]; render: (item: any) => React.ReactNode }) { return <AdminCard title={title}>{items.length ? <AdminStack>{items.map(render)}</AdminStack> : <p style={mutedStyle}>ยังไม่มีข้อมูลล่าสุด</p>}</AdminCard>; }
+function RecentCard({ title, items, render }: { title: string; items: any[]; render: (item: any) => ReactNode }) { return <AdminCard title={title}>{items.length ? <AdminStack>{items.map(render)}</AdminStack> : <p style={mutedStyle}>ยังไม่มีข้อมูลล่าสุด</p>}</AdminCard>; }
 function formatMoney(value: string | number, currency: string) { return `${currency} ${Number(value ?? 0).toLocaleString('th-TH', { minimumFractionDigits: 2 })}`; }
 function statusTone(status: string) { if (status === 'SUCCESS') return 'success'; if (status === 'FAILED') return 'danger'; if (status === 'PENDING') return 'warning'; return 'neutral'; }
 function severityTone(severity: string) { if (severity === 'CRITICAL' || severity === 'HIGH') return 'danger'; if (severity === 'MEDIUM') return 'warning'; return 'neutral'; }
