@@ -110,6 +110,10 @@ export default function MemberHome(props: MemberHomeProps) {
         <QuickAction href="/withdraw" title="ถอนเงิน" subtitle="ส่งคำขอ" />
         <QuickAction href="/games" title="เกม" subtitle="เข้าเล่น" />
         <QuickAction href="/bank-accounts" title="บัญชี" subtitle="จัดการ" />
+        <QuickAction href="/promotions" title="โปร" subtitle="รับสิทธิ์" />
+        <QuickAction href="/bonus" title="โบนัส" subtitle="ดูเทิร์น" />
+        <QuickAction href="/affiliate" title="ตัวแทน" subtitle="แนะนำเพื่อน" />
+        <QuickAction href="/support" title="ช่วยเหลือ" subtitle="แจ้งปัญหา" />
       </section>
 
       {isLoggedIn && pendingCount > 0 && <section className="member-info-card" style={alertCardStyle}>
