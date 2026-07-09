@@ -2,11 +2,25 @@ import { BadRequestException, ForbiddenException, Injectable, NotFoundException 
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../database/prisma.service';
 
+const GROWTH_PERMISSIONS = [
+  { code: 'promotions.claims.view', name: 'View promotion claims', module: 'promotions', description: 'ดูคำขอรับโปรโมชัน' },
+  { code: 'promotions.claims.review', name: 'Review promotion claims', module: 'promotions', description: 'อนุมัติหรือปฏิเสธคำขอรับโปรโมชัน' },
+  { code: 'bonus.ledger.view', name: 'View bonus ledger', module: 'bonus', description: 'ดู bonus ledger และ turnover' },
+  { code: 'bonus.turnover.update', name: 'Update bonus turnover', module: 'bonus', description: 'อัปเดต turnover progress ของโบนัส' },
+  { code: 'bonus.lifecycle.update', name: 'Update bonus lifecycle', module: 'bonus', description: 'release, expire หรือ revoke bonus ledger' },
+  { code: 'affiliate.view', name: 'View affiliates', module: 'affiliate', description: 'ดูตัวแทนและ downline' },
+  { code: 'affiliate.review', name: 'Review affiliates', module: 'affiliate', description: 'อนุมัติหรือปฏิเสธตัวแทน' },
+  { code: 'commission.view', name: 'View commission ledger', module: 'commission', description: 'ดู commission ledger' },
+  { code: 'commission.create', name: 'Create commission ledger', module: 'commission', description: 'สร้าง commission ledger แบบ manual review' },
+  { code: 'commission.review', name: 'Review commission ledger', module: 'commission', description: 'อนุมัติหรือปฏิเสธ commission ledger' },
+];
+
 @Injectable()
 export class AdminAccessService {
   constructor(private readonly prisma: PrismaService) {}
 
   async overview() {
+    await this.ensureGrowthPermissions();
     const [roles, permissions, adminUsers] = await Promise.all([
       this.prisma.role.findMany({
         include: { permissions: { include: { permission: true }, orderBy: { permission: { module: 'asc' } } }, adminUsers: true },
@@ -107,6 +121,10 @@ export class AdminAccessService {
     await this.prisma.adminUserRole.delete({ where: { adminUserId_roleId: { adminUserId: targetAdminId, roleId } } });
     await this.audit(actorAdminId, 'REMOVE_ROLE', targetAdminId, { roleId, roleCode: assignment.role.code, target: target.username });
     return this.overview();
+  }
+
+  private async ensureGrowthPermissions() {
+    await Promise.all(GROWTH_PERMISSIONS.map((permission) => this.prisma.permission.upsert({ where: { code: permission.code }, update: { name: permission.name, module: permission.module, description: permission.description }, create: permission })));
   }
 
   private async audit(actorAdminId: string, action: string, targetId: string, newData: Prisma.InputJsonObject) {
