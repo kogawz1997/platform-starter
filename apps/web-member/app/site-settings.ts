@@ -1,8 +1,10 @@
 export const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000';
 
+export type CmsAsset = { id: string; name: string; url: string; type: 'image' | 'video' | 'link'; tag?: string; enabled: boolean };
 export type CmsContent = {
-  banners: Array<{ title: string; subtitle: string; imageUrl: string; href: string; enabled: boolean }>;
-  popup: { title: string; message: string; ctaLabel: string; href: string; enabled: boolean; version?: string };
+  assets: CmsAsset[];
+  banners: Array<{ title: string; subtitle: string; imageUrl: string; href: string; enabled: boolean; assetId?: string }>;
+  popup: { title: string; message: string; ctaLabel: string; href: string; enabled: boolean; version?: string; assetId?: string; imageUrl?: string };
   announcements: Array<{ title: string; message: string; enabled: boolean }>;
   faqs: Array<{ question: string; answer: string; enabled: boolean }>;
 };
@@ -34,6 +36,7 @@ export type PublicSiteSettings = {
 };
 
 export const defaultCmsContent: CmsContent = {
+  assets: [],
   banners: [{ title: 'พร้อมเล่นทุกเกม', subtitle: 'ฝาก ถอน เล่นเกม และดูประวัติได้ในมือถือเครื่องเดียว', imageUrl: '', href: '/games', enabled: true }],
   popup: { title: 'ประกาศ', message: 'ยินดีต้อนรับ', ctaLabel: 'ดูเกม', href: '/games', enabled: false, version: 'v1' },
   announcements: [{ title: 'ระบบพร้อมใช้งาน', message: 'ฝาก ถอน และเกมเปิดให้บริการตามปกติ', enabled: true }],
@@ -45,43 +48,11 @@ export const defaultPromotionCampaigns: PromotionCampaign[] = [
 ];
 
 export const defaultSettings: PublicSiteSettings = {
-  website: {
-    site_name: 'Platform Starter',
-    site_description: 'Member platform starter',
-    registration_enabled: true,
-    login_enabled: true,
-    maintenance_mode: false,
-  },
-  branding: {
-    primary_color: '#f5c542',
-    background_color: '#080808',
-    card_color: '#181818',
-    text_color: '#ffffff',
-    success_color: '#22c55e',
-    danger_color: '#ef4444',
-  },
-  theme: {
-    show_balance_header: true,
-    show_deposit_withdraw_buttons: true,
-    show_promotion_banner: true,
-    show_game_categories: true,
-    show_popular_providers: true,
-    show_recommended_games: true,
-  },
-  maintenance: {
-    enabled: false,
-    member_enabled: false,
-    message: 'ระบบกำลังปรับปรุง',
-  },
-  features: {
-    registration_enabled: true,
-    login_enabled: true,
-    deposit_enabled: true,
-    withdraw_enabled: true,
-    promotion_enabled: true,
-    cms_content: defaultCmsContent,
-    promotion_campaigns: defaultPromotionCampaigns,
-  },
+  website: { site_name: 'Platform Starter', site_description: 'Member platform starter', registration_enabled: true, login_enabled: true, maintenance_mode: false },
+  branding: { primary_color: '#f5c542', background_color: '#080808', card_color: '#181818', text_color: '#ffffff', success_color: '#22c55e', danger_color: '#ef4444' },
+  theme: { show_balance_header: true, show_deposit_withdraw_buttons: true, show_promotion_banner: true, show_game_categories: true, show_popular_providers: true, show_recommended_games: true },
+  maintenance: { enabled: false, member_enabled: false, message: 'ระบบกำลังปรับปรุง' },
+  features: { registration_enabled: true, login_enabled: true, deposit_enabled: true, withdraw_enabled: true, promotion_enabled: true, cms_content: defaultCmsContent, promotion_campaigns: defaultPromotionCampaigns },
 };
 
 export async function loadPublicSiteSettings(): Promise<PublicSiteSettings> {
@@ -90,48 +61,29 @@ export async function loadPublicSiteSettings(): Promise<PublicSiteSettings> {
     if (!res.ok) return defaultSettings;
     const data = await res.json();
     return { ...defaultSettings, ...data, features: { ...defaultSettings.features, ...(data.features ?? {}) } };
-  } catch {
-    return defaultSettings;
-  }
+  } catch { return defaultSettings; }
 }
 
-export function textSetting(settings: PublicSiteSettings, group: keyof PublicSiteSettings, key: string, fallback: string) {
-  const value = settings[group]?.[key];
-  return typeof value === 'string' ? value : fallback;
-}
-
-export function boolSetting(settings: PublicSiteSettings, group: keyof PublicSiteSettings, key: string, fallback: boolean) {
-  const value = settings[group]?.[key];
-  return typeof value === 'boolean' ? value : fallback;
-}
+export function textSetting(settings: PublicSiteSettings, group: keyof PublicSiteSettings, key: string, fallback: string) { const value = settings[group]?.[key]; return typeof value === 'string' ? value : fallback; }
+export function boolSetting(settings: PublicSiteSettings, group: keyof PublicSiteSettings, key: string, fallback: boolean) { const value = settings[group]?.[key]; return typeof value === 'boolean' ? value : fallback; }
 
 export function cmsContentSetting(settings: PublicSiteSettings): CmsContent {
   const value = settings.features?.cms_content;
   if (!value || typeof value !== 'object' || Array.isArray(value)) return defaultCmsContent;
   const data = value as Partial<CmsContent>;
   return {
-    banners: Array.isArray(data.banners) ? data.banners.map((item: any) => ({ title: String(item.title ?? ''), subtitle: String(item.subtitle ?? ''), imageUrl: String(item.imageUrl ?? ''), href: String(item.href ?? '/games'), enabled: item.enabled !== false })) : defaultCmsContent.banners,
+    assets: Array.isArray((data as any).assets) ? (data as any).assets.map((item: any, index: number) => ({ id: String(item.id ?? `asset_${index}`), name: String(item.name ?? `Asset ${index + 1}`), url: String(item.url ?? ''), type: item.type === 'video' || item.type === 'link' ? item.type : 'image', tag: String(item.tag ?? ''), enabled: item.enabled !== false })) : defaultCmsContent.assets,
+    banners: Array.isArray(data.banners) ? data.banners.map((item: any) => ({ title: String(item.title ?? ''), subtitle: String(item.subtitle ?? ''), imageUrl: String(item.imageUrl ?? ''), href: String(item.href ?? '/games'), enabled: item.enabled !== false, assetId: String(item.assetId ?? '') })) : defaultCmsContent.banners,
     popup: { ...defaultCmsContent.popup, ...(data.popup && typeof data.popup === 'object' ? data.popup : {}) } as CmsContent['popup'],
     announcements: Array.isArray(data.announcements) ? data.announcements.map((item: any) => ({ title: String(item.title ?? ''), message: String(item.message ?? ''), enabled: item.enabled !== false })) : defaultCmsContent.announcements,
     faqs: Array.isArray(data.faqs) ? data.faqs.map((item: any) => ({ question: String(item.question ?? ''), answer: String(item.answer ?? ''), enabled: item.enabled !== false })) : defaultCmsContent.faqs,
   };
 }
 
+export function cmsAssetUrl(content: CmsContent, assetId?: string) { if (!assetId) return ''; return content.assets.find((asset) => asset.id === assetId && asset.enabled)?.url ?? ''; }
+
 export function promotionCampaignsSetting(settings: PublicSiteSettings): PromotionCampaign[] {
   const value = settings.features?.promotion_campaigns;
   if (!Array.isArray(value)) return defaultPromotionCampaigns;
-  return value.map((item: any, index) => ({
-    id: String(item.id ?? `promotion-${index + 1}`),
-    title: String(item.title ?? 'Promotion'),
-    description: String(item.description ?? ''),
-    enabled: item.enabled !== false,
-    bonusType: item.bonusType === 'fixed' ? 'fixed' : 'percent',
-    bonusValue: Number(item.bonusValue ?? 0),
-    minDeposit: Number(item.minDeposit ?? 0),
-    maxBonus: Number(item.maxBonus ?? 0),
-    turnoverMultiplier: Number(item.turnoverMultiplier ?? 0),
-    claimMode: item.claimMode === 'auto_pending' ? 'auto_pending' : 'manual_review',
-    startsAt: typeof item.startsAt === 'string' ? item.startsAt : undefined,
-    endsAt: typeof item.endsAt === 'string' ? item.endsAt : undefined,
-  }));
+  return value.map((item: any, index) => ({ id: String(item.id ?? `promotion-${index + 1}`), title: String(item.title ?? 'Promotion'), description: String(item.description ?? ''), enabled: item.enabled !== false, bonusType: item.bonusType === 'fixed' ? 'fixed' : 'percent', bonusValue: Number(item.bonusValue ?? 0), minDeposit: Number(item.minDeposit ?? 0), maxBonus: Number(item.maxBonus ?? 0), turnoverMultiplier: Number(item.turnoverMultiplier ?? 0), claimMode: item.claimMode === 'auto_pending' ? 'auto_pending' : 'manual_review', startsAt: typeof item.startsAt === 'string' ? item.startsAt : undefined, endsAt: typeof item.endsAt === 'string' ? item.endsAt : undefined }));
 }
