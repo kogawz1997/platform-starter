@@ -21,23 +21,34 @@ The provider simulator lets the platform test launch, transfer, webhook, timeout
 - `duplicate_webhook`
 - `invalid_signature`
 
-## API scaffold
-
-Current scaffold:
+## Admin scenario API
 
 ```text
 GET /admin/money-ops/provider-simulator/scenarios
 ```
 
-Next implementation phase:
+## Fake provider API
 
 ```text
-POST /simulator/launch
-POST /simulator/balance
-POST /simulator/transfer-in
-POST /simulator/transfer-out
-POST /simulator/webhook/send
-POST /simulator/timeout
+GET  /provider-simulator/health
+POST /provider-simulator/launch
+POST /provider-simulator/balance
+POST /provider-simulator/transfer-in
+POST /provider-simulator/transfer-out
+POST /provider-simulator/webhook
+POST /provider-simulator/timeout
+```
+
+## Example webhook payload
+
+```json
+{
+  "eventType": "simulator.transfer.completed",
+  "idempotencyKey": "simulator-idempotency-key",
+  "providerTransactionId": "simulator-tx-id",
+  "amount": "100.00",
+  "currency": "THB"
+}
 ```
 
 ## No-go rule
