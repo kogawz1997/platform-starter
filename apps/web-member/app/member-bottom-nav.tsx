@@ -7,6 +7,7 @@ const items = [
   { href: '/deposit', label: 'ฝาก', icon: '＋' },
   { href: '/withdraw', label: 'ถอนเงิน', icon: '↗' },
   { href: '/games', label: 'เกม', icon: '🎮' },
+  { href: '/support', label: 'ช่วยเหลือ', icon: '✉' },
   { href: '/transactions', label: 'ประวัติ', icon: '≡' },
 ];
 
