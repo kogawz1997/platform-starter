@@ -29,6 +29,7 @@ type LobbyPayload = { items?: Game[]; featured?: Game[]; newest?: Game[]; popula
 
 const FAVORITES_KEY = 'member_favorite_game_ids';
 const RECENT_KEY = 'member_recent_game_ids';
+const POPUP_CLOSED_VERSION_KEY = 'member_cms_popup_closed_version';
 
 export default function MemberHome(props: MemberHomeProps) {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
@@ -41,16 +42,18 @@ export default function MemberHome(props: MemberHomeProps) {
   const [popupClosed, setPopupClosed] = useState(false);
   const [activityMessage, setActivityMessage] = useState('');
   const [isActivityLoading, setIsActivityLoading] = useState(false);
+  const popup = props.cmsContent.popup;
+  const popupVersion = popup.version ?? 'v1';
 
   useEffect(() => {
     const ok = Boolean(window.localStorage.getItem('member_access_token') || window.localStorage.getItem('member_refresh_token'));
     setIsLoggedIn(ok);
     setFavoriteIds(readIds(FAVORITES_KEY));
     setRecentIds(readIds(RECENT_KEY));
-    setPopupClosed(window.localStorage.getItem('member_cms_popup_closed') === 'true');
+    setPopupClosed(window.localStorage.getItem(POPUP_CLOSED_VERSION_KEY) === popupVersion);
     loadGames();
     if (ok) loadActivity();
-  }, []);
+  }, [popupVersion]);
 
   async function loadGames() {
     const res = await memberApiFetch('/member/games');
@@ -91,9 +94,8 @@ export default function MemberHome(props: MemberHomeProps) {
   const cmsBanner = props.cmsContent.banners.find((item) => item.enabled);
   const announcements = props.cmsContent.announcements.filter((item) => item.enabled).slice(0, 3);
   const faqs = props.cmsContent.faqs.filter((item) => item.enabled).slice(0, 4);
-  const popup = props.cmsContent.popup;
 
-  function closePopup() { window.localStorage.setItem('member_cms_popup_closed', 'true'); setPopupClosed(true); }
+  function closePopup() { window.localStorage.setItem(POPUP_CLOSED_VERSION_KEY, popupVersion); setPopupClosed(true); }
 
   return (
     <section className="member-shell member-home-shell">
