@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { CmsContent } from './site-settings';
+import { CmsContent, cmsAssetUrl } from './site-settings';
 import { memberApiFetch } from './member-api';
 import WalletCard from './wallet-card';
 import MemberBottomNav from './member-bottom-nav';
@@ -64,11 +64,7 @@ export default function MemberHome(props: MemberHomeProps) {
     setIsActivityLoading(true);
     setActivityMessage('');
     try {
-      const [topupRes, withdrawalRes, ledgerRes] = await Promise.all([
-        memberApiFetch('/member/topups'),
-        memberApiFetch('/member/withdrawals'),
-        memberApiFetch('/member/wallet/ledger?limit=5'),
-      ]);
+      const [topupRes, withdrawalRes, ledgerRes] = await Promise.all([memberApiFetch('/member/topups'), memberApiFetch('/member/withdrawals'), memberApiFetch('/member/wallet/ledger?limit=5')]);
       const topupData = await topupRes.json().catch(() => null);
       const withdrawalData = await withdrawalRes.json().catch(() => null);
       const ledgerData = await ledgerRes.json().catch(() => null);
@@ -76,11 +72,7 @@ export default function MemberHome(props: MemberHomeProps) {
       if (withdrawalRes.ok) setWithdrawals(withdrawalData.items ?? []);
       if (ledgerRes.ok) setLedgers(ledgerData.items ?? []);
       if (!topupRes.ok || !withdrawalRes.ok || !ledgerRes.ok) setActivityMessage(topupData?.message ?? withdrawalData?.message ?? ledgerData?.message ?? 'โหลดข้อมูลไม่สำเร็จ');
-    } catch (error) {
-      setActivityMessage(error instanceof Error ? error.message : 'โหลดข้อมูลไม่สำเร็จ');
-    } finally {
-      setIsActivityLoading(false);
-    }
+    } catch (error) { setActivityMessage(error instanceof Error ? error.message : 'โหลดข้อมูลไม่สำเร็จ'); } finally { setIsActivityLoading(false); }
   }
 
   const pendingTopups = useMemo(() => topups.filter((item) => item.status === 'PENDING').slice(0, 3), [topups]);
@@ -92,6 +84,8 @@ export default function MemberHome(props: MemberHomeProps) {
   const recentGames = recentIds.map((id) => games.find((game) => game.id === id)).filter(Boolean) as Game[];
   const favoriteGames = favoriteIds.map((id) => games.find((game) => game.id === id)).filter(Boolean) as Game[];
   const cmsBanner = props.cmsContent.banners.find((item) => item.enabled);
+  const bannerImageUrl = cmsBanner ? cmsAssetUrl(props.cmsContent, cmsBanner.assetId) || cmsBanner.imageUrl : '';
+  const popupImageUrl = cmsAssetUrl(props.cmsContent, popup.assetId) || popup.imageUrl || '';
   const announcements = props.cmsContent.announcements.filter((item) => item.enabled).slice(0, 3);
   const faqs = props.cmsContent.faqs.filter((item) => item.enabled).slice(0, 4);
 
@@ -99,92 +93,35 @@ export default function MemberHome(props: MemberHomeProps) {
 
   return (
     <section className="member-shell member-home-shell">
-      {props.showPromotion && <section style={bannerStyle}>{cmsBanner?.imageUrl && <img src={cmsBanner.imageUrl} alt="" style={bannerImageStyle} />}<div><span style={eyebrowStyle}>พร้อมเล่น</span><h1 style={bannerTitleStyle}>{cmsBanner?.title || props.siteName}</h1><p style={mutedStyle}>{cmsBanner?.subtitle || props.description || 'เลือกเกมที่ชอบ ฝาก ถอน และดูประวัติได้จากมือถือเครื่องเดียว'}</p></div><a href={cmsBanner?.href || '/games'} style={{ ...bannerButtonStyle, background: props.primaryColor }}>เข้าเล่นเกม</a></section>}
-
+      {props.showPromotion && <section style={bannerStyle}>{bannerImageUrl && <img src={bannerImageUrl} alt="" style={bannerImageStyle} />}<div><span style={eyebrowStyle}>พร้อมเล่น</span><h1 style={bannerTitleStyle}>{cmsBanner?.title || props.siteName}</h1><p style={mutedStyle}>{cmsBanner?.subtitle || props.description || 'เลือกเกมที่ชอบ ฝาก ถอน และดูประวัติได้จากมือถือเครื่องเดียว'}</p></div><a href={cmsBanner?.href || '/games'} style={{ ...bannerButtonStyle, background: props.primaryColor }}>เข้าเล่นเกม</a></section>}
       {announcements.length > 0 && <section className="member-info-card" style={announcementCardStyle}><div style={sectionHeadStyle}><h2>ประกาศ</h2><span style={mutedStyle}>{announcements.length} รายการ</span></div><div style={pendingListStyle}>{announcements.map((item, index) => <div key={`${item.title}-${index}`} style={announcementRowStyle}><strong>{item.title}</strong><span>{item.message}</span></div>)}</div></section>}
-
       {props.showBalanceHeader && <WalletCard primaryColor={props.primaryColor} cardColor={props.cardColor} showButtons={props.showButtons && isLoggedIn} />}
-
-      <section className="member-quick-panel">
-        <QuickAction href="/deposit" title="ฝาก" subtitle="เพิ่มยอด" />
-        <QuickAction href="/withdraw" title="ถอนเงิน" subtitle="ส่งคำขอ" />
-        <QuickAction href="/games" title="เกม" subtitle="เข้าเล่น" />
-        <QuickAction href="/bank-accounts" title="บัญชี" subtitle="จัดการ" />
-        <QuickAction href="/promotions" title="โปร" subtitle="รับสิทธิ์" />
-        <QuickAction href="/bonus" title="โบนัส" subtitle="ดูเทิร์น" />
-        <QuickAction href="/affiliate" title="ตัวแทน" subtitle="แนะนำเพื่อน" />
-        <QuickAction href="/support" title="ช่วยเหลือ" subtitle="แจ้งปัญหา" />
-      </section>
-
-      {isLoggedIn && pendingCount > 0 && <section className="member-info-card" style={alertCardStyle}>
-        <div style={sectionHeadStyle}><div><p>รอดำเนินการ</p><h2>{pendingCount} รายการ</h2></div><a href="/transactions" style={{ color: props.primaryColor, fontWeight: 900, textDecoration: 'none' }}>ดูทั้งหมด</a></div>
-        <div style={pendingListStyle}>
-          {pendingTopups.map((item) => <ActivityRow key={item.id} title="ฝาก" href="/deposit" item={item} />)}
-          {pendingWithdrawals.map((item) => <ActivityRow key={item.id} title="ถอนเงิน" href="/withdraw" item={item} />)}
-        </div>
-      </section>}
-
+      <section className="member-quick-panel"><QuickAction href="/deposit" title="ฝาก" subtitle="เพิ่มยอด" /><QuickAction href="/withdraw" title="ถอนเงิน" subtitle="ส่งคำขอ" /><QuickAction href="/games" title="เกม" subtitle="เข้าเล่น" /><QuickAction href="/bank-accounts" title="บัญชี" subtitle="จัดการ" /><QuickAction href="/promotions" title="โปร" subtitle="รับสิทธิ์" /><QuickAction href="/bonus" title="โบนัส" subtitle="ดูเทิร์น" /><QuickAction href="/affiliate" title="ตัวแทน" subtitle="แนะนำเพื่อน" /><QuickAction href="/support" title="ช่วยเหลือ" subtitle="แจ้งปัญหา" /></section>
+      {isLoggedIn && pendingCount > 0 && <section className="member-info-card" style={alertCardStyle}><div style={sectionHeadStyle}><div><p>รอดำเนินการ</p><h2>{pendingCount} รายการ</h2></div><a href="/transactions" style={{ color: props.primaryColor, fontWeight: 900, textDecoration: 'none' }}>ดูทั้งหมด</a></div><div style={pendingListStyle}>{pendingTopups.map((item) => <ActivityRow key={item.id} title="ฝาก" href="/deposit" item={item} />)}{pendingWithdrawals.map((item) => <ActivityRow key={item.id} title="ถอนเงิน" href="/withdraw" item={item} />)}</div></section>}
       {props.showRecommended && <GameRail title="เกมแนะนำ" href="/games" items={featured} primaryColor={props.primaryColor} />}
       {recentGames.length > 0 && <GameRail title="เล่นล่าสุด" href="/games" items={recentGames} primaryColor={props.primaryColor} />}
       {favoriteGames.length > 0 && <GameRail title="เกมโปรด" href="/games" items={favoriteGames} primaryColor={props.primaryColor} />}
       {popular.length > 0 && <GameRail title="ยอดนิยม" href="/games" items={popular} primaryColor={props.primaryColor} />}
-
       {props.showCategories && <section className="member-info-card"><div style={sectionHeadStyle}><h2>หมวดเกม</h2><a href="/games" style={{ color: props.primaryColor, fontWeight: 900, textDecoration: 'none' }}>ดูทั้งหมด</a></div><div style={categoryGridStyle}>{(lobby.categories ?? []).slice(0, 8).map((item) => <a key={item} href={`/games?category=${encodeURIComponent(item)}`} style={categoryPillStyle}>{categoryLabel(item)}</a>)}{(lobby.categories ?? []).length === 0 && <span style={mutedStyle}>ยังไม่มีหมวดเกม</span>}</div></section>}
-
       {faqs.length > 0 && <section className="member-info-card"><div style={sectionHeadStyle}><h2>คำถามที่พบบ่อย</h2></div><div style={pendingListStyle}>{faqs.map((item, index) => <details key={`${item.question}-${index}`} style={faqStyle}><summary>{item.question}</summary><p style={mutedStyle}>{item.answer}</p></details>)}</div></section>}
-
-      {isLoggedIn && <section className="member-info-card">
-        <div style={sectionHeadStyle}><h2>ล่าสุด</h2><a href="/transactions" style={{ color: props.primaryColor, fontWeight: 900, textDecoration: 'none' }}>ทั้งหมด</a></div>
-        {isActivityLoading && <div style={noticeStyle}>กำลังโหลด...</div>}
-        {activityMessage && <div style={noticeStyle}><strong>โหลดข้อมูลไม่สำเร็จ</strong><span>{activityMessage}</span><button type="button" onClick={loadActivity} style={retryButtonStyle}>ลองใหม่</button></div>}
-        <div style={pendingListStyle}>
-          {ledgers.slice(0, 5).map((item) => <LedgerRow key={item.id} item={item} />)}
-          {ledgers.length === 0 && !activityMessage && !isActivityLoading && <EmptyState compact title="ยังไม่มีประวัติ" description="เมื่อมีรายการฝาก ถอน หรือปรับยอด รายการล่าสุดจะแสดงตรงนี้" actionHref="/deposit" actionLabel="ฝาก" />}
-        </div>
-      </section>}
-
-      {popup.enabled && !popupClosed && <div style={popupOverlayStyle}><section style={popupCardStyle}><button type="button" onClick={closePopup} style={popupCloseStyle}>×</button><h2>{popup.title}</h2><p style={mutedStyle}>{popup.message}</p><a href={popup.href} style={{ ...bannerButtonStyle, background: props.primaryColor }}>{popup.ctaLabel}</a></section></div>}
-
+      {isLoggedIn && <section className="member-info-card"><div style={sectionHeadStyle}><h2>ล่าสุด</h2><a href="/transactions" style={{ color: props.primaryColor, fontWeight: 900, textDecoration: 'none' }}>ทั้งหมด</a></div>{isActivityLoading && <div style={noticeStyle}>กำลังโหลด...</div>}{activityMessage && <div style={noticeStyle}><strong>โหลดข้อมูลไม่สำเร็จ</strong><span>{activityMessage}</span><button type="button" onClick={loadActivity} style={retryButtonStyle}>ลองใหม่</button></div>}<div style={pendingListStyle}>{ledgers.slice(0, 5).map((item) => <LedgerRow key={item.id} item={item} />)}{ledgers.length === 0 && !activityMessage && !isActivityLoading && <EmptyState compact title="ยังไม่มีประวัติ" description="เมื่อมีรายการฝาก ถอน หรือปรับยอด รายการล่าสุดจะแสดงตรงนี้" actionHref="/deposit" actionLabel="ฝาก" />}</div></section>}
+      {popup.enabled && !popupClosed && <div style={popupOverlayStyle}><section style={popupCardStyle}><button type="button" onClick={closePopup} style={popupCloseStyle}>×</button>{popupImageUrl && <img src={popupImageUrl} alt="" style={popupImageStyle} />}<h2>{popup.title}</h2><p style={mutedStyle}>{popup.message}</p><a href={popup.href} style={{ ...bannerButtonStyle, background: props.primaryColor }}>{popup.ctaLabel}</a></section></div>}
       <MemberBottomNav pendingCount={pendingCount} />
     </section>
   );
 }
 
-function QuickAction({ href, title, subtitle }: { href: string; title: string; subtitle: string }) {
-  return <a href={href} className="member-quick-action"><strong>{title}</strong><span>{subtitle}</span></a>;
-}
+function QuickAction({ href, title, subtitle }: { href: string; title: string; subtitle: string }) { return <a href={href} className="member-quick-action"><strong>{title}</strong><span>{subtitle}</span></a>; }
 function GameRail({ title, href, items, primaryColor }: { title: string; href: string; items: Game[]; primaryColor: string }) { if (items.length === 0) return null; return <section className="member-info-card"><div style={sectionHeadStyle}><h2>{title}</h2><a href={href} style={{ color: primaryColor, fontWeight: 900, textDecoration: 'none' }}>ดูทั้งหมด</a></div><div style={gameRailStyle}>{items.slice(0, 8).map((game) => <a key={game.id} href="/games" style={gameTileStyle}>{pickImage(game) ? <img src={pickImage(game) ?? ''} alt="" style={gameImageStyle} /> : <div style={gameFallbackStyle}>{game.name.slice(0, 2).toUpperCase()}</div>}<strong>{game.name}</strong><span>{game.provider?.name ?? game.providerGameCode}</span></a>)}</div></section>; }
-function EmptyState({ title, description, actionHref, actionLabel, compact = false }: { title: string; description: string; actionHref: string; actionLabel: string; compact?: boolean }) {
-  return <div style={compact ? compactEmptyStyle : emptyStyle}><div><strong>{title}</strong><span>{description}</span></div><a href={actionHref}>{actionLabel}</a></div>;
-}
-function ActivityRow({ title, href, item }: { title: string; href: string; item: MoneyRequest }) {
-  return <a href={href} style={rowLinkStyle}><div><strong>{title}</strong><span>{new Date(item.createdAt).toLocaleString('th-TH')}</span></div><div style={rightStyle}><strong>{formatMoney(item.amount, item.currency)}</strong><span>{statusLabel(item.status)}</span></div></a>;
-}
-function LedgerRow({ item }: { item: LedgerItem }) {
-  return <div style={rowStyle}><div><strong>{ledgerTypeLabel(item.type)}</strong><span>{new Date(item.createdAt).toLocaleString('th-TH')}</span></div><div style={rightStyle}><strong>{item.direction === 'CREDIT' ? '+' : '-'} {formatMoney(item.amount, 'THB')}</strong></div></div>;
-}
-function ledgerTypeLabel(type: string) {
-  const upper = type.toUpperCase();
-  if (upper.includes('DEPOSIT') || upper.includes('TOPUP')) return 'ฝาก';
-  if (upper.includes('WITHDRAW')) return 'ถอนเงิน';
-  if (upper.includes('TRANSFER')) return 'โยกเงิน';
-  if (upper.includes('REVERSAL')) return 'คืนเงิน';
-  if (upper.includes('ADJUST')) return 'ปรับยอด';
-  return 'รายการ';
-}
-function statusLabel(status: string) {
-  const upper = status.toUpperCase();
-  if (upper === 'PENDING') return 'รอตรวจสอบ';
-  if (upper === 'APPROVED' || upper === 'COMPLETED') return 'สำเร็จ';
-  if (upper === 'REJECTED') return 'ไม่อนุมัติ';
-  return status;
-}
+function EmptyState({ title, description, actionHref, actionLabel, compact = false }: { title: string; description: string; actionHref: string; actionLabel: string; compact?: boolean }) { return <div style={compact ? compactEmptyStyle : emptyStyle}><div><strong>{title}</strong><span>{description}</span></div><a href={actionHref}>{actionLabel}</a></div>; }
+function ActivityRow({ title, href, item }: { title: string; href: string; item: MoneyRequest }) { return <a href={href} style={rowLinkStyle}><div><strong>{title}</strong><span>{new Date(item.createdAt).toLocaleString('th-TH')}</span></div><div style={rightStyle}><strong>{formatMoney(item.amount, item.currency)}</strong><span>{statusLabel(item.status)}</span></div></a>; }
+function LedgerRow({ item }: { item: LedgerItem }) { return <div style={rowStyle}><div><strong>{ledgerTypeLabel(item.type)}</strong><span>{new Date(item.createdAt).toLocaleString('th-TH')}</span></div><div style={rightStyle}><strong>{item.direction === 'CREDIT' ? '+' : '-'} {formatMoney(item.amount, 'THB')}</strong></div></div>; }
+function ledgerTypeLabel(type: string) { const upper = type.toUpperCase(); if (upper.includes('DEPOSIT') || upper.includes('TOPUP')) return 'ฝาก'; if (upper.includes('WITHDRAW')) return 'ถอนเงิน'; if (upper.includes('TRANSFER')) return 'โยกเงิน'; if (upper.includes('REVERSAL')) return 'คืนเงิน'; if (upper.includes('ADJUST')) return 'ปรับยอด'; return 'รายการ'; }
+function statusLabel(status: string) { const upper = status.toUpperCase(); if (upper === 'PENDING') return 'รอตรวจสอบ'; if (upper === 'APPROVED' || upper === 'COMPLETED') return 'สำเร็จ'; if (upper === 'REJECTED') return 'ไม่อนุมัติ'; return status; }
 function pickImage(game: Game) { const media = game.media ?? []; return media.find((item) => item.type === 'COVER')?.cachedUrl ?? media.find((item) => item.type === 'COVER')?.sourceUrl ?? media.find((item) => item.type === 'ICON')?.cachedUrl ?? media.find((item) => item.type === 'ICON')?.sourceUrl ?? null; }
 function categoryLabel(value: string) { const map: Record<string, string> = { slot: 'สล็อต', casino: 'คาสิโน', sport: 'กีฬา', fishing: 'ตกปลา', popular: 'ยอดนิยม', new: 'ใหม่' }; return map[value?.toLowerCase?.()] ?? value; }
 function readIds(key: string) { try { return JSON.parse(window.localStorage.getItem(key) ?? '[]') as string[]; } catch { return []; } }
-function formatMoney(value: string | number, currency: string) {
-  return `${currency} ${Number(value).toLocaleString('th-TH', { minimumFractionDigits: 2 })}`;
-}
+function formatMoney(value: string | number, currency: string) { return `${currency} ${Number(value).toLocaleString('th-TH', { minimumFractionDigits: 2 })}`; }
 const bannerStyle = { border: '1px solid rgba(245,197,66,.26)', borderRadius: 28, padding: 18, background: 'radial-gradient(circle at top left, rgba(245,197,66,.24), transparent 38%), rgba(255,255,255,.05)', display: 'flex', justifyContent: 'space-between', gap: 14, alignItems: 'center', flexWrap: 'wrap' as const, overflow: 'hidden' as const } as const;
 const bannerImageStyle = { width: 86, height: 86, borderRadius: 20, objectFit: 'cover' as const, border: '1px solid rgba(255,255,255,.14)' };
 const eyebrowStyle = { color: '#facc15', fontWeight: 950, fontSize: 12, letterSpacing: '.1em', textTransform: 'uppercase' as const } as const;
@@ -212,4 +149,5 @@ const categoryPillStyle = { border: '1px solid rgba(255,255,255,.14)', borderRad
 const faqStyle = { border: '1px solid rgba(255,255,255,.10)', borderRadius: 14, padding: 12, background: 'rgba(255,255,255,.04)' } as const;
 const popupOverlayStyle = { position: 'fixed' as const, inset: 0, zIndex: 50, display: 'grid', placeItems: 'center', padding: 18, background: 'rgba(2,6,23,.72)' };
 const popupCardStyle = { width: 'min(420px, 100%)', border: '1px solid rgba(245,197,66,.28)', borderRadius: 24, padding: 20, background: '#111827', display: 'grid', gap: 12, position: 'relative' as const };
+const popupImageStyle = { width: '100%', maxHeight: 180, objectFit: 'cover' as const, borderRadius: 16, border: '1px solid rgba(255,255,255,.12)' };
 const popupCloseStyle = { position: 'absolute' as const, top: 10, right: 10, width: 34, height: 34, borderRadius: 999, border: '1px solid rgba(255,255,255,.16)', background: 'rgba(255,255,255,.06)', color: '#fff', fontSize: 22 };
