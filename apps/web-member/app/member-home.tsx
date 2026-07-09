@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { memberApiFetch } from './member-api';
 import WalletCard from './wallet-card';
+import MemberBottomNav from './member-bottom-nav';
 
 type MemberHomeProps = {
   siteName: string;
@@ -61,10 +62,34 @@ export default function MemberHome(props: MemberHomeProps) {
   const pendingTopups = useMemo(() => topups.filter((item) => item.status === 'PENDING').slice(0, 3), [topups]);
   const pendingWithdrawals = useMemo(() => withdrawals.filter((item) => item.status === 'PENDING').slice(0, 3), [withdrawals]);
   const pendingCount = pendingTopups.length + pendingWithdrawals.length;
+  const completedCount = topups.filter((item) => ['APPROVED', 'COMPLETED'].includes(item.status)).length + withdrawals.filter((item) => ['APPROVED', 'COMPLETED'].includes(item.status)).length;
 
   return (
     <section className="member-shell member-home-shell">
+      <section className="member-market-hero" style={{ background: `linear-gradient(135deg, ${props.primaryColor}22, rgba(255,255,255,.045)), ${props.cardColor}` }}>
+        <div>
+          <span className="member-eyebrow">ยินดีต้อนรับ</span>
+          <h1>{props.siteName}</h1>
+          <p>{props.description}</p>
+        </div>
+        <span className="member-market-badge">พร้อมใช้งาน</span>
+      </section>
+
       {props.showBalanceHeader && <WalletCard primaryColor={props.primaryColor} cardColor={props.cardColor} showButtons={props.showButtons && isLoggedIn} />}
+
+      <section className="member-quick-panel">
+        <QuickAction href="/deposit" title="ฝาก" subtitle="เพิ่มยอด" />
+        <QuickAction href="/withdraw" title="ถอนเงิน" subtitle="ส่งคำขอ" />
+        <QuickAction href="/games" title="เกม" subtitle="เข้าเล่น" />
+        <QuickAction href="/bank-accounts" title="บัญชี" subtitle="จัดการ" />
+      </section>
+
+      <section className="member-summary-grid">
+        <SummaryCard label="รอดำเนินการ" value={`${pendingCount} รายการ`} hot={pendingCount > 0} />
+        <SummaryCard label="สำเร็จ" value={`${completedCount} รายการ`} calm />
+        <SummaryCard label="ล่าสุด" value={`${ledgers.length} รายการ`} />
+        <SummaryCard label="สถานะ" value="ACTIVE" calm />
+      </section>
 
       {isLoggedIn && pendingCount > 0 && <section className="member-info-card" style={alertCardStyle}>
         <div style={sectionHeadStyle}><div><p>รอดำเนินการ</p><h2>{pendingCount} รายการ</h2></div><a href="/transactions" style={{ color: props.primaryColor, fontWeight: 900, textDecoration: 'none' }}>ดูทั้งหมด</a></div>
@@ -83,22 +108,27 @@ export default function MemberHome(props: MemberHomeProps) {
           {ledgers.length === 0 && !activityMessage && !isActivityLoading && <EmptyState compact title="ยังไม่มีประวัติ" description="เมื่อมีรายการฝาก ถอน หรือปรับยอด รายการล่าสุดจะแสดงตรงนี้" actionHref="/deposit" actionLabel="ฝาก" />}
         </div>
       </section>}
+
+      <MemberBottomNav pendingCount={pendingCount} />
     </section>
   );
 }
 
+function QuickAction({ href, title, subtitle }: { href: string; title: string; subtitle: string }) {
+  return <a href={href} className="member-quick-action"><strong>{title}</strong><span>{subtitle}</span></a>;
+}
+function SummaryCard({ label, value, hot = false, calm = false }: { label: string; value: string; hot?: boolean; calm?: boolean }) {
+  return <div className={`member-summary-card ${hot ? 'hot' : ''} ${calm ? 'calm' : ''}`}><span>{label}</span><strong>{value}</strong></div>;
+}
 function EmptyState({ title, description, actionHref, actionLabel, compact = false }: { title: string; description: string; actionHref: string; actionLabel: string; compact?: boolean }) {
   return <div style={compact ? compactEmptyStyle : emptyStyle}><div><strong>{title}</strong><span>{description}</span></div><a href={actionHref}>{actionLabel}</a></div>;
 }
-
 function ActivityRow({ title, href, item }: { title: string; href: string; item: MoneyRequest }) {
   return <a href={href} style={rowLinkStyle}><div><strong>{title}</strong><span>{new Date(item.createdAt).toLocaleString('th-TH')}</span></div><div style={rightStyle}><strong>{formatMoney(item.amount, item.currency)}</strong><span>{statusLabel(item.status)}</span></div></a>;
 }
-
 function LedgerRow({ item }: { item: LedgerItem }) {
   return <div style={rowStyle}><div><strong>{ledgerTypeLabel(item.type)}</strong><span>{new Date(item.createdAt).toLocaleString('th-TH')}</span></div><div style={rightStyle}><strong>{item.direction === 'CREDIT' ? '+' : '-'} {formatMoney(item.amount, 'THB')}</strong></div></div>;
 }
-
 function ledgerTypeLabel(type: string) {
   const upper = type.toUpperCase();
   if (upper.includes('DEPOSIT') || upper.includes('TOPUP')) return 'ฝาก';
@@ -106,7 +136,6 @@ function ledgerTypeLabel(type: string) {
   if (upper.includes('ADJUST')) return 'ปรับยอด';
   return 'รายการ';
 }
-
 function statusLabel(status: string) {
   const upper = status.toUpperCase();
   if (upper === 'PENDING') return 'รอตรวจสอบ';
@@ -114,11 +143,9 @@ function statusLabel(status: string) {
   if (upper === 'REJECTED') return 'ไม่อนุมัติ';
   return status;
 }
-
 function formatMoney(value: string | number, currency: string) {
   return `${currency} ${Number(value).toLocaleString('th-TH', { minimumFractionDigits: 2 })}`;
 }
-
 const alertCardStyle = { borderColor: 'rgba(245,197,66,.32)', background: 'linear-gradient(180deg, rgba(245,197,66,.13), rgba(255,255,255,.04))' } as const;
 const pendingListStyle = { display: 'grid', gap: 10, marginTop: 12, minWidth: 0 } as const;
 const sectionHeadStyle = { display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, flexWrap: 'wrap' as const, minWidth: 0 };
