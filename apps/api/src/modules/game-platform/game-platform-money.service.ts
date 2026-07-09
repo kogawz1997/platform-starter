@@ -10,6 +10,7 @@ type MemberActor = { id: string };
 type AdminActor = { id: string };
 type RequestMeta = { ipAddress?: string; userAgent?: string };
 type TransferKind = 'TRANSFER_IN' | 'TRANSFER_OUT';
+type ProviderGates = Partial<Record<'launchEnabled' | 'transferEnabled' | 'realMoneyEnabled' | 'webhookSettlementEnabled', boolean>>;
 type ProviderWithAdapterData = { code: string; walletMode: GameProviderWalletMode; currency: string; endpoints: Array<{ type: GameProviderEndpointType; url: string; timeoutMs: number; isEnabled?: boolean }>; credentials: Array<{ type: string; maskedValue: string; isEnabled?: boolean }> };
 
 @Injectable()
@@ -20,45 +21,63 @@ export class GamePlatformMoneyService {
     const session = await this.prisma.gameSession.findFirst({ where: { id: sessionId, userId: actor.id, status: { in: ['LAUNCHED', 'ACTIVE'] } }, include: { provider: { include: { endpoints: { where: { isEnabled: true }, orderBy: { type: 'asc' } }, credentials: { where: { isEnabled: true }, orderBy: { type: 'asc' }, select: this.credentialSelect() } } }, game: { select: { id: true, name: true, providerGameCode: true } } } });
     if (!session) throw new NotFoundException('Game session is not available for transfer');
     this.assertDryRunSafetyGate(session.provider, type);
-    const idempotencyKey = `${type.toLowerCase()}_${session.id}_${Date.now()}_${randomBytes(4).toString('hex')}`;
-    const requestPayload = { dryRun: true, type, sessionId: session.id, gameId: session.gameId, gameCode: session.game.providerGameCode, ipAddress: meta.ipAddress, userAgent: meta.userAgent };
-    const transfer = await this.prisma.gameTransfer.create({ data: { userId: actor.id, providerId: session.providerId, sessionId: session.id, type, status: 'PENDING', amount, currency: session.provider.currency, idempotencyKey, requestPayload } });
-    const adapter = this.adapterRegistry.getAdapter(session.provider.code);
-    const input = { userId: actor.id, amount, currency: session.provider.currency, idempotencyKey, sessionId: session.id };
-    const result = type === 'TRANSFER_IN' ? await adapter.transferIn(this.buildAdapterContext(session.provider), input) : await adapter.transferOut(this.buildAdapterContext(session.provider), input);
+    return this.createDryRunTransfer({ userId: actor.id, providerId: session.providerId, sessionId: session.id, type, amount, currency: session.provider.currency, provider: session.provider, requestPayload: { dryRun: true, type, sessionId: session.id, gameId: session.gameId, gameCode: session.game.providerGameCode, ipAddress: meta.ipAddress, userAgent: meta.userAgent } });
+  }
+
+  async retryDryRunTransfer(id: string, actor: AdminActor, note: string) {
+    const original = await this.prisma.gameTransfer.findUnique({ where: { id }, include: { session: { include: { game: { select: { providerGameCode: true } }, provider: { include: { endpoints: { where: { isEnabled: true }, orderBy: { type: 'asc' } }, credentials: { where: { isEnabled: true }, orderBy: { type: 'asc' }, select: this.credentialSelect() } } } } } } });
+    if (!original) throw new NotFoundException('Game transfer not found');
+    if (original.status !== 'FAILED') throw new BadRequestException('Only FAILED dry-run transfers can be retried');
+    if (!original.session) throw new BadRequestException('Original transfer has no session');
+    this.assertDryRunSafetyGate(original.session.provider, original.type as TransferKind);
+    return this.createDryRunTransfer({ userId: original.userId, providerId: original.providerId, sessionId: original.sessionId ?? undefined, type: original.type as TransferKind, amount: original.amount.toString(), currency: original.currency, provider: original.session.provider, requestPayload: { dryRun: true, retry: true, originalTransferId: original.id, retryBy: actor.id, retryNote: note, gameCode: original.session.game.providerGameCode } });
+  }
+
+  private async createDryRunTransfer(input: { userId: string; providerId: string; sessionId?: string; type: TransferKind; amount: string; currency: string; provider: ProviderWithAdapterData; requestPayload: Record<string, unknown> }) {
+    const idempotencyKey = `${input.type.toLowerCase()}_${input.sessionId ?? input.providerId}_${Date.now()}_${randomBytes(4).toString('hex')}`;
+    const transfer = await this.prisma.gameTransfer.create({ data: { userId: input.userId, providerId: input.providerId, sessionId: input.sessionId, type: input.type, status: 'PENDING', amount: input.amount, currency: input.currency, idempotencyKey, requestPayload: { ...input.requestPayload, idempotencyKey } } });
+    const adapter = this.adapterRegistry.getAdapter(input.provider.code);
+    const adapterInput = { userId: input.userId, amount: input.amount, currency: input.currency, idempotencyKey, sessionId: input.sessionId };
+    const result = input.type === 'TRANSFER_IN' ? await adapter.transferIn(this.buildAdapterContext(input.provider), adapterInput) : await adapter.transferOut(this.buildAdapterContext(input.provider), adapterInput);
     const updated = await this.prisma.gameTransfer.update({ where: { id: transfer.id }, data: result.ok && result.payload ? { status: 'SUCCESS', providerTransactionId: result.payload.providerTransactionId, responsePayload: this.safeJson(result), resolvedAt: new Date() } : { status: 'FAILED', responsePayload: this.safeJson(result), errorCode: result.errorCode ?? 'TRANSFER_FAILED', errorMessage: result.errorMessage ?? 'Provider dry-run transfer failed', resolvedAt: new Date() }, include: { provider: { select: { id: true, name: true, code: true } }, session: { select: { id: true, gameId: true, providerSessionId: true } } } });
     return { ok: updated.status === 'SUCCESS', transfer: updated, dryRun: true, safetyGate: 'dry-run-only' };
   }
 
-  async reviewTransfer(id: string, actor: AdminActor, note: string) {
-    const current = await this.prisma.gameTransfer.findUnique({ where: { id } });
-    if (!current) throw new NotFoundException('Game transfer not found');
-    const payload = this.mergeJson(current.responsePayload, { manualReview: { note, reviewedBy: actor.id, reviewedAt: new Date().toISOString() } });
-    const item = await this.prisma.gameTransfer.update({ where: { id }, data: { responsePayload: payload }, include: { user: { select: { id: true, username: true, phone: true } }, provider: { select: { id: true, name: true, code: true } } } });
-    return { ok: true, item };
+  async updateProviderGates(providerId: string, actor: AdminActor, gates: ProviderGates) {
+    const provider = await this.prisma.gameProvider.findUnique({ where: { id: providerId } });
+    if (!provider) throw new NotFoundException('Game provider not found');
+    const current = this.objectJson(provider.metadata);
+    const next = { ...current, ...gates, gateUpdatedBy: actor.id, gateUpdatedAt: new Date().toISOString() };
+    const item = await this.prisma.gameProvider.update({ where: { id: providerId }, data: { metadata: this.safeJson(next) }, select: { id: true, name: true, code: true, metadata: true } });
+    return { ok: true, item, gates: this.extractGates(item.metadata) };
   }
 
-  async reviewSnapshot(id: string, actor: AdminActor, input: { note: string; status: string }) {
-    const current = await this.prisma.providerWalletSnapshot.findUnique({ where: { id } });
-    if (!current) throw new NotFoundException('Provider wallet snapshot not found');
-    const rawPayload = this.mergeJson(current.rawPayload, { manualReview: { note: input.note, status: input.status, reviewedBy: actor.id, reviewedAt: new Date().toISOString() } });
-    const mappedStatus = input.status === 'RESOLVED' ? 'MATCHED' : current.status;
-    const item = await this.prisma.providerWalletSnapshot.update({ where: { id }, data: { rawPayload, status: mappedStatus }, include: { user: { select: { id: true, username: true, phone: true } }, provider: { select: { id: true, name: true, code: true } } } });
-    return { ok: true, item, reviewStatus: input.status };
+  async realMoneyPreflight(providerId: string) {
+    const panel = await this.providerRiskPanel(providerId);
+    const unresolvedMismatchCount = await this.prisma.providerWalletSnapshot.count({ where: { providerId, status: { in: ['MISMATCH', 'UNKNOWN'] } } });
+    const blockers = [...panel.checks.filter((item) => !item.ok).map((item) => item.key)];
+    if (!panel.flags.realMoneyEnabled) blockers.push('realMoneyEnabled_false');
+    if (!panel.flags.transferEnabled) blockers.push('transferEnabled_false');
+    if (!panel.flags.webhookSettlementEnabled) blockers.push('webhookSettlementEnabled_false');
+    if (unresolvedMismatchCount > 0) blockers.push('unresolved_mismatch');
+    return { ok: blockers.length === 0, provider: panel.provider, flags: panel.flags, blockers, unresolvedMismatchCount, riskStatus: panel.status, checks: panel.checks };
   }
+
+  async reviewTransfer(id: string, actor: AdminActor, note: string) { const current = await this.prisma.gameTransfer.findUnique({ where: { id } }); if (!current) throw new NotFoundException('Game transfer not found'); const payload = this.mergeJson(current.responsePayload, { manualReview: { note, reviewedBy: actor.id, reviewedAt: new Date().toISOString() } }); const item = await this.prisma.gameTransfer.update({ where: { id }, data: { responsePayload: payload }, include: { user: { select: { id: true, username: true, phone: true } }, provider: { select: { id: true, name: true, code: true } } } }); return { ok: true, item }; }
+  async reviewSnapshot(id: string, actor: AdminActor, input: { note: string; status: string }) { const current = await this.prisma.providerWalletSnapshot.findUnique({ where: { id } }); if (!current) throw new NotFoundException('Provider wallet snapshot not found'); const rawPayload = this.mergeJson(current.rawPayload, { manualReview: { note: input.note, status: input.status, reviewedBy: actor.id, reviewedAt: new Date().toISOString() } }); const mappedStatus = input.status === 'RESOLVED' ? 'MATCHED' : current.status; const item = await this.prisma.providerWalletSnapshot.update({ where: { id }, data: { rawPayload, status: mappedStatus }, include: { user: { select: { id: true, username: true, phone: true } }, provider: { select: { id: true, name: true, code: true } } } }); return { ok: true, item, reviewStatus: input.status }; }
 
   async providerRiskPanel(providerId: string) {
     const provider = await this.prisma.gameProvider.findUnique({ where: { id: providerId }, include: { endpoints: { orderBy: { type: 'asc' } }, credentials: { orderBy: { type: 'asc' }, select: this.credentialSelect() } } });
     if (!provider) throw new NotFoundException('Game provider not found');
-    const [failedTransferCount, duplicateWebhookCount, latestSnapshot] = await Promise.all([
+    const [failedTransferCount, duplicateWebhookCount, latestSnapshot, unresolvedMismatchCount] = await Promise.all([
       this.prisma.gameTransfer.count({ where: { providerId, status: 'FAILED' } }),
       this.prisma.webhookLog.count({ where: { providerId, status: 'DUPLICATE' } }),
       this.prisma.providerWalletSnapshot.findFirst({ where: { providerId }, orderBy: { checkedAt: 'desc' } }),
+      this.prisma.providerWalletSnapshot.count({ where: { providerId, status: { in: ['MISMATCH', 'UNKNOWN'] } } }),
     ]);
     const endpointSet = new Set(provider.endpoints.filter((item) => item.isEnabled).map((item) => item.type));
     const credentialSet = new Set(provider.credentials.filter((item) => item.isEnabled).map((item) => item.type));
-    const metadata = this.objectJson(provider.metadata);
-    const flags = { launchEnabled: metadata.launchEnabled !== false, transferEnabled: metadata.transferEnabled === true, realMoneyEnabled: metadata.realMoneyEnabled === true, webhookSettlementEnabled: metadata.webhookSettlementEnabled === true };
+    const flags = this.extractGates(provider.metadata);
     const checks = [
       { key: 'adapter_registered', ok: this.adapterRegistry.hasAdapter(provider.code) },
       { key: 'provider_active', ok: provider.status === 'ACTIVE' },
@@ -70,10 +89,11 @@ export class GamePlatformMoneyService {
       { key: 'api_key', ok: credentialSet.has('API_KEY') },
       { key: 'webhook_secret', ok: credentialSet.has('WEBHOOK_SECRET') },
       { key: 'latest_reconciliation_safe', ok: !latestSnapshot || latestSnapshot.status === 'MATCHED' },
+      { key: 'no_unresolved_mismatch', ok: unresolvedMismatchCount === 0 },
       { key: 'real_money_disabled_by_default', ok: !flags.realMoneyEnabled },
     ];
     const status = flags.realMoneyEnabled ? 'NEEDS_REVIEW' : checks.every((item) => item.ok) ? 'DRY_RUN_READY' : 'BLOCKED';
-    return { provider: { id: provider.id, name: provider.name, code: provider.code, status: provider.status }, flags, checks, status, failedTransferCount, duplicateWebhookCount, latestSnapshot };
+    return { provider: { id: provider.id, name: provider.name, code: provider.code, status: provider.status }, flags, checks, status, failedTransferCount, duplicateWebhookCount, latestSnapshot, unresolvedMismatchCount };
   }
 
   async listMemberSessionTransfers(sessionId: string, actor: MemberActor) { const session = await this.prisma.gameSession.findFirst({ where: { id: sessionId, userId: actor.id }, select: { id: true } }); if (!session) throw new NotFoundException('Game session not found'); const items = await this.prisma.gameTransfer.findMany({ where: { sessionId, userId: actor.id }, orderBy: { createdAt: 'desc' }, take: 30, select: { id: true, type: true, status: true, amount: true, currency: true, idempotencyKey: true, providerTransactionId: true, errorCode: true, errorMessage: true, createdAt: true, resolvedAt: true } }); return { items }; }
@@ -82,31 +102,14 @@ export class GamePlatformMoneyService {
   async getSnapshot(id: string) { const item = await this.prisma.providerWalletSnapshot.findUnique({ where: { id }, include: { user: { select: { id: true, username: true, phone: true } }, provider: { select: { id: true, name: true, code: true } } } }); if (!item) throw new NotFoundException('Provider wallet snapshot not found'); return item; }
   async listTransfers() { const items = await this.prisma.gameTransfer.findMany({ orderBy: { createdAt: 'desc' }, take: 100, include: { user: { select: { id: true, username: true, phone: true } }, provider: { select: { id: true, name: true, code: true } }, session: { select: { id: true, providerSessionId: true, game: { select: { id: true, name: true, providerGameCode: true } } } } } }); return { items, summary: { total: items.length, success: items.filter((item) => item.status === 'SUCCESS').length, failed: items.filter((item) => item.status === 'FAILED').length, pending: items.filter((item) => item.status === 'PENDING').length } }; }
   async getTransfer(id: string) { const item = await this.prisma.gameTransfer.findUnique({ where: { id }, include: { user: { select: { id: true, username: true, phone: true } }, provider: { select: { id: true, name: true, code: true } }, session: { include: { game: { select: { id: true, name: true, providerGameCode: true } } } } } }); if (!item) throw new NotFoundException('Game transfer not found'); return item; }
-
-  async receiveWebhook(providerCode: string, headers: Record<string, string | string[] | undefined>, body: unknown) {
-    const payload = this.objectJson(body);
-    if (!payload.eventType || typeof payload.eventType !== 'string') throw new BadRequestException('eventType is required');
-    if (!payload.idempotencyKey || typeof payload.idempotencyKey !== 'string') throw new BadRequestException('idempotencyKey is required');
-    const provider = await this.prisma.gameProvider.findUnique({ where: { code: providerCode }, include: { endpoints: { where: { isEnabled: true }, orderBy: { type: 'asc' } }, credentials: { where: { isEnabled: true }, orderBy: { type: 'asc' }, select: this.credentialSelect() } } });
-    if (!provider) throw new NotFoundException('Game provider not found');
-    const duplicate = await this.prisma.webhookLog.findFirst({ where: { providerId: provider.id, idempotencyKey: String(payload.idempotencyKey) }, select: { id: true } });
-    if (duplicate) { const log = await this.prisma.webhookLog.create({ data: { providerId: provider.id, eventType: String(payload.eventType), status: 'DUPLICATE', signatureValid: true, idempotencyKey: String(payload.idempotencyKey), providerTransactionId: typeof payload.providerTransactionId === 'string' ? payload.providerTransactionId : undefined, rawPayload: this.safeJson({ headers, body }), normalizedPayload: this.safeJson({ duplicateOf: duplicate.id }), responseStatus: 208, processedAt: new Date() } }); return { ok: true, duplicate: true, logId: log.id, duplicateOf: duplicate.id }; }
-    const adapter = this.adapterRegistry.getAdapter(provider.code);
-    const context = this.buildAdapterContext(provider);
-    const validation = await adapter.validateWebhook(context, headers, body);
-    if (!validation.valid) { const log = await this.prisma.webhookLog.create({ data: { providerId: provider.id, eventType: String(payload.eventType), status: 'FAILED', signatureValid: false, idempotencyKey: String(payload.idempotencyKey), rawPayload: this.safeJson({ headers, body }), normalizedPayload: this.safeJson(validation), responseStatus: 400, errorCode: 'INVALID_SIGNATURE', errorMessage: validation.reason } }); return { ok: false, logId: log.id, status: log.status, reason: validation.reason }; }
-    const events = await adapter.parseWebhook(context, body);
-    const logs = [];
-    for (const event of events) { const log = await this.prisma.webhookLog.create({ data: { providerId: provider.id, eventType: event.eventType || String(payload.eventType), status: 'PROCESSED', signatureValid: true, idempotencyKey: event.idempotencyKey ?? String(payload.idempotencyKey), providerTransactionId: event.providerTransactionId, rawPayload: this.safeJson({ headers, body }), normalizedPayload: this.safeJson(event), responseStatus: 200, processedAt: new Date() } }); logs.push(log); }
-    return { ok: true, providerCode: provider.code, received: logs.length, logs };
-  }
-
+  async receiveWebhook(providerCode: string, headers: Record<string, string | string[] | undefined>, body: unknown) { const payload = this.objectJson(body); if (!payload.eventType || typeof payload.eventType !== 'string') throw new BadRequestException('eventType is required'); if (!payload.idempotencyKey || typeof payload.idempotencyKey !== 'string') throw new BadRequestException('idempotencyKey is required'); const provider = await this.prisma.gameProvider.findUnique({ where: { code: providerCode }, include: { endpoints: { where: { isEnabled: true }, orderBy: { type: 'asc' } }, credentials: { where: { isEnabled: true }, orderBy: { type: 'asc' }, select: this.credentialSelect() } } }); if (!provider) throw new NotFoundException('Game provider not found'); const duplicate = await this.prisma.webhookLog.findFirst({ where: { providerId: provider.id, idempotencyKey: String(payload.idempotencyKey) }, select: { id: true } }); if (duplicate) { const log = await this.prisma.webhookLog.create({ data: { providerId: provider.id, eventType: String(payload.eventType), status: 'DUPLICATE', signatureValid: true, idempotencyKey: String(payload.idempotencyKey), providerTransactionId: typeof payload.providerTransactionId === 'string' ? payload.providerTransactionId : undefined, rawPayload: this.safeJson({ headers, body }), normalizedPayload: this.safeJson({ duplicateOf: duplicate.id }), responseStatus: 208, processedAt: new Date() } }); return { ok: true, duplicate: true, logId: log.id, duplicateOf: duplicate.id }; } const adapter = this.adapterRegistry.getAdapter(provider.code); const context = this.buildAdapterContext(provider); const validation = await adapter.validateWebhook(context, headers, body); if (!validation.valid) { const log = await this.prisma.webhookLog.create({ data: { providerId: provider.id, eventType: String(payload.eventType), status: 'FAILED', signatureValid: false, idempotencyKey: String(payload.idempotencyKey), rawPayload: this.safeJson({ headers, body }), normalizedPayload: this.safeJson(validation), responseStatus: 400, errorCode: 'INVALID_SIGNATURE', errorMessage: validation.reason } }); return { ok: false, logId: log.id, status: log.status, reason: validation.reason }; } const events = await adapter.parseWebhook(context, body); const logs = []; for (const event of events) { const log = await this.prisma.webhookLog.create({ data: { providerId: provider.id, eventType: event.eventType || String(payload.eventType), status: 'PROCESSED', signatureValid: true, idempotencyKey: event.idempotencyKey ?? String(payload.idempotencyKey), providerTransactionId: event.providerTransactionId, rawPayload: this.safeJson({ headers, body }), normalizedPayload: this.safeJson(event), responseStatus: 200, processedAt: new Date() } }); logs.push(log); } return { ok: true, providerCode: provider.code, received: logs.length, logs }; }
   async listWebhookLogs() { const items = await this.prisma.webhookLog.findMany({ orderBy: { createdAt: 'desc' }, take: 100, include: { provider: { select: { id: true, name: true, code: true } } } }); return { items, summary: { total: items.length, processed: items.filter((item) => item.status === 'PROCESSED').length, failed: items.filter((item) => item.status === 'FAILED').length, duplicate: items.filter((item) => item.status === 'DUPLICATE').length } }; }
   async getWebhookLog(id: string) { const item = await this.prisma.webhookLog.findUnique({ where: { id }, include: { provider: { select: { id: true, name: true, code: true } } } }); if (!item) throw new NotFoundException('Webhook log not found'); return item; }
   private assertDryRunSafetyGate(provider: ProviderWithAdapterData, type: TransferKind) { if (!this.adapterRegistry.hasAdapter(provider.code)) throw new ForbiddenException('Provider adapter is not registered'); const endpointSet = new Set(provider.endpoints.map((item) => item.type)); const credentialSet = new Set(provider.credentials.map((item) => item.type)); const requiredEndpoint = type === 'TRANSFER_IN' ? 'TRANSFER_IN' : 'TRANSFER_OUT'; if (!endpointSet.has(requiredEndpoint)) throw new ForbiddenException(`${requiredEndpoint} endpoint is not enabled`); if (!credentialSet.has('API_KEY')) throw new ForbiddenException('API_KEY credential is not enabled'); }
   private assertReconciliationSafetyGate(provider: ProviderWithAdapterData) { if (!this.adapterRegistry.hasAdapter(provider.code)) throw new ForbiddenException('Provider adapter is not registered'); const endpointSet = new Set(provider.endpoints.map((item) => item.type)); if (!endpointSet.has('BALANCE')) throw new ForbiddenException('BALANCE endpoint is not enabled'); }
   private buildAdapterContext(provider: ProviderWithAdapterData): ProviderAdapterContext { const endpointMap = provider.endpoints.reduce<Partial<Record<GameProviderEndpointType, string>>>((result, endpoint) => { result[endpoint.type] = endpoint.url; return result; }, {}); const credentialMap = provider.credentials.reduce<Record<string, string>>((result, credential) => { result[credential.type] = credential.maskedValue; return result; }, {}); return { providerCode: provider.code, baseUrl: endpointMap.HEALTH_CHECK ?? endpointMap.LAUNCH ?? '', walletMode: provider.walletMode, currency: provider.currency, timeoutMs: Math.max(...provider.endpoints.map((endpoint) => endpoint.timeoutMs), 10000), endpointMap, credentialMap }; }
   private credentialSelect() { return { id: true, providerId: true, type: true, maskedValue: true, isEnabled: true, rotatedAt: true, createdAt: true, updatedAt: true } as const; }
+  private extractGates(metadata: unknown) { const value = this.objectJson(metadata); return { launchEnabled: value.launchEnabled !== false, transferEnabled: value.transferEnabled === true, realMoneyEnabled: value.realMoneyEnabled === true, webhookSettlementEnabled: value.webhookSettlementEnabled === true }; }
   private safeJson(value: unknown) { return JSON.parse(JSON.stringify(value)) as Prisma.InputJsonValue; }
   private objectJson(value: unknown) { return value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : {}; }
   private mergeJson(current: unknown, patch: Record<string, unknown>) { return this.safeJson({ ...this.objectJson(current), ...patch }); }
