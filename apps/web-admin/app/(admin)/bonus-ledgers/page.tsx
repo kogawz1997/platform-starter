@@ -1,0 +1,37 @@
+'use client';
+
+import { useEffect, useMemo, useState } from 'react';
+import { adminApiFetch } from '../../admin-api';
+import { AdminBadge, AdminButton, AdminCard, AdminEmpty, AdminGrid, AdminMetric, AdminMetricGrid, AdminNotice, AdminPage, AdminRow, AdminStack, AdminToolbar } from '../_components/admin-ui';
+
+type BonusLedger = { id: string; claimId: string; campaignId: string; campaign?: { title?: string }; amount: number; currency: string; turnoverRequired: number; turnoverProgress: number; turnoverCompleted: boolean; walletCreditEnabled: boolean; walletCreditStatus: string; status: string; rawStatus: string; events?: Array<{ by: string; action: string; amount?: number; message?: string; createdAt: string }>; member?: { username?: string | null; phone?: string | null; email?: string | null }; createdAt: string; resolvedAt?: string | null };
+
+export default function BonusLedgersPage() {
+  const [items, setItems] = useState<BonusLedger[]>([]);
+  const [status, setStatus] = useState('ALL');
+  const [amounts, setAmounts] = useState<Record<string, string>>({});
+  const [notes, setNotes] = useState<Record<string, string>>({});
+  const [message, setMessage] = useState('กำลังโหลดโบนัส...');
+  const [busyId, setBusyId] = useState('');
+  useEffect(() => { load(); }, [status]);
+  const stats = useMemo(() => ({ active: items.filter((item) => item.status === 'ACTIVE').length, completed: items.filter((item) => item.turnoverCompleted).length, amount: items.reduce((sum, item) => sum + Number(item.amount || 0), 0), remaining: items.reduce((sum, item) => sum + Math.max(Number(item.turnoverRequired || 0) - Number(item.turnoverProgress || 0), 0), 0) }), [items]);
+  async function load() { setMessage('กำลังโหลดโบนัส...'); const params = new URLSearchParams(); if (status !== 'ALL') params.set('status', status); const res = await adminApiFetch(`/admin/bonus-ledgers?${params.toString()}`); const data = await res.json().catch(() => null); if (!res.ok) { setMessage(data?.message ?? 'โหลดโบนัสไม่สำเร็จ'); return; } setItems(data.items ?? []); setMessage(''); }
+  async function addProgress(id: string) { const amount = Number(amounts[id] || 0); if (!Number.isFinite(amount) || amount <= 0) { setMessage('กรุณาใส่ turnover progress มากกว่า 0'); return; } setBusyId(id); const res = await adminApiFetch(`/admin/bonus-ledgers/${id}/turnover-progress`, { method: 'PATCH', body: JSON.stringify({ amount, note: notes[id] ?? '' }) }); const data = await res.json().catch(() => null); setBusyId(''); if (!res.ok) { setMessage(data?.message ?? 'อัปเดต turnover ไม่สำเร็จ'); return; } setItems((current) => current.map((item) => item.id === id ? data.item : item)); setAmounts((current) => ({ ...current, [id]: '' })); setNotes((current) => ({ ...current, [id]: '' })); setMessage('อัปเดต turnover แล้ว'); }
+  return <AdminPage eyebrow="Bonus Ops" title="Bonus Ledger" description="บัญชีโบนัสแยกจาก wallet หลัก ดูยอดโบนัสและ progress เทิร์นก่อนปล่อยเงินจริงเข้าระบบ" actions={<AdminButton onClick={load}>รีเฟรช</AdminButton>}>
+    {message && <AdminNotice>{message}</AdminNotice>}
+    <AdminMetricGrid><AdminMetric tone={stats.active > 0 ? 'warning' : 'success'} title="โบนัสใช้งาน" value={String(stats.active)} /><AdminMetric tone="success" title="ผ่านเทิร์น" value={String(stats.completed)} /><AdminMetric tone="warning" title="ยอดโบนัส" value={money(stats.amount)} /><AdminMetric tone={stats.remaining > 0 ? 'danger' : 'success'} title="เทิร์นคงเหลือ" value={money(stats.remaining)} /></AdminMetricGrid>
+    <AdminToolbar><select value={status} onChange={(event) => setStatus(event.target.value)} style={selectStyle}><option value="ALL">ทุกสถานะ</option><option value="OPEN">ACTIVE</option><option value="REVIEWING">REVIEWING</option><option value="RESOLVED">COMPLETED</option><option value="DISMISSED">EXPIRED</option></select></AdminToolbar>
+    <AdminGrid>{items.map((item) => <AdminCard key={item.id} title={item.campaign?.title ?? item.campaignId} description={`${memberLabel(item)} · ${new Date(item.createdAt).toLocaleString('th-TH')}`} tone={item.turnoverCompleted ? 'success' : 'warning'}><AdminStack><AdminRow><strong>สถานะ</strong><span><AdminBadge tone={item.turnoverCompleted ? 'success' : 'warning'}>{statusLabel(item.status)}</AdminBadge> <AdminBadge tone={item.walletCreditEnabled ? 'success' : 'danger'}>{item.walletCreditStatus}</AdminBadge></span></AdminRow><AdminRow><strong>ยอดโบนัส</strong><span>{money(item.amount)} {item.currency}</span></AdminRow><AdminRow><strong>เทิร์น</strong><span>{money(item.turnoverProgress)} / {money(item.turnoverRequired)}</span></AdminRow><div style={progressOuterStyle}><div style={{ ...progressInnerStyle, width: `${progressPercent(item)}%` }} /></div><section style={timelineStyle}>{(item.events ?? []).slice(-4).map((event, index) => <div key={index} style={eventStyle}><AdminBadge tone={event.by === 'admin' ? 'success' : 'neutral'}>{event.by}</AdminBadge><strong>{event.action}</strong><span>{event.amount ? money(event.amount) : event.message || '-'}</span><small>{new Date(event.createdAt).toLocaleString('th-TH')}</small></div>)}</section>{!item.turnoverCompleted && <div style={formGridStyle}><input type="number" value={amounts[item.id] ?? ''} onChange={(event) => setAmounts((current) => ({ ...current, [item.id]: event.target.value }))} placeholder="เพิ่ม turnover" style={inputStyle} /><input value={notes[item.id] ?? ''} onChange={(event) => setNotes((current) => ({ ...current, [item.id]: event.target.value }))} placeholder="หมายเหตุ" style={inputStyle} /><AdminButton disabled={busyId === item.id} onClick={() => addProgress(item.id)}>เพิ่ม progress</AdminButton></div>}</AdminStack></AdminCard>)}{items.length === 0 && <AdminEmpty>ยังไม่มี bonus ledger</AdminEmpty>}</AdminGrid>
+  </AdminPage>;
+}
+function memberLabel(item: BonusLedger) { return item.member?.username ?? item.member?.phone ?? item.member?.email ?? '-'; }
+function statusLabel(status: string) { const map: Record<string, string> = { ACTIVE: 'ใช้งาน', REVIEWING: 'กำลังตรวจ', TURNOVER_COMPLETED: 'ผ่านเทิร์น', COMPLETED: 'เสร็จสิ้น', EXPIRED: 'หมดอายุ' }; return map[status] ?? status; }
+function progressPercent(item: BonusLedger) { const required = Number(item.turnoverRequired || 0); if (required <= 0) return 100; return Math.min(100, Math.round((Number(item.turnoverProgress || 0) / required) * 100)); }
+function money(value: number) { return `THB ${Number(value || 0).toLocaleString('th-TH', { minimumFractionDigits: 2 })}`; }
+const selectStyle = { minHeight: 44, borderRadius: 12, border: '1px solid rgba(148,163,184,.22)', background: '#0b1220', color: '#f8fafc', padding: '0 12px', minWidth: 180 } as const;
+const inputStyle = { minHeight: 42, borderRadius: 12, border: '1px solid rgba(148,163,184,.22)', background: '#0b1220', color: '#f8fafc', padding: '0 12px', minWidth: 0 } as const;
+const formGridStyle = { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(160px, 100%), 1fr))', gap: 8 } as const;
+const progressOuterStyle = { height: 10, borderRadius: 999, background: 'rgba(148,163,184,.18)', overflow: 'hidden' as const };
+const progressInnerStyle = { height: '100%', borderRadius: 999, background: 'linear-gradient(90deg,#facc15,#22c55e)' };
+const timelineStyle = { border: '1px solid rgba(148,163,184,.14)', borderRadius: 16, padding: 12, background: 'rgba(255,255,255,.04)', display: 'grid', gap: 8 } as const;
+const eventStyle = { display: 'grid', gap: 4, borderBottom: '1px solid rgba(148,163,184,.10)', paddingBottom: 8 } as const;
