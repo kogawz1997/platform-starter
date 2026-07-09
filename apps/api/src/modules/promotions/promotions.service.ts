@@ -1,5 +1,5 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
-import { Prisma, RiskAlertSeverity, RiskAlertStatus } from '@prisma/client';
+import { Prisma, RiskAlertStatus } from '@prisma/client';
 import { PrismaService } from '../../database/prisma.service';
 
 type Actor = { id: string };
@@ -56,8 +56,8 @@ export class PromotionsService {
   }
 
   private async activeCampaigns() {
-    const settings = await this.prisma.siteSetting.findFirst({ where: { group: 'features', key: 'promotion_campaigns' } });
-    const campaigns = this.normalizeCampaigns(settings?.value);
+    const settings = await this.prisma.siteSetting.findUnique({ where: { key: 'features.promotion_campaigns' } });
+    const campaigns = this.normalizeCampaigns(settings?.valueJson);
     const now = Date.now();
     return campaigns.filter((item) => item.enabled && this.inWindow(item, now));
   }
