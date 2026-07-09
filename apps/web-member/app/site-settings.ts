@@ -24,6 +24,7 @@ export type PromotionCampaign = {
   iconUrl?: string;
   badgeText?: string;
   accentColor?: string;
+  priority?: number;
   startsAt?: string;
   endsAt?: string;
 };
@@ -48,7 +49,7 @@ export const defaultCmsContent: CmsContent = {
 };
 
 export const defaultPromotionCampaigns: PromotionCampaign[] = [
-  { id: 'welcome-bonus', title: 'โบนัสต้อนรับ', description: 'รับโบนัสสำหรับรายการฝากแรกตามเงื่อนไขที่กำหนด', enabled: false, bonusType: 'percent', bonusValue: 10, minDeposit: 100, maxBonus: 500, turnoverMultiplier: 3, claimMode: 'manual_review', badgeText: 'WELCOME', accentColor: '#f5c542' },
+  { id: 'welcome-bonus', title: 'โบนัสต้อนรับ', description: 'รับโบนัสสำหรับรายการฝากแรกตามเงื่อนไขที่กำหนด', enabled: false, bonusType: 'percent', bonusValue: 10, minDeposit: 100, maxBonus: 500, turnoverMultiplier: 3, claimMode: 'manual_review', badgeText: 'WELCOME', accentColor: '#f5c542', priority: 10 },
 ];
 
 export const defaultSettings: PublicSiteSettings = {
@@ -104,6 +105,7 @@ export function promotionCampaignsSetting(settings: PublicSiteSettings): Promoti
     iconUrl: typeof item.iconUrl === 'string' ? item.iconUrl : '',
     badgeText: typeof item.badgeText === 'string' ? item.badgeText : '',
     accentColor: typeof item.accentColor === 'string' ? item.accentColor : '#f5c542',
+    priority: Number(item.priority ?? 0),
     startsAt: typeof item.startsAt === 'string' ? item.startsAt : undefined,
     endsAt: typeof item.endsAt === 'string' ? item.endsAt : undefined,
   }));
