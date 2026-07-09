@@ -26,6 +26,12 @@ export class AffiliatesController {
     return this.affiliates.linkMemberReferral(user, body);
   }
 
+  @UseGuards(MemberAuthGuard)
+  @Get('member/affiliate/commissions')
+  listMemberCommissions(@CurrentUser() user: any) {
+    return this.affiliates.listMemberCommissions(user);
+  }
+
   @UseGuards(AdminAuthGuard)
   @Get('admin/affiliates')
   listAdminProfiles(@Query('status') status?: string) {
@@ -36,5 +42,23 @@ export class AffiliatesController {
   @Patch('admin/affiliates/:id/review')
   reviewProfile(@CurrentUser() user: any, @Param('id') id: string, @Body() body: any) {
     return this.affiliates.reviewProfile(user, id, body);
+  }
+
+  @UseGuards(AdminAuthGuard)
+  @Get('admin/commission-ledgers')
+  listAdminCommissions(@Query('status') status?: string) {
+    return this.affiliates.listAdminCommissions({ status });
+  }
+
+  @UseGuards(AdminAuthGuard)
+  @Post('admin/commission-ledgers')
+  createCommissionLedger(@CurrentUser() user: any, @Body() body: any) {
+    return this.affiliates.createCommissionLedger(user, body);
+  }
+
+  @UseGuards(AdminAuthGuard)
+  @Patch('admin/commission-ledgers/:id/review')
+  reviewCommission(@CurrentUser() user: any, @Param('id') id: string, @Body() body: any) {
+    return this.affiliates.reviewCommission(user, id, body);
   }
 }
