@@ -54,4 +54,10 @@ export class PromotionsController {
   addTurnoverProgress(@CurrentUser() user: any, @Param('id') id: string, @Body() body: any) {
     return this.promotions.addTurnoverProgress(user, id, body);
   }
+
+  @UseGuards(AdminAuthGuard)
+  @Patch('admin/bonus-ledgers/:id/lifecycle')
+  updateBonusLifecycle(@CurrentUser() user: any, @Param('id') id: string, @Body() body: any) {
+    return this.promotions.updateBonusLifecycle(user, id, body);
+  }
 }
