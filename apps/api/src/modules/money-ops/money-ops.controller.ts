@@ -23,6 +23,10 @@ export class MoneyOpsController {
   simulateLedger(@Body() body: unknown) { return this.moneyOps.simulateLedgerMutation(body as any); }
 
   @RequirePermission('game.providers.manage')
+  @Post('ledger/mutate')
+  mutateLedger(@Body() body: unknown, @CurrentUser() user: any, @Req() req: any) { return this.moneyOps.mutateLedger(user, this.meta(req), body as any); }
+
+  @RequirePermission('game.providers.manage')
   @Post('audit-events')
   writeAudit(@Body() body: any, @CurrentUser() user: any, @Req() req: any) { return this.moneyOps.writeAudit(user, this.meta(req), body); }
 
