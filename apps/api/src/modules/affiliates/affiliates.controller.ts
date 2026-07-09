@@ -56,6 +56,13 @@ export class AffiliatesController {
   }
 
   @UseGuards(AdminAuthGuard, PermissionsGuard)
+  @RequirePermission('commission.view')
+  @Post('admin/commission-ledgers/preview')
+  previewCommission(@Body() body: any) {
+    return this.affiliates.previewCommission(body);
+  }
+
+  @UseGuards(AdminAuthGuard, PermissionsGuard)
   @RequirePermission('commission.create')
   @Post('admin/commission-ledgers')
   createCommissionLedger(@CurrentUser() user: any, @Body() body: any) {
