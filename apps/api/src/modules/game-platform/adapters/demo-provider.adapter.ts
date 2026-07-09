@@ -41,7 +41,8 @@ export class DemoProviderAdapter implements GameProviderAdapter {
   }
 
   async launchGame(context: ProviderAdapterContext, input: LaunchGameInput): Promise<ProviderAdapterResult<LaunchGameOutput>> {
-    return ok(context, 'demo_launch', { launchUrl: `https://demo-provider.local/launch/${encodeURIComponent(input.gameCode)}?session=${encodeURIComponent(input.sessionId)}`, providerSessionId: `demo_${input.sessionId}`, expiresAt: new Date(Date.now() + 15 * 60 * 1000).toISOString() }, input);
+    const launchUrl = `/games/demo-launch?game=${encodeURIComponent(input.gameCode)}&session=${encodeURIComponent(input.sessionId)}`;
+    return ok(context, 'demo_launch', { launchUrl, providerSessionId: `demo_${input.sessionId}`, expiresAt: new Date(Date.now() + 15 * 60 * 1000).toISOString() }, input);
   }
 
   async getBalance(context: ProviderAdapterContext, input: BalanceInput): Promise<ProviderAdapterResult<BalanceOutput>> {
