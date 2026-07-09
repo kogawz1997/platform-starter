@@ -59,15 +59,17 @@ export class SupportService {
   async listAdminTickets(query: { status?: string; category?: string }) {
     const where: Prisma.RiskAlertWhereInput = { refType: SUPPORT_REF_TYPE };
     if (query.status && query.status !== 'ALL') where.status = query.status as RiskAlertStatus;
-    const items = await this.prisma.riskAlert.findMany({ where, orderBy: { createdAt: 'desc' }, take: 100, include: { member: { select: { id: true, username: true, phone: true, email: true } } } });
-    const formatted = items.map((item) => this.formatTicket(item)).filter((item) => !query.category || query.category === 'ALL' || item.category === query.category);
+    const items = await this.prisma.riskAlert.findMany({ where, orderBy: { createdAt: 'desc' }, take: 100 });
+    const memberMap = await this.memberMap(items.map((item) => item.memberId).filter(Boolean) as string[]);
+    const formatted = items.map((item) => this.formatTicket({ ...item, member: item.memberId ? memberMap.get(item.memberId) : undefined })).filter((item) => !query.category || query.category === 'ALL' || item.category === query.category);
     return { items: formatted, total: formatted.length };
   }
 
   async getAdminTicket(id: string) {
-    const item = await this.prisma.riskAlert.findFirst({ where: { id, refType: SUPPORT_REF_TYPE }, include: { member: { select: { id: true, username: true, phone: true, email: true } } } });
+    const item = await this.prisma.riskAlert.findFirst({ where: { id, refType: SUPPORT_REF_TYPE } });
     if (!item) throw new NotFoundException('Support ticket not found');
-    return this.formatTicket(item);
+    const member = item.memberId ? await this.prisma.user.findUnique({ where: { id: item.memberId }, select: { id: true, username: true, phone: true, email: true } }) : null;
+    return this.formatTicket({ ...item, member });
   }
 
   async adminReply(admin: Actor, id: string, input: ReplyInput) {
@@ -95,6 +97,13 @@ export class SupportService {
     const updated = await this.prisma.riskAlert.update({ where: { id }, data: patch });
     await this.audit(admin.id, 'support.update', id, item, updated);
     return { ok: true, item: this.formatTicket(updated) };
+  }
+
+  private async memberMap(memberIds: string[]) {
+    const uniqueIds = Array.from(new Set(memberIds));
+    if (uniqueIds.length === 0) return new Map<string, { id: string; username: string; phone: string | null; email: string | null }>();
+    const users = await this.prisma.user.findMany({ where: { id: { in: uniqueIds } }, select: { id: true, username: true, phone: true, email: true } });
+    return new Map(users.map((user) => [user.id, user]));
   }
 
   private formatTicket(item: any) {
