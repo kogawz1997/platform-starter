@@ -1,5 +1,5 @@
 import { BadRequestException, ForbiddenException, Injectable } from '@nestjs/common';
-import { Prisma, RiskAlertSeverity, RiskAlertType, WalletLedgerDirection, WalletLedgerType } from '@prisma/client';
+import { Prisma, RiskAlertSeverity, RiskAlertType, WalletLedgerDirection } from '@prisma/client';
 import { randomBytes } from 'crypto';
 import { PrismaService } from '../../database/prisma.service';
 
