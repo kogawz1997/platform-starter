@@ -3,12 +3,15 @@
 import { FormEvent, useEffect, useState } from 'react';
 import { API_URL, PublicSiteSettings, boolSetting, defaultSettings, textSetting } from '../../site-settings';
 
+const REFERRAL_CODE_KEY = 'member_pending_referral_code';
+
 export default function MemberRegisterPage() {
   const [settings, setSettings] = useState<PublicSiteSettings>(defaultSettings);
   const [username, setUsername] = useState('');
   const [phone, setPhone] = useState('');
   const [email, setEmail] = useState('');
   const [secret, setSecret] = useState('');
+  const [referralCode, setReferralCode] = useState('');
   const [message, setMessage] = useState('');
   const [status, setStatus] = useState<'idle' | 'success' | 'error' | 'info'>('idle');
   const [loading, setLoading] = useState(false);
@@ -16,6 +19,9 @@ export default function MemberRegisterPage() {
 
   useEffect(() => {
     if (window.localStorage.getItem('member_access_token') || window.localStorage.getItem('member_refresh_token')) { window.location.replace('/'); return; }
+    const ref = new URLSearchParams(window.location.search).get('ref') ?? window.localStorage.getItem(REFERRAL_CODE_KEY) ?? '';
+    const cleanRef = normalizeReferralCode(ref);
+    if (cleanRef) { setReferralCode(cleanRef); window.localStorage.setItem(REFERRAL_CODE_KEY, cleanRef); }
     fetch(`${API_URL}/public/site-settings`).then((res) => res.json()).then((data) => setSettings({ ...defaultSettings, ...data })).catch(() => setSettings(defaultSettings));
   }, []);
 
@@ -34,12 +40,14 @@ export default function MemberRegisterPage() {
     if (!registrationEnabled) { setStatus('error'); setMessage('ขณะนี้ปิดรับสมัครสมาชิก'); return; }
     if (!username.trim() || !phone.trim() || !secret.trim()) { setStatus('error'); setMessage('กรุณากรอกข้อมูลให้ครบ'); return; }
     setLoading(true); setStatus('info'); setMessage('กำลังสมัครสมาชิก...');
+    const cleanRef = normalizeReferralCode(referralCode);
     const res = await fetch(`${API_URL}/member/auth/register`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username: username.trim(), phone: phone.trim(), email: email.trim() || undefined, secret, deviceId: 'web-member' }) });
     const data = await res.json().catch(() => null); setLoading(false);
     if (!res.ok) { setStatus('error'); setMessage(data?.message ?? 'สมัครสมาชิกไม่สำเร็จ กรุณาตรวจสอบข้อมูล'); return; }
     window.localStorage.setItem('member_access_token', data.accessToken);
     window.localStorage.setItem('member_refresh_token', data.refreshToken);
-    setStatus('success'); setMessage('สมัครสมาชิกสำเร็จ กำลังพาไปหน้าแรก...');
+    if (cleanRef) await linkReferralAfterRegister(cleanRef, data.accessToken);
+    setStatus('success'); setMessage(cleanRef ? 'สมัครสมาชิกสำเร็จและบันทึกรหัสแนะนำแล้ว กำลังพาไปหน้าแรก...' : 'สมัครสมาชิกสำเร็จ กำลังพาไปหน้าแรก...');
     window.location.replace('/');
   }
 
@@ -51,6 +59,7 @@ export default function MemberRegisterPage() {
         <label style={labelStyle}>Username<input value={username} onChange={(e) => setUsername(e.target.value)} placeholder="ตั้งชื่อผู้ใช้" disabled={disabled} autoComplete="username" style={inputStyle} /></label>
         <label style={labelStyle}>Phone<input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="เบอร์โทรศัพท์" disabled={disabled} autoComplete="tel" inputMode="tel" style={inputStyle} /></label>
         <label style={labelStyle}>Email <span style={{ opacity: 0.6, fontWeight: 500 }}>(ไม่บังคับ)</span><input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="อีเมล" disabled={disabled} autoComplete="email" type="email" style={inputStyle} /></label>
+        <label style={labelStyle}>Referral code <span style={{ opacity: 0.6, fontWeight: 500 }}>(ไม่บังคับ)</span><input value={referralCode} onChange={(e) => { const value = normalizeReferralCode(e.target.value); setReferralCode(value); if (value) window.localStorage.setItem(REFERRAL_CODE_KEY, value); }} placeholder="รหัสแนะนำ" disabled={disabled} autoComplete="off" style={inputStyle} /></label>
         <label style={labelStyle}>Password<div style={passwordWrapStyle}><input value={secret} onChange={(e) => setSecret(e.target.value)} placeholder="ตั้ง Password" type={showSecret ? 'text' : 'password'} disabled={disabled} autoComplete="new-password" style={{ ...inputStyle, paddingRight: 58 }} /><button type="button" onClick={() => setShowSecret((v) => !v)} style={eyeButtonStyle} disabled={disabled} aria-label={showSecret ? 'Hide password' : 'Show password'} title={showSecret ? 'Hide password' : 'Show password'}>{showSecret ? '🙈' : '👁️'}</button></div></label>
         <button type="submit" disabled={disabled} style={{ ...submitStyle, background: primaryColor, color: '#111' }}>{loading ? 'กำลังสมัคร...' : 'สมัครสมาชิก'}</button>
         {message && <div style={alertStyle(status)}>{message}</div>}
@@ -60,6 +69,13 @@ export default function MemberRegisterPage() {
   </main>;
 }
 
+async function linkReferralAfterRegister(referralCode: string, token?: string) {
+  const accessToken = token || window.localStorage.getItem('member_access_token');
+  if (!accessToken) return;
+  const res = await fetch(`${API_URL}/member/affiliate/link`, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${accessToken}` }, body: JSON.stringify({ referralCode }) });
+  if (res.ok) window.localStorage.removeItem(REFERRAL_CODE_KEY);
+}
+function normalizeReferralCode(value: string) { return String(value ?? '').trim().toUpperCase().replace(/[^A-Z0-9_-]+/g, '').slice(0, 24); }
 const pageStyle = { minHeight: '100dvh', padding: 16, display: 'grid', placeItems: 'center' } as const;
 const shellStyle = { width: '100%', maxWidth: 460, margin: '0 auto', display: 'grid', placeItems: 'center' } as const;
 const cardStyle = { width: '100%', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 28, padding: 24, display: 'grid', gap: 14, boxShadow: '0 28px 90px rgba(0,0,0,0.34)', boxSizing: 'border-box' } as const;
