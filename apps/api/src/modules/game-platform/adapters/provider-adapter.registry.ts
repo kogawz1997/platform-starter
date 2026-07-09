@@ -2,6 +2,7 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { GameProviderAdapter } from '../provider-adapter.interface';
 import { DemoProviderAdapter } from './demo-provider.adapter';
 import { SimulatorProviderAdapter } from './simulator-provider.adapter';
+import { GenericTransferProviderAdapter } from './generic-transfer-provider.adapter';
 
 @Injectable()
 export class ProviderAdapterRegistry {
@@ -10,6 +11,8 @@ export class ProviderAdapterRegistry {
   constructor() {
     this.register('demo-provider', new DemoProviderAdapter());
     this.register('simulator-provider', new SimulatorProviderAdapter());
+    this.register('generic-transfer', new GenericTransferProviderAdapter());
+    this.register('real-provider', new GenericTransferProviderAdapter());
   }
 
   register(providerCode: string, adapter: GameProviderAdapter) {
