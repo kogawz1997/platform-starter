@@ -5,6 +5,7 @@ import { CreateWithdrawalRequestDto } from './dto/create-withdrawal-request.dto'
 import { ReviewWithdrawalRequestDto } from './dto/review-withdrawal-request.dto';
 
 const CLAIM_TIMEOUT_MS = 15 * 60 * 1000;
+const BONUS_LEDGER_REF_TYPE = 'BONUS_LEDGER';
 
 @Injectable()
 export class WithdrawalsService {
@@ -15,6 +16,12 @@ export class WithdrawalsService {
     if (amount.lte(0)) throw new BadRequestException('Amount must be greater than zero');
     if (!dto.accountName || !dto.accountNumber || !dto.bankName) throw new BadRequestException('Withdrawal bank account is required');
     return this.prisma.$transaction(async (tx) => {
+      const activeBonus = await tx.riskAlert.findFirst({ where: { refType: BONUS_LEDGER_REF_TYPE, memberId: userId, status: { in: ['OPEN', 'REVIEWING'] } }, orderBy: { createdAt: 'desc' } });
+      if (activeBonus) {
+        const metadata = this.bonusMetadata(activeBonus.metadata);
+        const remaining = Math.max(metadata.turnoverRequired - metadata.turnoverProgress, 0);
+        if (!metadata.turnoverCompleted && remaining > 0) throw new BadRequestException(`ยังถอนเงินไม่ได้ เพราะมีโบนัสที่ต้องทำเทิร์นคงเหลือ ${remaining.toLocaleString('th-TH', { minimumFractionDigits: 2 })} THB`);
+      }
       const approvedBank = await tx.memberBankAccount.findFirst({ where: { userId, status: 'ACTIVE', bankName: dto.bankName, accountName: dto.accountName, accountNumber: dto.accountNumber } });
       if (!approvedBank) throw new BadRequestException('กรุณาใช้บัญชีถอนเงินที่แอดมินอนุมัติแล้วเท่านั้น');
       const wallet = await tx.wallet.findUnique({ where: { userId } });
@@ -109,6 +116,7 @@ export class WithdrawalsService {
     });
   }
 
+  private bonusMetadata(value: unknown) { const data = value && typeof value === 'object' && !Array.isArray(value) ? value as any : {}; return { turnoverRequired: Number(data.turnoverRequired ?? 0), turnoverProgress: Number(data.turnoverProgress ?? 0), turnoverCompleted: data.turnoverCompleted === true }; }
   private async releaseExpiredClaims() { const staleSince = new Date(Date.now() - CLAIM_TIMEOUT_MS); await this.prisma.withdrawalRequest.updateMany({ where: { status: 'PENDING', claimedBy: { not: null }, claimedAt: { lt: staleSince } }, data: { claimedBy: null, claimedAt: null } }); }
   private audit(adminUserId: string, action: string, targetId: string, oldData: any, newData: any, meta: RequestMeta) { return this.prisma.adminAuditLog.create({ data: { adminUserId, action, module: 'withdrawals', targetId, oldData, newData, ipAddress: meta.ipAddress, userAgent: meta.userAgent } }).catch(() => null); }
   private formatRequest(item: any) { return { id: item.id, userId: item.userId, amount: item.amount.toString(), currency: item.currency, status: item.status, method: item.method, accountName: item.accountName, accountNumber: item.accountNumber, bankName: item.bankName, note: item.note, adminNote: item.adminNote, reviewedBy: item.reviewedBy, reviewedAt: item.reviewedAt, claimedBy: item.claimedBy, claimedAt: item.claimedAt, createdAt: item.createdAt, updatedAt: item.updatedAt }; }
