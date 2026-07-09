@@ -1,31 +1,102 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
+import { BadRequestException, ForbiddenException, Injectable } from '@nestjs/common';
+import { Prisma, RiskAlertSeverity, RiskAlertType, WalletLedgerDirection, WalletLedgerType } from '@prisma/client';
 import { randomBytes } from 'crypto';
 import { PrismaService } from '../../database/prisma.service';
 
 type AdminActor = { id?: string };
 type RequestMeta = { ipAddress?: string; userAgent?: string };
 type LedgerDryRunInput = { userId?: string; amount?: unknown; direction?: unknown; referenceType?: unknown; referenceId?: unknown; note?: unknown; idempotencyKey?: unknown };
-type AlertRule = { code: string; title: string; severity: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL'; description: string; queryHint: string };
+type AlertRule = { code: string; type: RiskAlertType; title: string; severity: RiskAlertSeverity; description: string; queryHint: string };
+
+const REAL_LEDGER_MUTATION_ENABLED = process.env.REAL_LEDGER_MUTATION_ENABLED === 'true';
+
 const ALERT_RULES: AlertRule[] = [
-  { code: 'GAME_TRANSFER_FAILED', title: 'Game transfer failed', severity: 'HIGH', description: 'Create alert when dry-run or real transfer fails.', queryHint: 'gameTransfer.status = FAILED' },
-  { code: 'WEBHOOK_INVALID_SIGNATURE', title: 'Webhook invalid signature', severity: 'CRITICAL', description: 'Create alert when provider webhook signature fails.', queryHint: 'webhookLog.signatureValid = false' },
-  { code: 'WEBHOOK_DUPLICATE_SPIKE', title: 'Duplicate webhook spike', severity: 'MEDIUM', description: 'Create alert when duplicate webhooks increase quickly.', queryHint: 'webhookLog.status = DUPLICATE' },
-  { code: 'RECONCILIATION_MISMATCH', title: 'Reconciliation mismatch', severity: 'CRITICAL', description: 'Create alert when provider wallet snapshot is MISMATCH or UNKNOWN.', queryHint: 'providerWalletSnapshot.status IN (MISMATCH, UNKNOWN)' },
-  { code: 'PROVIDER_DEGRADED', title: 'Provider health degraded', severity: 'HIGH', description: 'Create alert when provider health check reports degraded/offline.', queryHint: 'gameProvider.status IN (DEGRADED, MAINTENANCE)' },
-  { code: 'REAL_MONEY_GATE_ENABLED', title: 'Real money gate enabled', severity: 'CRITICAL', description: 'Create alert when realMoneyEnabled is switched on.', queryHint: 'gameProvider.metadata.realMoneyEnabled = true' },
+  { code: 'GAME_TRANSFER_FAILED', type: 'WALLET_LEDGER_MISMATCH', title: 'Game transfer failed', severity: 'HIGH', description: 'Dry-run or real game transfer has failed.', queryHint: 'gameTransfer.status = FAILED' },
+  { code: 'WEBHOOK_INVALID_SIGNATURE', type: 'WALLET_LEDGER_MISMATCH', title: 'Webhook invalid signature', severity: 'CRITICAL', description: 'Provider webhook signature failed.', queryHint: 'webhookLog.signatureValid = false' },
+  { code: 'WEBHOOK_DUPLICATE_SPIKE', type: 'WALLET_LEDGER_MISMATCH', title: 'Duplicate webhook spike', severity: 'MEDIUM', description: 'Duplicate provider webhooks detected.', queryHint: 'webhookLog.status = DUPLICATE' },
+  { code: 'RECONCILIATION_MISMATCH', type: 'WALLET_LEDGER_MISMATCH', title: 'Reconciliation mismatch', severity: 'CRITICAL', description: 'Provider wallet snapshot is MISMATCH or UNKNOWN.', queryHint: 'providerWalletSnapshot.status IN (MISMATCH, UNKNOWN)' },
+  { code: 'PROVIDER_DEGRADED', type: 'WALLET_LEDGER_MISMATCH', title: 'Provider health degraded', severity: 'HIGH', description: 'Provider is degraded or in maintenance.', queryHint: 'gameProvider.status IN (DEGRADED, MAINTENANCE)' },
+  { code: 'REAL_MONEY_GATE_ENABLED', type: 'WALLET_LEDGER_MISMATCH', title: 'Real money gate enabled', severity: 'CRITICAL', description: 'Provider realMoneyEnabled gate is enabled.', queryHint: 'gameProvider.metadata.realMoneyEnabled = true' },
 ];
 
 @Injectable()
 export class MoneyOpsService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async financeControlCenter() { const [walletCount, ledgers, failedTransfers, pendingTransfers, mismatchSnapshots, webhookFailed, duplicateWebhooks, openRiskAlerts, recentLedgers, recentTransfers, recentSnapshots] = await Promise.all([this.prisma.wallet.count(), this.prisma.walletLedger.findMany({ orderBy: { createdAt: 'desc' }, take: 1, select: { id: true } }), this.prisma.gameTransfer.count({ where: { status: 'FAILED' } }), this.prisma.gameTransfer.count({ where: { status: 'PENDING' } }), this.prisma.providerWalletSnapshot.count({ where: { status: { in: ['MISMATCH', 'UNKNOWN'] } } }), this.prisma.webhookLog.count({ where: { status: 'FAILED' } }), this.prisma.webhookLog.count({ where: { status: 'DUPLICATE' } }), this.prisma.riskAlert.count({ where: { status: { in: ['OPEN', 'REVIEWING'] } } }), this.prisma.walletLedger.findMany({ orderBy: { createdAt: 'desc' }, take: 10, include: { user: { select: { id: true, username: true, phone: true } } } }), this.prisma.gameTransfer.findMany({ orderBy: { createdAt: 'desc' }, take: 10, include: { provider: { select: { name: true, code: true } }, user: { select: { username: true, phone: true } } } }), this.prisma.providerWalletSnapshot.findMany({ orderBy: { checkedAt: 'desc' }, take: 10, include: { provider: { select: { name: true, code: true } }, user: { select: { username: true, phone: true } } } })]); return { summary: { walletCount, ledgerActivity: ledgers.length, failedTransfers, pendingTransfers, mismatchSnapshots, webhookFailed, duplicateWebhooks, openRiskAlerts }, queues: { failedTransfers, pendingTransfers, mismatchSnapshots, webhookFailed, duplicateWebhooks, openRiskAlerts }, recent: { ledgers: recentLedgers, transfers: recentTransfers, snapshots: recentSnapshots }, dryRun: true }; }
-  async listLedger(query: { userId?: string; referenceType?: string; referenceId?: string; take?: string | number }) { const take = Math.min(Math.max(Number(query.take ?? 50), 1), 100); const where: Prisma.WalletLedgerWhereInput = {}; if (query.userId) where.userId = query.userId; if (query.referenceType) where.referenceType = query.referenceType; if (query.referenceId) where.referenceId = query.referenceId; const items = await this.prisma.walletLedger.findMany({ where, orderBy: { createdAt: 'desc' }, take, include: { user: { select: { id: true, username: true, phone: true } }, wallet: { select: { id: true, currency: true, balance: true, lockedBalance: true } } } }); return { items, total: items.length }; }
-  simulateLedgerMutation(body: LedgerDryRunInput) { if (!body.userId || typeof body.userId !== 'string') throw new BadRequestException('userId is required'); const amount = Number(body.amount); if (!Number.isFinite(amount) || amount <= 0) throw new BadRequestException('amount must be positive'); const direction = body.direction === 'DEBIT' ? 'DEBIT' : body.direction === 'CREDIT' ? 'CREDIT' : null; if (!direction) throw new BadRequestException('direction must be CREDIT or DEBIT'); const balanceBefore = 1000; const balanceAfter = direction === 'CREDIT' ? balanceBefore + amount : balanceBefore - amount; const ok = balanceAfter >= 0; return { ok, dryRun: true, mutation: { userId: body.userId, direction, amount: amount.toFixed(2), balanceBefore: balanceBefore.toFixed(2), balanceAfter: balanceAfter.toFixed(2), referenceType: body.referenceType ?? 'SIMULATED', referenceId: body.referenceId ?? null, idempotencyKey: body.idempotencyKey ?? `sim_${Date.now()}`, note: body.note ?? null }, warning: ok ? null : 'Insufficient simulated balance' }; }
-  async writeAudit(actor: AdminActor, meta: RequestMeta, input: { action: string; module: string; targetId?: string; oldData?: unknown; newData?: unknown }) { const item = await this.prisma.adminAuditLog.create({ data: { adminUserId: actor.id, action: input.action, module: input.module, targetId: input.targetId, oldData: this.safeJson(input.oldData ?? null), newData: this.safeJson(input.newData ?? null), ipAddress: meta.ipAddress, userAgent: meta.userAgent } }); return { ok: true, item }; }
-  listAlertRules() { return { items: ALERT_RULES, dryRun: true }; }
-  async scanAlertRules(actor: AdminActor, meta: RequestMeta) { const [failedTransfers, invalidWebhooks, duplicateWebhooks, mismatchSnapshots, degradedProviders] = await Promise.all([this.prisma.gameTransfer.count({ where: { status: 'FAILED' } }), this.prisma.webhookLog.count({ where: { signatureValid: false } }), this.prisma.webhookLog.count({ where: { status: 'DUPLICATE' } }), this.prisma.providerWalletSnapshot.count({ where: { status: { in: ['MISMATCH', 'UNKNOWN'] } } }), this.prisma.gameProvider.count({ where: { status: { in: ['DEGRADED', 'MAINTENANCE'] } } })]); const findings = [{ code: 'GAME_TRANSFER_FAILED', count: failedTransfers }, { code: 'WEBHOOK_INVALID_SIGNATURE', count: invalidWebhooks }, { code: 'WEBHOOK_DUPLICATE_SPIKE', count: duplicateWebhooks }, { code: 'RECONCILIATION_MISMATCH', count: mismatchSnapshots }, { code: 'PROVIDER_DEGRADED', count: degradedProviders }].filter((item) => item.count > 0); await this.writeAudit(actor, meta, { action: 'alert_rules.scan', module: 'money_ops', newData: findings }); return { findings, dryRun: true }; }
+  async financeControlCenter() {
+    const [walletCount, ledgers, failedTransfers, pendingTransfers, mismatchSnapshots, webhookFailed, duplicateWebhooks, openRiskAlerts, recentLedgers, recentTransfers, recentSnapshots] = await Promise.all([
+      this.prisma.wallet.count(),
+      this.prisma.walletLedger.findMany({ orderBy: { createdAt: 'desc' }, take: 1, select: { id: true } }),
+      this.prisma.gameTransfer.count({ where: { status: 'FAILED' } }),
+      this.prisma.gameTransfer.count({ where: { status: 'PENDING' } }),
+      this.prisma.providerWalletSnapshot.count({ where: { status: { in: ['MISMATCH', 'UNKNOWN'] } } }),
+      this.prisma.webhookLog.count({ where: { status: 'FAILED' } }),
+      this.prisma.webhookLog.count({ where: { status: 'DUPLICATE' } }),
+      this.prisma.riskAlert.count({ where: { status: { in: ['OPEN', 'REVIEWING'] } } }),
+      this.prisma.walletLedger.findMany({ orderBy: { createdAt: 'desc' }, take: 10, include: { user: { select: { id: true, username: true, phone: true } } } }),
+      this.prisma.gameTransfer.findMany({ orderBy: { createdAt: 'desc' }, take: 10, include: { provider: { select: { name: true, code: true } }, user: { select: { username: true, phone: true } } } }),
+      this.prisma.providerWalletSnapshot.findMany({ orderBy: { checkedAt: 'desc' }, take: 10, include: { provider: { select: { name: true, code: true } }, user: { select: { username: true, phone: true } } } }),
+    ]);
+    return { summary: { walletCount, ledgerActivity: ledgers.length, failedTransfers, pendingTransfers, mismatchSnapshots, webhookFailed, duplicateWebhooks, openRiskAlerts }, queues: { failedTransfers, pendingTransfers, mismatchSnapshots, webhookFailed, duplicateWebhooks, openRiskAlerts }, recent: { ledgers: recentLedgers, transfers: recentTransfers, snapshots: recentSnapshots }, realLedgerMutationEnabled: REAL_LEDGER_MUTATION_ENABLED };
+  }
+
+  async listLedger(query: { userId?: string; referenceType?: string; referenceId?: string; take?: string | number }) {
+    const take = Math.min(Math.max(Number(query.take ?? 50), 1), 100);
+    const where: Prisma.WalletLedgerWhereInput = {};
+    if (query.userId) where.userId = query.userId;
+    if (query.referenceType) where.referenceType = query.referenceType;
+    if (query.referenceId) where.referenceId = query.referenceId;
+    const items = await this.prisma.walletLedger.findMany({ where, orderBy: { createdAt: 'desc' }, take, include: { user: { select: { id: true, username: true, phone: true } }, wallet: { select: { id: true, currency: true, balance: true, lockedBalance: true } } } });
+    return { items, total: items.length };
+  }
+
+  simulateLedgerMutation(body: LedgerDryRunInput) {
+    const parsed = this.parseLedgerInput(body);
+    const balanceBefore = 1000;
+    const balanceAfter = parsed.direction === 'CREDIT' ? balanceBefore + parsed.amount : balanceBefore - parsed.amount;
+    const ok = balanceAfter >= 0;
+    return { ok, dryRun: true, mutation: { ...parsed, amount: parsed.amount.toFixed(2), balanceBefore: balanceBefore.toFixed(2), balanceAfter: balanceAfter.toFixed(2) }, warning: ok ? null : 'Insufficient simulated balance' };
+  }
+
+  async mutateLedger(actor: AdminActor, meta: RequestMeta, body: LedgerDryRunInput) {
+    if (!REAL_LEDGER_MUTATION_ENABLED) throw new ForbiddenException('REAL_LEDGER_MUTATION_ENABLED is not enabled');
+    const parsed = this.parseLedgerInput(body);
+    const item = await this.prisma.$transaction(async (tx) => {
+      const wallet = await tx.wallet.findUnique({ where: { userId: parsed.userId } });
+      if (!wallet) throw new BadRequestException('Wallet not found');
+      if (wallet.status !== 'ACTIVE') throw new BadRequestException('Wallet is not active');
+      const balanceBefore = Number(wallet.balance);
+      const balanceAfter = parsed.direction === 'CREDIT' ? balanceBefore + parsed.amount : balanceBefore - parsed.amount;
+      if (balanceAfter < 0) throw new BadRequestException('Insufficient balance');
+      const updatedWallet = await tx.wallet.update({ where: { id: wallet.id }, data: { balance: balanceAfter.toFixed(2) } });
+      return tx.walletLedger.create({ data: { walletId: wallet.id, userId: parsed.userId, type: 'ADJUSTMENT', direction: parsed.direction, amount: parsed.amount.toFixed(2), balanceBefore: balanceBefore.toFixed(2), balanceAfter: balanceAfter.toFixed(2), referenceType: parsed.referenceType, referenceId: parsed.referenceId, idempotencyKey: parsed.idempotencyKey, metadata: this.safeJson({ note: parsed.note, featureFlag: 'REAL_LEDGER_MUTATION_ENABLED', updatedWalletId: updatedWallet.id }), createdByAdminId: actor.id } });
+    });
+    await this.writeAudit(actor, meta, { action: 'ledger.mutate', module: 'money_ops', targetId: item.id, newData: item });
+    return { ok: true, item, realMutation: true };
+  }
+
+  async writeAudit(actor: AdminActor, meta: RequestMeta, input: { action: string; module: string; targetId?: string; oldData?: unknown; newData?: unknown }) {
+    const item = await this.prisma.adminAuditLog.create({ data: { adminUserId: actor.id, action: input.action, module: input.module, targetId: input.targetId, oldData: this.safeJson(input.oldData ?? null), newData: this.safeJson(input.newData ?? null), ipAddress: meta.ipAddress, userAgent: meta.userAgent } });
+    return { ok: true, item };
+  }
+
+  listAlertRules() { return { items: ALERT_RULES, dryRun: false }; }
+
+  async scanAlertRules(actor: AdminActor, meta: RequestMeta) {
+    const findings = (await Promise.all([
+      this.findFailedTransfers(),
+      this.findInvalidWebhooks(),
+      this.findDuplicateWebhooks(),
+      this.findMismatchSnapshots(),
+      this.findDegradedProviders(),
+      this.findRealMoneyEnabledProviders(),
+    ])).flat();
+    const persisted = [];
+    for (const finding of findings) persisted.push(await this.upsertRiskAlert(finding));
+    await this.writeAudit(actor, meta, { action: 'alert_rules.scan', module: 'money_ops', newData: { findings, persisted: persisted.length } });
+    return { findings, persisted, dryRun: false };
+  }
+
   simulatorScenarios() { return { scenarios: [{ code: 'launch_success', description: 'Fake provider returns launchUrl and session id.' }, { code: 'balance_success', description: 'Fake provider returns stable balance.' }, { code: 'transfer_in_success', description: 'Fake provider accepts transfer in.' }, { code: 'transfer_out_success', description: 'Fake provider accepts transfer out.' }, { code: 'timeout', description: 'Fake provider delays past timeout.' }, { code: 'duplicate_webhook', description: 'Fake provider sends the same idempotency key twice.' }, { code: 'invalid_signature', description: 'Fake provider sends invalid signature headers.' }], webhookPayloadExample: { eventType: 'simulator.transfer.completed', idempotencyKey: 'simulator-idempotency-key', providerTransactionId: 'simulator-tx-id' } }; }
   simulatorHealth() { return { ok: true, providerCode: 'simulator-provider', status: 'ONLINE', latencyMs: 12, dryRun: true }; }
   simulatorLaunch(body: any) { const gameCode = String(body?.gameCode ?? 'sim-slot-001'); const sessionId = `sim_session_${Date.now()}_${randomBytes(3).toString('hex')}`; return { ok: true, providerCode: 'simulator-provider', launchUrl: `/provider-simulator/play?game=${encodeURIComponent(gameCode)}&session=${encodeURIComponent(sessionId)}`, providerSessionId: sessionId, expiresAt: new Date(Date.now() + 15 * 60 * 1000).toISOString(), rawRequest: body ?? null, dryRun: true }; }
@@ -34,5 +105,65 @@ export class MoneyOpsService {
   simulatorWebhook(body: any) { const idempotencyKey = String(body?.idempotencyKey ?? `sim_webhook_${Date.now()}`); return { ok: true, headers: { 'x-provider-signature': 'simulated-signature', 'x-provider-timestamp': String(Date.now()) }, payload: { eventType: body?.eventType ?? 'simulator.transfer.completed', idempotencyKey, providerTransactionId: body?.providerTransactionId ?? `sim_tx_${randomBytes(5).toString('hex')}`, amount: body?.amount ?? '100.00', currency: body?.currency ?? 'THB' }, dryRun: true }; }
   simulatorTimeout() { return { ok: false, providerCode: 'simulator-provider', errorCode: 'SIMULATED_TIMEOUT', errorMessage: 'Fake provider timeout response. No wallet mutation happened.', dryRun: true }; }
   securityHardeningChecklist() { return { items: ['Rate limit admin money operations', 'Rate limit provider webhook endpoints', 'Limit webhook request body size', 'Add provider IP allowlist before real settlement', 'Rotate provider credentials on schedule', 'Audit every gate/retry/review/resolve action', 'Keep realMoneyEnabled false until preflight passes', 'Test backup and restore before real wallet mutation'] }; }
+
+  private parseLedgerInput(body: LedgerDryRunInput) {
+    if (!body.userId || typeof body.userId !== 'string') throw new BadRequestException('userId is required');
+    const amount = Number(body.amount);
+    if (!Number.isFinite(amount) || amount <= 0) throw new BadRequestException('amount must be positive');
+    const direction = body.direction === 'DEBIT' ? 'DEBIT' : body.direction === 'CREDIT' ? 'CREDIT' : null;
+    if (!direction) throw new BadRequestException('direction must be CREDIT or DEBIT');
+    return { userId: body.userId, direction: direction as WalletLedgerDirection, amount, referenceType: String(body.referenceType ?? 'MANUAL_LEDGER'), referenceId: body.referenceId ? String(body.referenceId) : null, idempotencyKey: String(body.idempotencyKey ?? `ledger_${Date.now()}_${randomBytes(4).toString('hex')}`), note: body.note ? String(body.note) : null };
+  }
+
+  private async findFailedTransfers() {
+    const rule = this.rule('GAME_TRANSFER_FAILED');
+    const items = await this.prisma.gameTransfer.findMany({ where: { status: 'FAILED' }, take: 25, orderBy: { createdAt: 'desc' }, select: { id: true, errorMessage: true, userId: true, providerId: true } });
+    return items.map((item) => ({ rule, refType: 'GameTransfer', refId: item.id, memberId: item.userId, metadata: item }));
+  }
+
+  private async findInvalidWebhooks() {
+    const rule = this.rule('WEBHOOK_INVALID_SIGNATURE');
+    const items = await this.prisma.webhookLog.findMany({ where: { signatureValid: false }, take: 25, orderBy: { createdAt: 'desc' }, select: { id: true, eventType: true, errorMessage: true, providerId: true } });
+    return items.map((item) => ({ rule, refType: 'WebhookLog', refId: item.id, memberId: null, metadata: item }));
+  }
+
+  private async findDuplicateWebhooks() {
+    const rule = this.rule('WEBHOOK_DUPLICATE_SPIKE');
+    const items = await this.prisma.webhookLog.findMany({ where: { status: 'DUPLICATE' }, take: 25, orderBy: { createdAt: 'desc' }, select: { id: true, eventType: true, idempotencyKey: true, providerId: true } });
+    return items.map((item) => ({ rule, refType: 'WebhookLog', refId: item.id, memberId: null, metadata: item }));
+  }
+
+  private async findMismatchSnapshots() {
+    const rule = this.rule('RECONCILIATION_MISMATCH');
+    const items = await this.prisma.providerWalletSnapshot.findMany({ where: { status: { in: ['MISMATCH', 'UNKNOWN'] } }, take: 25, orderBy: { checkedAt: 'desc' }, select: { id: true, status: true, userId: true, providerId: true, difference: true } });
+    return items.map((item) => ({ rule, refType: 'ProviderWalletSnapshot', refId: item.id, memberId: item.userId, metadata: item }));
+  }
+
+  private async findDegradedProviders() {
+    const rule = this.rule('PROVIDER_DEGRADED');
+    const items = await this.prisma.gameProvider.findMany({ where: { status: { in: ['DEGRADED', 'MAINTENANCE'] } }, take: 25, orderBy: { updatedAt: 'desc' }, select: { id: true, name: true, code: true, status: true } });
+    return items.map((item) => ({ rule, refType: 'GameProvider', refId: item.id, memberId: null, metadata: item }));
+  }
+
+  private async findRealMoneyEnabledProviders() {
+    const rule = this.rule('REAL_MONEY_GATE_ENABLED');
+    const items = await this.prisma.gameProvider.findMany({ take: 100, orderBy: { updatedAt: 'desc' }, select: { id: true, name: true, code: true, metadata: true } });
+    return items.filter((item) => this.objectJson(item.metadata).realMoneyEnabled === true).map((item) => ({ rule, refType: 'GameProvider', refId: item.id, memberId: null, metadata: item }));
+  }
+
+  private async upsertRiskAlert(input: { rule: AlertRule; refType: string; refId: string; memberId: string | null; metadata: unknown }) {
+    const existing = await this.prisma.riskAlert.findFirst({ where: { refType: input.refType, refId: input.refId, type: input.rule.type, status: { in: ['OPEN', 'REVIEWING'] } } });
+    if (existing) return { ...existing, deduped: true };
+    const created = await this.prisma.riskAlert.create({ data: { type: input.rule.type, severity: input.rule.severity, status: 'OPEN', memberId: input.memberId ?? undefined, refType: input.refType, refId: input.refId, title: input.rule.title, description: input.rule.description, metadata: this.safeJson({ code: input.rule.code, source: 'money_ops.alert_rules.scan', payload: input.metadata }) } });
+    return { ...created, deduped: false };
+  }
+
+  private rule(code: string) {
+    const rule = ALERT_RULES.find((item) => item.code === code);
+    if (!rule) throw new BadRequestException(`Unknown alert rule: ${code}`);
+    return rule;
+  }
+
+  private objectJson(value: unknown) { return value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : {}; }
   private safeJson(value: unknown) { return JSON.parse(JSON.stringify(value)) as Prisma.InputJsonValue; }
 }
