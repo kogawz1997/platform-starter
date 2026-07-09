@@ -1,8 +1,7 @@
 export const navGroups = [
-  { title: 'Overview', items: [['Dashboard', '/dashboard'], ['Finance', '/finance']] },
-  { title: 'Queues', items: [['Top-ups', '/topups'], ['Withdrawals', '/withdrawals']] },
-  { title: 'Money', items: [['Wallets', '/wallets'], ['Ledgers', '/ledgers'], ['Reports', '/reports'], ['Risk Alerts', '/risk-alerts'], ['Money Ops', '/money-ops']] },
-  { title: 'Game Platform', items: [['Game Providers', '/game-providers'], ['Provider Risk', '/provider-risk'], ['Game API Settings', '/game-api-settings'], ['Game Catalog', '/games'], ['Game Sessions', '/game-sessions'], ['Game Transfers', '/game-transfers'], ['Reconciliation', '/provider-wallet-snapshots'], ['Webhook Logs', '/webhook-logs'], ['Provider Adapters', '/provider-adapters']] },
-  { title: 'Operations', items: [['Members', '/members'], ['Bank Accounts', '/bank-accounts'], ['Activity', '/activity'], ['Settings', '/settings']] },
-  { title: 'Security', items: [['Access Control', '/access'], ['Admin 2FA', '/security'], ['Audit Logs', '/audit']] },
+  { title: 'Operation', items: [['Dashboard', '/dashboard'], ['Operations', '/operations'], ['ฝากรอตรวจ', '/topups'], ['ถอนเงิน', '/withdrawals'], ['Members', '/members'], ['Bank Accounts', '/bank-accounts']] },
+  { title: 'Money', items: [['Wallets', '/wallets'], ['Wallet Ledgers', '/wallet-ledgers'], ['Money Ops', '/money-ops'], ['Risk Alerts', '/risk-alerts'], ['Finance', '/finance'], ['Reports', '/reports']] },
+  { title: 'Game Platform', items: [['Provider Setup', '/provider-setup-wizard'], ['Provider Presets', '/provider-presets'], ['Adapter Test', '/adapter-test'], ['Game Providers', '/game-providers'], ['Provider Risk', '/provider-risk'], ['Game API Settings', '/game-api-settings'], ['Game Catalog', '/games'], ['Game Sessions', '/game-sessions'], ['Game Transfers', '/game-transfers'], ['Reconciliation', '/reconciliation-center'], ['Webhook Settlement', '/webhook-settlement'], ['Webhook Logs', '/webhook-logs'], ['Provider Adapters', '/provider-adapters']] },
+  { title: 'Risk / Security', items: [['Access Control', '/access'], ['Admin 2FA', '/security'], ['Audit Logs', '/audit-logs'], ['Activity', '/activity']] },
+  { title: 'Settings', items: [['Site Settings', '/settings']] },
 ] as const;
