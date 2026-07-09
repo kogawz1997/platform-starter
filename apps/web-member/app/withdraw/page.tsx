@@ -45,11 +45,6 @@ export default function WithdrawPage() {
     setIsLoading(false);
   }
 
-  async function copyText(value: string, label: string) {
-    try { await navigator.clipboard.writeText(value); setMessage(`คัดลอก${label}แล้ว`); }
-    catch { setMessage(`คัดลอก${label}ไม่สำเร็จ`); }
-  }
-
   function chooseBank(id: string, source = banks) {
     setBankAccountId(id);
     const selected = source.find((item) => item.id === id);
@@ -116,7 +111,6 @@ export default function WithdrawPage() {
           <label style={labelStyle}>บัญชีธนาคาร<select value={bankAccountId} onChange={(e) => chooseBank(e.target.value)} style={inputStyle}><option value="">เลือกบัญชี</option>{banks.map((item) => <option key={item.id} value={item.id} disabled={item.status !== 'ACTIVE'}>{item.bankName} / {item.accountNumber} {item.isPrimary ? '(หลัก)' : ''} {item.status !== 'ACTIVE' ? `- ${item.status}` : ''}</option>)}</select></label>
           {!isLoading && activeBanks.length === 0 && <EmptyAction title="ยังไม่มีบัญชีธนาคารที่ใช้ถอนได้" description="เพิ่มบัญชีธนาคารแล้วรออนุมัติก่อนส่งคำขอถอน" actionHref="/bank-accounts" actionLabel="การจัดการบัญชีธนาคาร" />}
           {activeBanks.length > 0 && <a href="/bank-accounts" style={bankLinkStyle}>การจัดการบัญชีธนาคาร</a>}
-          {hasSelectedBank && <BankPreview bankName={bankName} accountName={accountName} accountNumber={accountNumber} onCopy={copyText} />}
           <button type="submit" disabled={activeBanks.length === 0} style={buttonStyle}>ถัดไป</button>
         </form>
       )}
@@ -124,7 +118,6 @@ export default function WithdrawPage() {
       {step === 'amount' && (
         <form onSubmit={goConfirm} style={cardStyle}>
           <div style={cardHeaderStyle}><h2 style={sectionTitleStyle}>ใส่ยอดถอน</h2><p style={mutedStyle}>ยอดถอนต้องไม่เกินยอดที่ถอนได้</p></div>
-          {hasSelectedBank && <BankPreview bankName={bankName} accountName={accountName} accountNumber={accountNumber} onCopy={copyText} compact />}
           <label style={labelStyle}>จำนวนเงิน<input value={amount} onChange={(e) => setAmount(e.target.value)} inputMode="decimal" placeholder="เช่น 100" style={inputStyle} /></label>
           <label style={labelStyle}>หมายเหตุ<textarea value={note} onChange={(e) => setNote(e.target.value)} placeholder="รายละเอียดเพิ่มเติม ถ้ามี" style={textareaStyle} /></label>
           <div style={actionRowStyle}><button type="button" onClick={() => setStep('account')} style={secondaryButtonStyle}>ย้อนกลับ</button><button type="submit" style={buttonStyle}>ถัดไป</button></div>
@@ -135,7 +128,7 @@ export default function WithdrawPage() {
         <section style={cardStyle}>
           <div style={cardHeaderStyle}><h2 style={sectionTitleStyle}>ยืนยันคำขอถอน</h2><p style={mutedStyle}>ตรวจสอบข้อมูลให้ถูกต้องก่อนส่งคำขอ</p></div>
           <section style={confirmBoxStyle}><span>ยอดถอน</span><strong>THB {Number.isFinite(parsedAmount) ? parsedAmount.toLocaleString('th-TH', { minimumFractionDigits: 2 }) : '0.00'}</strong></section>
-          {hasSelectedBank && <BankPreview bankName={bankName} accountName={accountName} accountNumber={accountNumber} onCopy={copyText} compact />}
+          {hasSelectedBank && <section style={confirmBoxStyle}><span>บัญชีธนาคาร</span><strong>{bankName} / {accountName} / {accountNumber}</strong></section>}
           {note && <div style={noticeStyle}>หมายเหตุ: {note}</div>}
           <div style={actionRowStyle}><button type="button" onClick={() => setStep('amount')} style={secondaryButtonStyle}>แก้ไข</button><button type="button" onClick={openConfirmModal} disabled={isSubmitting} style={buttonStyle}>{isSubmitting ? 'กำลังส่ง...' : 'ตรวจสอบก่อนส่ง'}</button></div>
         </section>
@@ -164,10 +157,7 @@ export default function WithdrawPage() {
   );
 }
 
-function BankPreview({ bankName, accountName, accountNumber, onCopy, compact = false }: { bankName: string; accountName: string; accountNumber: string; onCopy: (value: string, label: string) => void; compact?: boolean }) {
-  return <section style={compact ? compactAccountBoxStyle : accountBoxStyle}><InfoRow label="ชื่อบัญชี" value={accountName} /><InfoRow label="เลขบัญชี" value={accountNumber} action={<button type="button" onClick={() => onCopy(accountNumber, 'เลขบัญชี')} style={copyButtonStyle}>คัดลอก</button>} /><InfoRow label="ธนาคาร" value={bankName} action={<button type="button" onClick={() => onCopy(bankName, 'ชื่อธนาคาร')} style={copyButtonStyle}>คัดลอก</button>} /></section>;
-}
-function InfoRow({ label, value, action }: { label: string; value: string; action?: React.ReactNode }) { return <div style={infoRowStyle}><div style={{ minWidth: 0 }}><span>{label}</span><strong>{value}</strong></div>{action}</div>; }
+function InfoRow({ label, value }: { label: string; value: string }) { return <div style={infoRowStyle}><div style={{ minWidth: 0 }}><span>{label}</span><strong>{value}</strong></div></div>; }
 function EmptyAction({ title, description, actionHref, actionLabel }: { title: string; description: string; actionHref: string; actionLabel: string }) { return <div style={emptyStyle}><div><strong>{title}</strong><span>{description}</span></div><a href={actionHref}>{actionLabel}</a></div>; }
 function SummaryModal({ title, children, onClose, onConfirm, loading, confirmLabel }: { title: string; children: React.ReactNode; onClose: () => void; onConfirm: () => void; loading: boolean; confirmLabel: string }) { return <div style={modalBackdropStyle}><section style={modalStyle}><div style={modalHeadStyle}><h2 style={sectionTitleStyle}>{title}</h2><button type="button" onClick={onClose} style={closeButtonStyle}>×</button></div>{children}<div style={actionRowStyle}><button type="button" onClick={onClose} style={secondaryButtonStyle}>แก้ไข</button><button type="button" onClick={onConfirm} disabled={loading} style={buttonStyle}>{loading ? 'กำลังส่ง...' : confirmLabel}</button></div></section></div>; }
 function statusLabel(status: string) { if (status === 'PENDING') return 'รอดำเนินการ'; if (status === 'APPROVED' || status === 'COMPLETED') return 'สำเร็จ'; if (status === 'REJECTED') return 'ไม่อนุมัติ'; return status; }
@@ -192,12 +182,9 @@ const actionRowStyle = { display: 'grid', gridTemplateColumns: 'repeat(auto-fit,
 const noticeStyle = { border: '1px solid rgba(255,255,255,0.12)', borderRadius: 16, padding: 12, background: 'rgba(255,255,255,0.07)', overflowWrap: 'anywhere' as const };
 const emptyStyle = { border: '1px dashed rgba(255,255,255,.18)', borderRadius: 18, padding: 14, background: 'rgba(255,255,255,.04)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap' as const, color: 'rgba(255,255,255,.82)' };
 const bankLinkStyle = { color: '#f5c542', textDecoration: 'none', fontWeight: 900 } as const;
-const accountBoxStyle = { border: '1px solid rgba(245,197,66,.22)', borderRadius: 18, padding: 12, background: 'rgba(245,197,66,.06)', display: 'grid', gap: 10, minWidth: 0 };
-const compactAccountBoxStyle = { ...accountBoxStyle, background: 'rgba(255,255,255,.04)', border: '1px solid rgba(255,255,255,.10)' } as const;
 const confirmBoxStyle = { border: '1px solid rgba(245,197,66,.24)', borderRadius: 22, padding: 14, background: 'rgba(245,197,66,.10)', display: 'grid', gap: 5, minWidth: 0 } as const;
 const successBoxStyle = { border: '1px solid rgba(101,217,139,.30)', borderRadius: 18, padding: 14, background: 'rgba(101,217,139,.10)', color: '#a9ffc4', fontWeight: 950 } as const;
-const infoRowStyle = { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(180px, 100%), 1fr))', gap: 10, alignItems: 'center', border: '1px solid rgba(255,255,255,.10)', borderRadius: 14, padding: 10, background: 'rgba(255,255,255,.04)', overflowWrap: 'anywhere' as const };
-const copyButtonStyle = { minHeight: 40, border: '1px solid rgba(245,197,66,.35)', borderRadius: 999, padding: '8px 10px', background: 'rgba(245,197,66,.14)', color: '#f5c542', fontWeight: 900, cursor: 'pointer' } as const;
+const infoRowStyle = { display: 'grid', gap: 10, alignItems: 'center', border: '1px solid rgba(255,255,255,.10)', borderRadius: 14, padding: 10, background: 'rgba(255,255,255,.04)', overflowWrap: 'anywhere' as const };
 const listStyle = { display: 'grid', gap: 12, minWidth: 0 } as const;
 const historySectionStyle = { display: 'grid', gap: 10, minWidth: 0 } as const;
 const historyCardStyle = { border: '1px solid rgba(255,255,255,0.10)', borderRadius: 20, padding: 14, background: '#151515', display: 'grid', gap: 8, minWidth: 0, overflow: 'hidden' as const };
