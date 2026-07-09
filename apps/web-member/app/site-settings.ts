@@ -9,6 +9,9 @@ export type CmsContent = {
   faqs: Array<{ question: string; answer: string; enabled: boolean }>;
 };
 
+export type IconKey = 'home' | 'deposit' | 'withdraw' | 'games' | 'bonus' | 'affiliate' | 'support' | 'history' | 'bank' | 'profile' | 'notification' | 'promotion' | 'vip' | 'wallet';
+export type SiteIconSettings = Record<IconKey, string>;
+
 export type PromotionCampaign = {
   id: string;
   title: string;
@@ -33,6 +36,7 @@ export type PublicSiteSettings = {
   website?: Record<string, unknown>;
   branding?: Record<string, unknown>;
   theme?: Record<string, unknown>;
+  icons?: Record<string, unknown>;
   seo?: Record<string, unknown>;
   contact?: Record<string, unknown>;
   maintenance?: Record<string, unknown>;
@@ -48,6 +52,23 @@ export const defaultCmsContent: CmsContent = {
   faqs: [{ question: 'ฝากใช้เวลานานไหม', answer: 'หลังแนบสลิป แอดมินจะตรวจและอนุมัติให้เร็วที่สุด', enabled: true }],
 };
 
+export const defaultIconSettings: SiteIconSettings = {
+  home: '⌂',
+  deposit: '＋',
+  withdraw: '↗',
+  games: '🎮',
+  bonus: '★',
+  affiliate: '↔',
+  support: '✉',
+  history: '≡',
+  bank: '◈',
+  profile: '👤',
+  notification: '🔔',
+  promotion: '🎁',
+  vip: '♛',
+  wallet: '฿',
+};
+
 export const defaultPromotionCampaigns: PromotionCampaign[] = [
   { id: 'welcome-bonus', title: 'โบนัสต้อนรับ', description: 'รับโบนัสสำหรับรายการฝากแรกตามเงื่อนไขที่กำหนด', enabled: false, bonusType: 'percent', bonusValue: 10, minDeposit: 100, maxBonus: 500, turnoverMultiplier: 3, claimMode: 'manual_review', badgeText: 'WELCOME', accentColor: '#f5c542', priority: 10 },
 ];
@@ -56,6 +77,7 @@ export const defaultSettings: PublicSiteSettings = {
   website: { site_name: 'Platform Starter', site_description: 'Member platform starter', registration_enabled: true, login_enabled: true, maintenance_mode: false },
   branding: { primary_color: '#f5c542', background_color: '#080808', card_color: '#181818', text_color: '#ffffff', success_color: '#22c55e', danger_color: '#ef4444' },
   theme: { show_balance_header: true, show_deposit_withdraw_buttons: true, show_promotion_banner: true, show_game_categories: true, show_popular_providers: true, show_recommended_games: true },
+  icons: defaultIconSettings,
   maintenance: { enabled: false, member_enabled: false, message: 'ระบบกำลังปรับปรุง' },
   features: { registration_enabled: true, login_enabled: true, deposit_enabled: true, withdraw_enabled: true, promotion_enabled: true, cms_content: defaultCmsContent, promotion_campaigns: defaultPromotionCampaigns },
 };
@@ -65,7 +87,7 @@ export async function loadPublicSiteSettings(): Promise<PublicSiteSettings> {
     const res = await fetch(`${API_URL}/public/site-settings`, { cache: 'no-store' });
     if (!res.ok) return defaultSettings;
     const data = await res.json();
-    return { ...defaultSettings, ...data, features: { ...defaultSettings.features, ...(data.features ?? {}) } };
+    return { ...defaultSettings, ...data, icons: { ...defaultIconSettings, ...(data.icons ?? {}) }, features: { ...defaultSettings.features, ...(data.features ?? {}) } };
   } catch { return defaultSettings; }
 }
 
@@ -86,6 +108,9 @@ export function cmsContentSetting(settings: PublicSiteSettings): CmsContent {
 }
 
 export function cmsAssetUrl(content: CmsContent, assetId?: string) { if (!assetId) return ''; return content.assets.find((asset) => asset.id === assetId && asset.enabled)?.url ?? ''; }
+export function iconSettings(settings: PublicSiteSettings): SiteIconSettings { return { ...defaultIconSettings, ...(settings.icons ?? {}) } as SiteIconSettings; }
+export function iconSetting(settings: PublicSiteSettings, key: IconKey) { const value = settings.icons?.[key]; return typeof value === 'string' && value.trim() ? value.trim() : defaultIconSettings[key]; }
+export function isIconUrl(value: string) { try { const url = new URL(value); return url.protocol === 'http:' || url.protocol === 'https:'; } catch { return false; } }
 
 export function promotionCampaignsSetting(settings: PublicSiteSettings): PromotionCampaign[] {
   const value = settings.features?.promotion_campaigns;
