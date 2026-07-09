@@ -7,11 +7,13 @@ import { AdminGameMoneyController, MemberGameTransferController, ProviderWebhook
 import { GamePlatformMoneyService } from './game-platform-money.service';
 import { GamePlatformService } from './game-platform.service';
 import { MemberGamePlatformController } from './member-game-platform.controller';
+import { ProviderPresetController } from './provider-preset.controller';
+import { ProviderPresetService } from './provider-preset.service';
 
 @Module({
   imports: [DatabaseModule, JwtModule.register({})],
-  controllers: [GamePlatformController, MemberGamePlatformController, MemberGameTransferController, AdminGameMoneyController, ProviderWebhookController],
-  providers: [GamePlatformService, GamePlatformMoneyService, ProviderAdapterRegistry],
-  exports: [GamePlatformService, GamePlatformMoneyService, ProviderAdapterRegistry],
+  controllers: [GamePlatformController, MemberGamePlatformController, MemberGameTransferController, AdminGameMoneyController, ProviderWebhookController, ProviderPresetController],
+  providers: [GamePlatformService, GamePlatformMoneyService, ProviderPresetService, ProviderAdapterRegistry],
+  exports: [GamePlatformService, GamePlatformMoneyService, ProviderPresetService, ProviderAdapterRegistry],
 })
 export class GamePlatformModule {}
