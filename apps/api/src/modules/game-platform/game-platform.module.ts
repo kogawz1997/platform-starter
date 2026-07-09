@@ -1,6 +1,8 @@
 import { Module } from '@nestjs/common';
 import { JwtModule } from '@nestjs/jwt';
 import { DatabaseModule } from '../../database/database.module';
+import { AdapterTestController } from './adapter-test.controller';
+import { AdapterTestService } from './adapter-test.service';
 import { ProviderAdapterRegistry } from './adapters/provider-adapter.registry';
 import { GamePlatformController } from './game-platform.controller';
 import { AdminGameMoneyController, MemberGameTransferController, ProviderWebhookController } from './game-platform-money.controller';
@@ -12,8 +14,8 @@ import { ProviderPresetService } from './provider-preset.service';
 
 @Module({
   imports: [DatabaseModule, JwtModule.register({})],
-  controllers: [GamePlatformController, MemberGamePlatformController, MemberGameTransferController, AdminGameMoneyController, ProviderWebhookController, ProviderPresetController],
-  providers: [GamePlatformService, GamePlatformMoneyService, ProviderPresetService, ProviderAdapterRegistry],
-  exports: [GamePlatformService, GamePlatformMoneyService, ProviderPresetService, ProviderAdapterRegistry],
+  controllers: [GamePlatformController, MemberGamePlatformController, MemberGameTransferController, AdminGameMoneyController, ProviderWebhookController, ProviderPresetController, AdapterTestController],
+  providers: [GamePlatformService, GamePlatformMoneyService, ProviderPresetService, AdapterTestService, ProviderAdapterRegistry],
+  exports: [GamePlatformService, GamePlatformMoneyService, ProviderPresetService, AdapterTestService, ProviderAdapterRegistry],
 })
 export class GamePlatformModule {}
