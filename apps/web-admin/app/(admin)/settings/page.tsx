@@ -3,6 +3,7 @@ import { AdminBadge, AdminCard, AdminGrid, AdminLinkButton, AdminMetric, AdminMe
 const websiteItems = [
   ['Website', '/settings/website', 'ข้อมูลเว็บหลัก ภาษา โดเมน และสถานะ login/register', 'Core'],
   ['Branding', '/settings/branding', 'โลโก้ สีหลัก ไอคอน และตัวอย่างหน้าตาแบรนด์', 'Brand'],
+  ['Icons', '/settings/icons', 'ตั้งค่าไอคอนเมนู shortcut และ bottom nav ฝั่งสมาชิก', 'Icon'],
   ['Theme', '/settings/theme', 'Layout ผู้เล่น มือถือ เดสก์ท็อป และเกม', 'UI'],
   ['SEO', '/settings/seo', 'Meta, sitemap, robots และ social preview', 'Growth'],
   ['Contact', '/settings/contact', 'Line, Telegram, Facebook, email และช่องทางช่วยเหลือ', 'Support'],
@@ -39,7 +40,7 @@ export default function SettingsPage() {
   return (
     <AdminPage eyebrow="Admin Console" title="Settings" description="ศูนย์รวมโครงตั้งค่าเว็บ ระบบเงิน เกม API ค่ายเกม ความปลอดภัย และ operation">
       <AdminMetricGrid>
-        <AdminMetric title="Website modules" value={String(websiteItems.length)} helper="แบรนด์, SEO, contact, feature flags" />
+        <AdminMetric title="Website modules" value={String(websiteItems.length)} helper="แบรนด์, icons, SEO, contact, feature flags" />
         <AdminMetric title="Money modules" value={String(moneyItems.length)} helper="คิวเงิน, wallet, ledger, risk" />
         <AdminMetric title="Game modules" value={String(gameItems.length)} helper="providers, API, catalog, adapters" />
         <AdminMetric title="Safety modules" value={String(safetyItems.length)} helper="access, audit, activity" />
@@ -51,6 +52,7 @@ export default function SettingsPage() {
           <p style={mutedStyle}>ทางลัดสำหรับ setting ที่แตะ production, เงิน, provider และ API key โดยตรง</p>
         </div>
         <div style={quickActionsStyle}>
+          <AdminLinkButton href="/settings/icons">Icons</AdminLinkButton>
           <AdminLinkButton href="/game-providers">Game Providers</AdminLinkButton>
           <AdminLinkButton href="/game-api-settings">Game API</AdminLinkButton>
           <AdminLinkButton href="/games">Game Catalog</AdminLinkButton>
