@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
+import { CmsContent } from './site-settings';
 import { memberApiFetch } from './member-api';
 import WalletCard from './wallet-card';
 import MemberBottomNav from './member-bottom-nav';
@@ -17,6 +18,7 @@ type MemberHomeProps = {
   showCategories: boolean;
   showProviders: boolean;
   showRecommended: boolean;
+  cmsContent: CmsContent;
 };
 
 type MoneyRequest = { id: string; amount: string; currency: string; status: string; method?: string | null; createdAt: string };
@@ -36,6 +38,7 @@ export default function MemberHome(props: MemberHomeProps) {
   const [lobby, setLobby] = useState<LobbyPayload>({});
   const [favoriteIds, setFavoriteIds] = useState<string[]>([]);
   const [recentIds, setRecentIds] = useState<string[]>([]);
+  const [popupClosed, setPopupClosed] = useState(false);
   const [activityMessage, setActivityMessage] = useState('');
   const [isActivityLoading, setIsActivityLoading] = useState(false);
 
@@ -44,6 +47,7 @@ export default function MemberHome(props: MemberHomeProps) {
     setIsLoggedIn(ok);
     setFavoriteIds(readIds(FAVORITES_KEY));
     setRecentIds(readIds(RECENT_KEY));
+    setPopupClosed(window.localStorage.getItem('member_cms_popup_closed') === 'true');
     loadGames();
     if (ok) loadActivity();
   }, []);
@@ -84,10 +88,18 @@ export default function MemberHome(props: MemberHomeProps) {
   const popular = (lobby.popular?.length ? lobby.popular : games.filter((game) => game.isPopular)).slice(0, 8);
   const recentGames = recentIds.map((id) => games.find((game) => game.id === id)).filter(Boolean) as Game[];
   const favoriteGames = favoriteIds.map((id) => games.find((game) => game.id === id)).filter(Boolean) as Game[];
+  const cmsBanner = props.cmsContent.banners.find((item) => item.enabled);
+  const announcements = props.cmsContent.announcements.filter((item) => item.enabled).slice(0, 3);
+  const faqs = props.cmsContent.faqs.filter((item) => item.enabled).slice(0, 4);
+  const popup = props.cmsContent.popup;
+
+  function closePopup() { window.localStorage.setItem('member_cms_popup_closed', 'true'); setPopupClosed(true); }
 
   return (
     <section className="member-shell member-home-shell">
-      {props.showPromotion && <section style={bannerStyle}><div><span style={eyebrowStyle}>พร้อมเล่น</span><h1 style={bannerTitleStyle}>{props.siteName}</h1><p style={mutedStyle}>{props.description || 'เลือกเกมที่ชอบ ฝาก ถอน และดูประวัติได้จากมือถือเครื่องเดียว'}</p></div><a href="/games" style={{ ...bannerButtonStyle, background: props.primaryColor }}>เข้าเล่นเกม</a></section>}
+      {props.showPromotion && <section style={bannerStyle}>{cmsBanner?.imageUrl && <img src={cmsBanner.imageUrl} alt="" style={bannerImageStyle} />}<div><span style={eyebrowStyle}>พร้อมเล่น</span><h1 style={bannerTitleStyle}>{cmsBanner?.title || props.siteName}</h1><p style={mutedStyle}>{cmsBanner?.subtitle || props.description || 'เลือกเกมที่ชอบ ฝาก ถอน และดูประวัติได้จากมือถือเครื่องเดียว'}</p></div><a href={cmsBanner?.href || '/games'} style={{ ...bannerButtonStyle, background: props.primaryColor }}>เข้าเล่นเกม</a></section>}
+
+      {announcements.length > 0 && <section className="member-info-card" style={announcementCardStyle}><div style={sectionHeadStyle}><h2>ประกาศ</h2><span style={mutedStyle}>{announcements.length} รายการ</span></div><div style={pendingListStyle}>{announcements.map((item, index) => <div key={`${item.title}-${index}`} style={announcementRowStyle}><strong>{item.title}</strong><span>{item.message}</span></div>)}</div></section>}
 
       {props.showBalanceHeader && <WalletCard primaryColor={props.primaryColor} cardColor={props.cardColor} showButtons={props.showButtons && isLoggedIn} />}
 
@@ -113,6 +125,8 @@ export default function MemberHome(props: MemberHomeProps) {
 
       {props.showCategories && <section className="member-info-card"><div style={sectionHeadStyle}><h2>หมวดเกม</h2><a href="/games" style={{ color: props.primaryColor, fontWeight: 900, textDecoration: 'none' }}>ดูทั้งหมด</a></div><div style={categoryGridStyle}>{(lobby.categories ?? []).slice(0, 8).map((item) => <a key={item} href={`/games?category=${encodeURIComponent(item)}`} style={categoryPillStyle}>{categoryLabel(item)}</a>)}{(lobby.categories ?? []).length === 0 && <span style={mutedStyle}>ยังไม่มีหมวดเกม</span>}</div></section>}
 
+      {faqs.length > 0 && <section className="member-info-card"><div style={sectionHeadStyle}><h2>คำถามที่พบบ่อย</h2></div><div style={pendingListStyle}>{faqs.map((item, index) => <details key={`${item.question}-${index}`} style={faqStyle}><summary>{item.question}</summary><p style={mutedStyle}>{item.answer}</p></details>)}</div></section>}
+
       {isLoggedIn && <section className="member-info-card">
         <div style={sectionHeadStyle}><h2>ล่าสุด</h2><a href="/transactions" style={{ color: props.primaryColor, fontWeight: 900, textDecoration: 'none' }}>ทั้งหมด</a></div>
         {isActivityLoading && <div style={noticeStyle}>กำลังโหลด...</div>}
@@ -122,6 +136,8 @@ export default function MemberHome(props: MemberHomeProps) {
           {ledgers.length === 0 && !activityMessage && !isActivityLoading && <EmptyState compact title="ยังไม่มีประวัติ" description="เมื่อมีรายการฝาก ถอน หรือปรับยอด รายการล่าสุดจะแสดงตรงนี้" actionHref="/deposit" actionLabel="ฝาก" />}
         </div>
       </section>}
+
+      {popup.enabled && !popupClosed && <div style={popupOverlayStyle}><section style={popupCardStyle}><button type="button" onClick={closePopup} style={popupCloseStyle}>×</button><h2>{popup.title}</h2><p style={mutedStyle}>{popup.message}</p><a href={popup.href} style={{ ...bannerButtonStyle, background: props.primaryColor }}>{popup.ctaLabel}</a></section></div>}
 
       <MemberBottomNav pendingCount={pendingCount} />
     </section>
@@ -158,16 +174,19 @@ function statusLabel(status: string) {
   return status;
 }
 function pickImage(game: Game) { const media = game.media ?? []; return media.find((item) => item.type === 'COVER')?.cachedUrl ?? media.find((item) => item.type === 'COVER')?.sourceUrl ?? media.find((item) => item.type === 'ICON')?.cachedUrl ?? media.find((item) => item.type === 'ICON')?.sourceUrl ?? null; }
-function categoryLabel(value: string) { const map: Record<string, string> = { slot: 'สล็อต', casino: 'คาสิโน', sport: 'กีฬา', fishing: 'ยิงปลา', popular: 'ยอดนิยม', new: 'ใหม่' }; return map[value?.toLowerCase?.()] ?? value; }
+function categoryLabel(value: string) { const map: Record<string, string> = { slot: 'สล็อต', casino: 'คาสิโน', sport: 'กีฬา', fishing: 'Winvalidปลา', popular: 'ยอดนิยม', new: 'ใหม่' }; return map[value?.toLowerCase?.()] ?? value; }
 function readIds(key: string) { try { return JSON.parse(window.localStorage.getItem(key) ?? '[]') as string[]; } catch { return []; } }
 function formatMoney(value: string | number, currency: string) {
   return `${currency} ${Number(value).toLocaleString('th-TH', { minimumFractionDigits: 2 })}`;
 }
-const bannerStyle = { border: '1px solid rgba(245,197,66,.26)', borderRadius: 28, padding: 18, background: 'radial-gradient(circle at top left, rgba(245,197,66,.24), transparent 38%), rgba(255,255,255,.05)', display: 'flex', justifyContent: 'space-between', gap: 14, alignItems: 'center', flexWrap: 'wrap' as const } as const;
+const bannerStyle = { border: '1px solid rgba(245,197,66,.26)', borderRadius: 28, padding: 18, background: 'radial-gradient(circle at top left, rgba(245,197,66,.24), transparent 38%), rgba(255,255,255,.05)', display: 'flex', justifyContent: 'space-between', gap: 14, alignItems: 'center', flexWrap: 'wrap' as const, overflow: 'hidden' as const } as const;
+const bannerImageStyle = { width: 86, height: 86, borderRadius: 20, objectFit: 'cover' as const, border: '1px solid rgba(255,255,255,.14)' };
 const eyebrowStyle = { color: '#facc15', fontWeight: 950, fontSize: 12, letterSpacing: '.1em', textTransform: 'uppercase' as const } as const;
 const bannerTitleStyle = { margin: '4px 0 6px', fontSize: 30, lineHeight: 1.05 } as const;
 const bannerButtonStyle = { minHeight: 44, borderRadius: 14, padding: '0 16px', display: 'inline-flex', alignItems: 'center', color: '#111827', fontWeight: 950, textDecoration: 'none' } as const;
 const alertCardStyle = { borderColor: 'rgba(245,197,66,.32)', background: 'linear-gradient(180deg, rgba(245,197,66,.13), rgba(255,255,255,.04))' } as const;
+const announcementCardStyle = { borderColor: 'rgba(245,197,66,.28)', background: 'rgba(245,197,66,.07)' } as const;
+const announcementRowStyle = { border: '1px solid rgba(255,255,255,.10)', borderRadius: 14, padding: 12, display: 'grid', gap: 4, background: 'rgba(255,255,255,.04)' } as const;
 const pendingListStyle = { display: 'grid', gap: 10, marginTop: 12, minWidth: 0 } as const;
 const sectionHeadStyle = { display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, flexWrap: 'wrap' as const, minWidth: 0 };
 const rowStyle = { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(190px, 100%), 1fr))', gap: 12, border: '1px solid rgba(255,255,255,.10)', borderRadius: 16, padding: 12, background: 'rgba(255,255,255,.045)', minWidth: 0 };
@@ -184,3 +203,7 @@ const gameImageStyle = { width: '100%', aspectRatio: '4 / 3', objectFit: 'cover'
 const gameFallbackStyle = { aspectRatio: '4 / 3', display: 'grid', placeItems: 'center', background: 'rgba(245,197,66,.12)', color: '#facc15', fontSize: 26, fontWeight: 950 } as const;
 const categoryGridStyle = { display: 'flex', gap: 10, overflowX: 'auto' as const, paddingTop: 12 } as const;
 const categoryPillStyle = { border: '1px solid rgba(255,255,255,.14)', borderRadius: 999, padding: '10px 14px', color: '#fff', background: 'rgba(255,255,255,.06)', textDecoration: 'none', whiteSpace: 'nowrap' as const, fontWeight: 900 } as const;
+const faqStyle = { border: '1px solid rgba(255,255,255,.10)', borderRadius: 14, padding: 12, background: 'rgba(255,255,255,.04)' } as const;
+const popupOverlayStyle = { position: 'fixed' as const, inset: 0, zIndex: 50, display: 'grid', placeItems: 'center', padding: 18, background: 'rgba(2,6,23,.72)' };
+const popupCardStyle = { width: 'min(420px, 100%)', border: '1px solid rgba(245,197,66,.28)', borderRadius: 24, padding: 20, background: '#111827', display: 'grid', gap: 12, position: 'relative' as const };
+const popupCloseStyle = { position: 'absolute' as const, top: 10, right: 10, width: 34, height: 34, borderRadius: 999, border: '1px solid rgba(255,255,255,.16)', background: 'rgba(255,255,255,.06)', color: '#fff', fontSize: 22 };
