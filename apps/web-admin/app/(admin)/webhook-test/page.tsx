@@ -1,8 +1,7 @@
 'use client';
 
-import { createHmac } from 'crypto';
 import { useEffect, useState } from 'react';
-import { adminApiFetch } from '../../admin-api';
+import { API_URL, adminApiFetch } from '../../admin-api';
 import { AdminBadge, AdminButton, AdminCard, AdminEmpty, AdminMetric, AdminMetricGrid, AdminNotice, AdminPage, AdminRow, AdminStack } from '../_components/admin-ui';
 
 type Provider = { id: string; name: string; code: string; status: string };
@@ -23,15 +22,16 @@ export default function WebhookTestPage() {
     if (!providerCode) { setMessage('เลือก provider ก่อน'); return; }
     const body = { eventType, idempotencyKey, providerTransactionId: `tx_${idempotencyKey}`, roundId: `round_${idempotencyKey}`, amount: '1.00', currency: 'THB', testMode: true };
     const timestamp = new Date().toISOString();
-    const signature = invalidSignature ? 'invalid-signature' : createHmac('sha256', 'adapter-test-secret').update(`${timestamp}.${JSON.stringify(body)}`).digest('hex');
+    const signature = invalidSignature ? 'invalid-signature' : 'mock-browser-signature';
     setLoading(true); setMessage('กำลังส่ง mock webhook...');
-    const res = await fetch(`/api/proxy/provider-webhooks/${providerCode}`, { method: 'POST', headers: { 'content-type': 'application/json', 'x-timestamp': timestamp, 'x-signature': signature }, body: JSON.stringify(body) });
+    const res = await fetch(`${API_URL}/provider-webhooks/${providerCode}`, { method: 'POST', headers: { 'content-type': 'application/json', 'x-timestamp': timestamp, 'x-signature': signature }, body: JSON.stringify(body) });
     const data = await res.json().catch(() => null);
     setLoading(false); setResult(data); setMessage(res.ok ? 'ส่ง mock webhook แล้ว' : data?.message ?? 'ส่ง mock webhook ไม่สำเร็จ');
   }
   return <AdminPage eyebrow="Game Platform" title="Mock Webhook Test" description="ยิง webhook จำลองเพื่อทดสอบ validate, duplicate, invalid signature และ log ก่อนเปิดรับ callback ค่ายจริง" actions={<AdminButton onClick={send} disabled={loading || !providerCode}>{loading ? 'กำลังส่ง...' : 'Send Mock Webhook'}</AdminButton>}>
     {message && <AdminNotice>{message}</AdminNotice>}
-    <AdminMetricGrid><AdminMetric title="Provider" value={providerCode || '-'} helper="provider code" /><AdminMetric title="Event" value={eventType} helper="mock event" /><AdminMetric title="Signature" value={invalidSignature ? 'invalid' : 'test'} helper="header" /><AdminMetric title="Result" value={result?.ok === false ? 'FAILED' : result ? 'DONE' : '-'} helper="last send" /></AdminMetricGrid>
+    <AdminMetricGrid><AdminMetric title="Provider" value={providerCode || '-'} helper="provider code" /><AdminMetric title="Event" value={eventType} helper="mock event" /><AdminMetric title="Signature" value={invalidSignature ? 'invalid' : 'mock'} helper="browser-safe header" /><AdminMetric title="Result" value={result?.ok === false ? 'FAILED' : result ? 'DONE' : '-'} helper="last send" /></AdminMetricGrid>
+    <AdminNotice>หมายเหตุ: ถ้าใช้ generic adapter ที่ตรวจ HMAC จริง ให้ใช้หน้า Adapter Test Harness method validateWebhook สำหรับ signed payload ที่ถูกต้อง หน้านี้ไว้ทดสอบ log/duplicate/invalid แบบ browser-safe</AdminNotice>
     <AdminCard title="Mock payload" description="ทดสอบ idempotency/duplicate ได้ด้วยการกดส่งซ้ำ key เดิม"><div style={formStyle}><label style={labelStyle}>Provider<select value={providerCode} onChange={(event) => setProviderCode(event.target.value)} style={inputStyle}>{providers.map((provider) => <option key={provider.id} value={provider.code}>{provider.name} ({provider.code})</option>)}</select></label><label style={labelStyle}>Event<select value={eventType} onChange={(event) => setEventType(event.target.value)} style={inputStyle}>{events.map((item) => <option key={item} value={item}>{item}</option>)}</select></label><label style={labelStyle}>Idempotency Key<input value={idempotencyKey} onChange={(event) => setIdempotencyKey(event.target.value)} style={inputStyle} /></label><label style={checkStyle}><input type="checkbox" checked={invalidSignature} onChange={(event) => setInvalidSignature(event.target.checked)} /> ส่ง invalid signature</label></div></AdminCard>
     {result ? <AdminStack><AdminCard title="Webhook response"><AdminRow><strong>Status</strong><AdminBadge tone={result?.ok === false ? 'danger' : 'success'}>{result?.ok === false ? 'FAILED' : 'OK'}</AdminBadge></AdminRow><pre style={preStyle}>{JSON.stringify(result, null, 2)}</pre></AdminCard></AdminStack> : <AdminEmpty>ยังไม่มีผล mock webhook</AdminEmpty>}
   </AdminPage>;
