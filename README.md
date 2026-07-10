@@ -125,6 +125,10 @@ scripts/
   backup-db.sh
   restore-db.sh
 docs/
+  ux-ui-master-roadmap.md
+  mobile-visual-regression-checklist.md
+  responsive-surface-guardrails.md
+  ux-regression-matrix-finance-operations.md
   final-qa-checklist.md
   reports-analytics.md
   activity-timeline.md
@@ -272,6 +276,10 @@ pnpm test:e2e:smoke
 
 | Document | Purpose |
 |---|---|
+| [`docs/ux-ui-master-roadmap.md`](docs/ux-ui-master-roadmap.md) | Master status, backlog, execution order, and definition of done for UX/UI across Member, Admin, and Public/Auth |
+| [`docs/mobile-visual-regression-checklist.md`](docs/mobile-visual-regression-checklist.md) | Mobile visual verification checklist |
+| [`docs/responsive-surface-guardrails.md`](docs/responsive-surface-guardrails.md) | Mobile/desktop ownership and responsive safety rules |
+| [`docs/ux-regression-matrix-finance-operations.md`](docs/ux-regression-matrix-finance-operations.md) | Finance and operations route/state/viewport regression matrix |
 | [`docs/final-qa-checklist.md`](docs/final-qa-checklist.md) | Final QA and production verification checklist |
 | [`docs/member-ux-qa.md`](docs/member-ux-qa.md) | Member mobile UX and production integration QA |
 | [`docs/reports-analytics.md`](docs/reports-analytics.md) | Reports, queue aging, and CSV export guide |
@@ -292,15 +300,19 @@ pnpm test:e2e:smoke
 | Admin operations | Ready |
 | Reports/activity | Ready |
 | Security/2FA | Ready |
-| CI build | Passing |
+| CI build | Passing at latest confirmed checkpoint |
 | API smoke | Passing |
 | E2E smoke | Passing |
-| UX/UI polish | In progress via Issue #2 |
+| Member UX/UI modernization | In progress |
+| Admin UX/UI modernization | In progress |
+| Public/Auth UX/UI modernization | In progress |
+| Master UX/UI tracking | [`docs/ux-ui-master-roadmap.md`](docs/ux-ui-master-roadmap.md) |
 
 ## UX/UI Polish Tracking
 
-Ongoing UX/UI work is tracked in:
+The master roadmap is maintained in:
 
+- [`docs/ux-ui-master-roadmap.md`](docs/ux-ui-master-roadmap.md)
 - [Issue #2: UX/UI polish backlog after CI pass](https://github.com/kogawz1997/platform-starter/issues/2)
 
 ## License
