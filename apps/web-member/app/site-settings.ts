@@ -11,6 +11,20 @@ export type CmsContent = {
 
 export type IconKey = 'home' | 'deposit' | 'withdraw' | 'games' | 'bonus' | 'affiliate' | 'support' | 'history' | 'bank' | 'profile' | 'notification' | 'promotion' | 'vip' | 'wallet';
 export type SiteIconSettings = Record<IconKey, string>;
+export type MemberFeatureFlags = {
+  registration: boolean;
+  login: boolean;
+  deposit: boolean;
+  withdraw: boolean;
+  promotion: boolean;
+  bonus: boolean;
+  affiliate: boolean;
+  support: boolean;
+  kyc: boolean;
+  games: boolean;
+  profile: boolean;
+  notifications: boolean;
+};
 
 export type PromotionCampaign = {
   id: string;
@@ -53,20 +67,22 @@ export const defaultCmsContent: CmsContent = {
 };
 
 export const defaultIconSettings: SiteIconSettings = {
-  home: '⌂',
-  deposit: '＋',
-  withdraw: '↗',
-  games: '🎮',
-  bonus: '★',
-  affiliate: '↔',
-  support: '✉',
-  history: '≡',
-  bank: '◈',
-  profile: '👤',
-  notification: '🔔',
-  promotion: '🎁',
-  vip: '♛',
-  wallet: '฿',
+  home: '⌂', deposit: '＋', withdraw: '↗', games: '🎮', bonus: '★', affiliate: '↔', support: '✉', history: '≡', bank: '◈', profile: '👤', notification: '🔔', promotion: '🎁', vip: '♛', wallet: '฿',
+};
+
+export const defaultFeatureFlags: MemberFeatureFlags = {
+  registration: true,
+  login: true,
+  deposit: true,
+  withdraw: true,
+  promotion: true,
+  bonus: true,
+  affiliate: true,
+  support: true,
+  kyc: true,
+  games: true,
+  profile: true,
+  notifications: true,
 };
 
 export const defaultPromotionCampaigns: PromotionCampaign[] = [
@@ -79,7 +95,22 @@ export const defaultSettings: PublicSiteSettings = {
   theme: { show_balance_header: true, show_deposit_withdraw_buttons: true, show_promotion_banner: true, show_game_categories: true, show_popular_providers: true, show_recommended_games: true },
   icons: defaultIconSettings,
   maintenance: { enabled: false, member_enabled: false, message: 'ระบบกำลังปรับปรุง' },
-  features: { registration_enabled: true, login_enabled: true, deposit_enabled: true, withdraw_enabled: true, promotion_enabled: true, cms_content: defaultCmsContent, promotion_campaigns: defaultPromotionCampaigns },
+  features: {
+    registration_enabled: true,
+    login_enabled: true,
+    deposit_enabled: true,
+    withdraw_enabled: true,
+    promotion_enabled: true,
+    bonus_enabled: true,
+    affiliate_enabled: true,
+    support_enabled: true,
+    kyc_enabled: true,
+    game_lobby_enabled: true,
+    profile_enabled: true,
+    notification_enabled: true,
+    cms_content: defaultCmsContent,
+    promotion_campaigns: defaultPromotionCampaigns,
+  },
 };
 
 export async function loadPublicSiteSettings(): Promise<PublicSiteSettings> {
@@ -93,6 +124,23 @@ export async function loadPublicSiteSettings(): Promise<PublicSiteSettings> {
 
 export function textSetting(settings: PublicSiteSettings, group: keyof PublicSiteSettings, key: string, fallback: string) { const value = settings[group]?.[key]; return typeof value === 'string' ? value : fallback; }
 export function boolSetting(settings: PublicSiteSettings, group: keyof PublicSiteSettings, key: string, fallback: boolean) { const value = settings[group]?.[key]; return typeof value === 'boolean' ? value : fallback; }
+export function memberFeatureFlags(settings: PublicSiteSettings): MemberFeatureFlags {
+  const feature = (key: string, fallback: boolean) => boolSetting(settings, 'features', key, fallback);
+  return {
+    registration: feature('registration_enabled', true),
+    login: feature('login_enabled', true),
+    deposit: feature('deposit_enabled', true),
+    withdraw: feature('withdraw_enabled', true),
+    promotion: feature('promotion_enabled', true),
+    bonus: feature('bonus_enabled', true),
+    affiliate: feature('affiliate_enabled', true),
+    support: feature('support_enabled', true),
+    kyc: feature('kyc_enabled', true),
+    games: feature('game_lobby_enabled', feature('provider_enabled', true)),
+    profile: feature('profile_enabled', true),
+    notifications: feature('notification_enabled', true),
+  };
+}
 
 export function cmsContentSetting(settings: PublicSiteSettings): CmsContent {
   const value = settings.features?.cms_content;
@@ -116,22 +164,8 @@ export function promotionCampaignsSetting(settings: PublicSiteSettings): Promoti
   const value = settings.features?.promotion_campaigns;
   if (!Array.isArray(value)) return defaultPromotionCampaigns;
   return value.map((item: any, index) => ({
-    id: String(item.id ?? `promotion-${index + 1}`),
-    title: String(item.title ?? 'Promotion'),
-    description: String(item.description ?? ''),
-    enabled: item.enabled !== false,
-    bonusType: item.bonusType === 'fixed' ? 'fixed' : 'percent',
-    bonusValue: Number(item.bonusValue ?? 0),
-    minDeposit: Number(item.minDeposit ?? 0),
-    maxBonus: Number(item.maxBonus ?? 0),
-    turnoverMultiplier: Number(item.turnoverMultiplier ?? 0),
-    claimMode: item.claimMode === 'auto_pending' ? 'auto_pending' : 'manual_review',
-    imageUrl: typeof item.imageUrl === 'string' ? item.imageUrl : '',
-    iconUrl: typeof item.iconUrl === 'string' ? item.iconUrl : '',
-    badgeText: typeof item.badgeText === 'string' ? item.badgeText : '',
-    accentColor: typeof item.accentColor === 'string' ? item.accentColor : '#f5c542',
-    priority: Number(item.priority ?? 0),
-    startsAt: typeof item.startsAt === 'string' ? item.startsAt : undefined,
-    endsAt: typeof item.endsAt === 'string' ? item.endsAt : undefined,
+    id: String(item.id ?? `promotion-${index + 1}`), title: String(item.title ?? 'Promotion'), description: String(item.description ?? ''), enabled: item.enabled !== false,
+    bonusType: item.bonusType === 'fixed' ? 'fixed' : 'percent', bonusValue: Number(item.bonusValue ?? 0), minDeposit: Number(item.minDeposit ?? 0), maxBonus: Number(item.maxBonus ?? 0), turnoverMultiplier: Number(item.turnoverMultiplier ?? 0), claimMode: item.claimMode === 'auto_pending' ? 'auto_pending' : 'manual_review',
+    imageUrl: typeof item.imageUrl === 'string' ? item.imageUrl : '', iconUrl: typeof item.iconUrl === 'string' ? item.iconUrl : '', badgeText: typeof item.badgeText === 'string' ? item.badgeText : '', accentColor: typeof item.accentColor === 'string' ? item.accentColor : '#f5c542', priority: Number(item.priority ?? 0), startsAt: typeof item.startsAt === 'string' ? item.startsAt : undefined, endsAt: typeof item.endsAt === 'string' ? item.endsAt : undefined,
   }));
 }
