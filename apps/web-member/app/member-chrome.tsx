@@ -3,33 +3,27 @@
 import { ReactNode, useEffect, useMemo, useState } from 'react';
 import { usePathname } from 'next/navigation';
 import { API_URL, clearMemberSession, memberApiFetch, refreshMemberToken } from './member-api';
+import { defaultIconSettings, defaultSettings, iconSettings, isIconUrl, loadPublicSiteSettings, memberFeatureFlags, PublicSiteSettings, textSetting } from './site-settings';
+import { activeNavigationHref, navigationFor } from './member-navigation';
 import MemberFooter from './member-footer';
-import { defaultIconSettings, defaultSettings, iconSettings, isIconUrl, loadPublicSiteSettings, memberFeatureFlags, PublicSiteSettings, SiteIconSettings, textSetting } from './site-settings';
-
-const bottomNavItems: Array<{ title: string; href: string; iconKey: keyof SiteIconSettings; badge?: boolean; feature?: keyof ReturnType<typeof memberFeatureFlags> }> = [
-  { title: 'หน้าแรก', href: '/', iconKey: 'home' },
-  { title: 'เกม', href: '/games', iconKey: 'games', feature: 'games' },
-  { title: 'ฝาก', href: '/deposit', iconKey: 'deposit', feature: 'deposit' },
-  { title: 'ถอนเงิน', href: '/withdraw', iconKey: 'withdraw', feature: 'withdraw' },
-  { title: 'ประวัติ', href: '/transactions', iconKey: 'history', badge: true },
-];
-
-const drawerItems: Array<{ title: string; href: string; description: string; iconKey: keyof SiteIconSettings; badge?: boolean; feature?: keyof ReturnType<typeof memberFeatureFlags> }> = [
-  { title: 'เกมทั้งหมด', href: '/games', description: 'เลือกเกม แนะนำ มาใหม่ และยอดนิยม', iconKey: 'games', feature: 'games' },
-  { title: 'โปรโมชัน', href: '/promotions', description: 'ดูโปรที่เปิดให้รับสิทธิ์', iconKey: 'promotion', feature: 'promotion' },
-  { title: 'โบนัส', href: '/bonus', description: 'ดูสถานะโบนัสและเทิร์น', iconKey: 'bonus', feature: 'bonus' },
-  { title: 'ตัวแทน', href: '/affiliate', description: 'ลิงก์แนะนำและค่าคอม', iconKey: 'affiliate', feature: 'affiliate' },
-  { title: 'สถานะรายการ', href: '/transactions', description: 'เช็กรายการรอตรวจสอบ', iconKey: 'history', badge: true },
-  { title: 'การจัดการบัญชีธนาคาร', href: '/bank-accounts', description: 'เพิ่มหรือแก้ไขบัญชีธนาคาร', iconKey: 'bank', feature: 'kyc' },
-  { title: 'ช่วยเหลือ', href: '/support', description: 'เปิด ticket และดูคำตอบ', iconKey: 'support', feature: 'support' },
-  { title: 'ติดต่อเรา', href: '/contact', description: 'ดูช่องทางติดต่อและเวลาบริการ', iconKey: 'support' },
-];
 
 type MoneyRequest = { status: string };
 type DisabledRoute = { prefix: string; feature: keyof ReturnType<typeof memberFeatureFlags>; label: string };
+
 const disabledRoutes: DisabledRoute[] = [
-  { prefix: '/games', feature: 'games', label: 'เกม' }, { prefix: '/deposit', feature: 'deposit', label: 'ฝาก' }, { prefix: '/withdraw', feature: 'withdraw', label: 'ถอนเงิน' }, { prefix: '/promotions', feature: 'promotion', label: 'โปรโมชัน' }, { prefix: '/bonus', feature: 'bonus', label: 'โบนัส' }, { prefix: '/affiliate', feature: 'affiliate', label: 'ตัวแทน' }, { prefix: '/support', feature: 'support', label: 'ช่วยเหลือ' }, { prefix: '/bank-accounts', feature: 'kyc', label: 'บัญชีธนาคาร' }, { prefix: '/profile', feature: 'profile', label: 'โปรไฟล์' }, { prefix: '/notifications', feature: 'notifications', label: 'แจ้งเตือน' },
+  { prefix: '/games', feature: 'games', label: 'เกม' },
+  { prefix: '/deposit', feature: 'deposit', label: 'ฝาก' },
+  { prefix: '/withdraw', feature: 'withdraw', label: 'ถอนเงิน' },
+  { prefix: '/promotions', feature: 'promotion', label: 'โปรโมชัน' },
+  { prefix: '/bonus', feature: 'bonus', label: 'โบนัส' },
+  { prefix: '/affiliate', feature: 'affiliate', label: 'ตัวแทน' },
+  { prefix: '/support', feature: 'support', label: 'ช่วยเหลือ' },
+  { prefix: '/bank-accounts', feature: 'kyc', label: 'บัญชีธนาคาร' },
+  { prefix: '/profile', feature: 'profile', label: 'โปรไฟล์' },
+  { prefix: '/notifications', feature: 'notifications', label: 'แจ้งเตือน' },
 ];
+
+const publicPrefixes = ['/login', '/register', '/contact', '/legal'];
 
 export default function MemberChrome({ children }: { children: ReactNode }) {
   const pathname = usePathname();
@@ -38,6 +32,7 @@ export default function MemberChrome({ children }: { children: ReactNode }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [pendingCount, setPendingCount] = useState(0);
   const [settings, setSettings] = useState<PublicSiteSettings>(defaultSettings);
+
   const icons = iconSettings(settings);
   const features = memberFeatureFlags(settings);
   const siteName = textSetting(settings, 'website', 'site_name', 'ศูนย์สมาชิก');
@@ -45,30 +40,141 @@ export default function MemberChrome({ children }: { children: ReactNode }) {
   const logoUrl = textSetting(settings, 'branding', 'logo_url', '');
   const brandMark = textSetting(settings, 'branding', 'brand_mark', siteName.slice(0, 1).toUpperCase() || 'P');
   const primaryColor = textSetting(settings, 'branding', 'primary_color', '#f5c542');
-  const isAuthPage = pathname.startsWith('/login') || pathname.startsWith('/register');
-  const isPublicInfoPage = pathname.startsWith('/legal/') || pathname === '/contact';
-  const activeHref = useMemo(() => { if (pathname.startsWith('/games')) return '/games'; if (pathname.startsWith('/promotions')) return '/promotions'; if (pathname.startsWith('/bonus')) return '/bonus'; if (pathname.startsWith('/affiliate')) return '/affiliate'; if (pathname.startsWith('/deposit')) return '/deposit'; if (pathname.startsWith('/withdraw')) return '/withdraw'; if (pathname.startsWith('/transactions')) return '/transactions'; if (pathname.startsWith('/bank-accounts')) return '/bank-accounts'; if (pathname.startsWith('/support')) return '/support'; if (pathname.startsWith('/contact')) return '/contact'; return '/'; }, [pathname]);
+  const isPublicRoute = publicPrefixes.some((prefix) => pathname.startsWith(prefix));
+  const activeHref = useMemo(() => activeNavigationHref(pathname), [pathname]);
   const blockedRoute = disabledRoutes.find((route) => pathname.startsWith(route.prefix) && !features[route.feature]);
-  const visibleBottomNav = bottomNavItems.filter((item) => !item.feature || features[item.feature]);
-  const visibleDrawer = drawerItems.filter((item) => !item.feature || features[item.feature]);
+  const visibleBottomNav = navigationFor('bottom', features);
+  const visibleDrawer = navigationFor('drawer', features);
 
-  useEffect(() => { loadPublicSiteSettings().then(setSettings).catch(() => setSettings(defaultSettings)); }, []);
-  useEffect(() => { let cancelled = false; async function checkAuth() { if (isPublicInfoPage) { setReady(true); setIsLoggedIn(Boolean(window.localStorage.getItem('member_access_token') || window.localStorage.getItem('member_refresh_token'))); return; } const ok = await verifyMemberSession(); if (cancelled) return; setIsLoggedIn(ok); setReady(true); if (!isAuthPage && !ok) { const next = encodeURIComponent(`${pathname}${window.location.search}`); window.location.replace(`/login?next=${next}`); } if (isAuthPage && ok) window.location.replace('/'); } setReady(false); checkAuth(); return () => { cancelled = true; }; }, [pathname, isAuthPage, isPublicInfoPage]);
-  useEffect(() => { if (!isLoggedIn || isAuthPage || isPublicInfoPage) return; let cancelled = false; async function loadPendingCount() { const [topupRes, withdrawalRes] = await Promise.all([memberApiFetch('/member/topups'), memberApiFetch('/member/withdrawals')]).catch(() => [] as Response[]); if (!topupRes || !withdrawalRes || cancelled) return; const topupData = await topupRes.json().catch(() => null); const withdrawalData = await withdrawalRes.json().catch(() => null); const topups = Array.isArray(topupData?.items) ? topupData.items as MoneyRequest[] : []; const withdrawals = Array.isArray(withdrawalData?.items) ? withdrawalData.items as MoneyRequest[] : []; setPendingCount([...topups, ...withdrawals].filter((item) => item.status === 'PENDING').length); } loadPendingCount(); return () => { cancelled = true; }; }, [isLoggedIn, isAuthPage, isPublicInfoPage]);
-  useEffect(() => { if (!menuOpen) return; const bodyOverflow = document.body.style.overflow; const htmlOverflow = document.documentElement.style.overflow; document.body.style.overflow = 'hidden'; document.documentElement.style.overflow = 'hidden'; return () => { document.body.style.overflow = bodyOverflow; document.documentElement.style.overflow = htmlOverflow; }; }, [menuOpen]);
-  function logout() { clearMemberSession(); window.location.href = '/login'; }
-  if (isAuthPage) return <>{children}</>;
-  if (!ready) return <main style={{ minHeight: '100dvh', display: 'grid', placeItems: 'center', background: '#080808', color: '#fff', padding: 16 }}>กำลังโหลด...</main>;
-  if (isPublicInfoPage) return <>{children}<MemberFooter settings={settings} /></>;
-  if (!isLoggedIn) return null;
+  useEffect(() => {
+    loadPublicSiteSettings().then(setSettings).catch(() => setSettings(defaultSettings));
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function checkAuth() {
+      if (isPublicRoute) {
+        const ok = await verifyMemberSession();
+        if (cancelled) return;
+        setIsLoggedIn(ok);
+        setReady(true);
+        if ((pathname.startsWith('/login') || pathname.startsWith('/register')) && ok) window.location.replace('/');
+        return;
+      }
+      const ok = await verifyMemberSession();
+      if (cancelled) return;
+      setIsLoggedIn(ok);
+      setReady(true);
+      if (!ok) {
+        const next = encodeURIComponent(`${pathname}${window.location.search}`);
+        window.location.replace(`/login?next=${next}`);
+      }
+    }
+    setReady(false);
+    checkAuth();
+    return () => { cancelled = true; };
+  }, [pathname, isPublicRoute]);
+
+  useEffect(() => {
+    if (!isLoggedIn || isPublicRoute) return;
+    let cancelled = false;
+    async function loadPendingCount() {
+      const responses = await Promise.all([memberApiFetch('/member/topups'), memberApiFetch('/member/withdrawals')]).catch(() => [] as Response[]);
+      const [topupRes, withdrawalRes] = responses;
+      if (!topupRes || !withdrawalRes || cancelled) return;
+      const topupData = await topupRes.json().catch(() => null);
+      const withdrawalData = await withdrawalRes.json().catch(() => null);
+      const topups = Array.isArray(topupData?.items) ? topupData.items as MoneyRequest[] : [];
+      const withdrawals = Array.isArray(withdrawalData?.items) ? withdrawalData.items as MoneyRequest[] : [];
+      setPendingCount([...topups, ...withdrawals].filter((item) => item.status === 'PENDING').length);
+    }
+    loadPendingCount();
+    return () => { cancelled = true; };
+  }, [isLoggedIn, isPublicRoute]);
+
+  useEffect(() => {
+    if (!menuOpen) return;
+    const bodyOverflow = document.body.style.overflow;
+    const htmlOverflow = document.documentElement.style.overflow;
+    document.body.style.overflow = 'hidden';
+    document.documentElement.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = bodyOverflow;
+      document.documentElement.style.overflow = htmlOverflow;
+    };
+  }, [menuOpen]);
+
+  function logout() {
+    clearMemberSession();
+    window.location.href = '/login';
+  }
+
+  if (isPublicRoute) return <>{children}</>;
+  if (!ready || !isLoggedIn) return <main style={loadingPageStyle}>กำลังโหลด...</main>;
 
   const content = blockedRoute ? <FeatureDisabled label={blockedRoute.label} siteName={siteName} primaryColor={primaryColor} /> : children;
-  return <><header className="member-topbar global-member-topbar" style={{ borderColor: `${primaryColor}33` }}><a href="/" className="member-brand"><span className="member-brand-mark" style={{ background: primaryColor }}>{logoUrl ? <img src={logoUrl} alt="" style={logoStyle} /> : brandMark}</span><span className="member-brand-copy"><strong>{siteName}</strong><small>{siteDescription}</small></span></a><div className="member-actions"><button type="button" className="member-menu-button" onClick={() => setMenuOpen(true)} aria-label="เปิดเมนู">☰</button></div></header>{menuOpen && <button type="button" className="member-menu-backdrop" onClick={() => setMenuOpen(false)} aria-label="ปิดเมนู" />}<aside className={menuOpen ? 'member-drawer open' : 'member-drawer'} aria-hidden={!menuOpen}><div className="member-drawer-head"><div><strong>{siteName}</strong><p>{siteDescription}</p></div><button type="button" onClick={() => setMenuOpen(false)} aria-label="ปิดเมนู">×</button></div><nav className="member-drawer-nav">{visibleDrawer.map((item) => <a key={item.href} href={item.href} onClick={() => setMenuOpen(false)} className={activeHref === item.href ? 'active' : ''}><IconValue value={icons[item.iconKey] ?? defaultIconSettings[item.iconKey]} /><span className="member-drawer-copy"><strong>{item.title}</strong><small>{item.badge && pendingCount > 0 ? `${pendingCount} รายการรอตรวจสอบ` : item.description}</small></span>{item.badge && pendingCount > 0 && <em>{pendingCount}</em>}</a>)}</nav><button type="button" className="member-logout-button" onClick={logout}>ออกจากระบบ</button></aside>{content}<MemberFooter settings={settings} /><nav className="member-bottom-nav" aria-label="เมนูหลัก">{visibleBottomNav.map((item) => <a key={item.href} href={item.href} className={activeHref === item.href ? 'active' : ''} aria-current={activeHref === item.href ? 'page' : undefined}><span className="member-bottom-icon"><IconValue value={icons[item.iconKey] ?? defaultIconSettings[item.iconKey]} /></span><span>{item.title}</span>{item.badge && pendingCount > 0 && <em>{pendingCount}</em>}</a>)}</nav></>;
+
+  return <>
+    <header className="member-topbar global-member-topbar" style={{ borderColor: `${primaryColor}33` }}>
+      <a href="/" className="member-brand">
+        <span className="member-brand-mark" style={{ background: primaryColor }}>{logoUrl ? <img src={logoUrl} alt="" style={logoStyle} /> : brandMark}</span>
+        <span className="member-brand-copy"><strong>{siteName}</strong><small>{siteDescription}</small></span>
+      </a>
+      <div className="member-actions"><button type="button" className="member-menu-button" onClick={() => setMenuOpen(true)} aria-label="เปิดเมนู">☰</button></div>
+    </header>
+
+    {menuOpen && <button type="button" className="member-menu-backdrop" onClick={() => setMenuOpen(false)} aria-label="ปิดเมนู" />}
+
+    <aside className={menuOpen ? 'member-drawer open' : 'member-drawer'} aria-hidden={!menuOpen}>
+      <div className="member-drawer-head"><div><strong>{siteName}</strong><p>{siteDescription}</p></div><button type="button" onClick={() => setMenuOpen(false)} aria-label="ปิดเมนู">×</button></div>
+      <nav className="member-drawer-nav">
+        {visibleDrawer.map((item) => <a key={item.key} href={item.href} onClick={() => setMenuOpen(false)} className={activeHref === item.href ? 'active' : ''}>
+          <IconValue value={icons[item.iconKey] ?? defaultIconSettings[item.iconKey]} />
+          <span className="member-drawer-copy"><strong>{item.title}</strong><small>{item.badge === 'pending' && pendingCount > 0 ? `${pendingCount} รายการรอตรวจสอบ` : item.description}</small></span>
+          {item.badge === 'pending' && pendingCount > 0 && <em>{pendingCount}</em>}
+        </a>)}
+      </nav>
+      <button type="button" className="member-logout-button" onClick={logout}>ออกจากระบบ</button>
+    </aside>
+
+    {content}
+    <MemberFooter settings={settings} />
+
+    <nav className="member-bottom-nav" aria-label="เมนูหลัก">
+      {visibleBottomNav.map((item) => <a key={item.key} href={item.href} className={activeHref === item.href ? 'active' : ''} aria-current={activeHref === item.href ? 'page' : undefined}>
+        <span className="member-bottom-icon"><IconValue value={icons[item.iconKey] ?? defaultIconSettings[item.iconKey]} /></span>
+        <span>{item.shortTitle ?? item.title}</span>
+        {item.badge === 'pending' && pendingCount > 0 && <em>{pendingCount}</em>}
+      </a>)}
+    </nav>
+  </>;
 }
 
-function FeatureDisabled({ label, siteName, primaryColor }: { label: string; siteName: string; primaryColor: string }) { return <main style={disabledPageStyle}><section style={disabledCardStyle}><span style={{ ...disabledBadgeStyle, color: primaryColor, borderColor: `${primaryColor}55`, background: `${primaryColor}12` }}>ปิดใช้งานชั่วคราว</span><h1 style={disabledTitleStyle}>{label}</h1><p style={disabledTextStyle}>{siteName} ปิดฟีเจอร์นี้จากการตั้งค่าระบบ กรุณากลับหน้าแรกหรือรอประกาศเปิดใช้งานอีกครั้ง</p><a href="/" style={{ ...disabledButtonStyle, background: primaryColor }}>กลับหน้าแรก</a></section></main>; }
-function IconValue({ value }: { value: string }) { return isIconUrl(value) ? <img src={value} alt="" style={iconImageStyle} /> : <>{value}</>; }
-async function verifyMemberSession() { const token = window.localStorage.getItem('member_access_token'); if (!token && !window.localStorage.getItem('member_refresh_token')) return false; if (token) { const res = await fetch(`${API_URL}/member/wallet`, { headers: { Authorization: `Bearer ${token}` } }); if (res.ok) return true; if (res.status !== 401) return false; } const refreshed = await refreshMemberToken(); if (!refreshed) { clearMemberSession(); return false; } const retry = await fetch(`${API_URL}/member/wallet`, { headers: { Authorization: `Bearer ${refreshed}` } }); if (retry.ok) return true; clearMemberSession(); return false; }
+function FeatureDisabled({ label, siteName, primaryColor }: { label: string; siteName: string; primaryColor: string }) {
+  return <main style={disabledPageStyle}><section style={disabledCardStyle}><span style={{ ...disabledBadgeStyle, color: primaryColor, borderColor: `${primaryColor}55`, background: `${primaryColor}12` }}>ปิดใช้งานชั่วคราว</span><h1 style={disabledTitleStyle}>{label}</h1><p style={disabledTextStyle}>{siteName} ปิดฟีเจอร์นี้จากการตั้งค่าระบบ กรุณากลับหน้าแรกหรือรอประกาศเปิดใช้งานอีกครั้ง</p><a href="/" style={{ ...disabledButtonStyle, background: primaryColor }}>กลับหน้าแรก</a></section></main>;
+}
+
+function IconValue({ value }: { value: string }) {
+  return isIconUrl(value) ? <img src={value} alt="" style={iconImageStyle} /> : <>{value}</>;
+}
+
+async function verifyMemberSession() {
+  const token = window.localStorage.getItem('member_access_token');
+  if (!token && !window.localStorage.getItem('member_refresh_token')) return false;
+  if (token) {
+    const res = await fetch(`${API_URL}/member/wallet`, { headers: { Authorization: `Bearer ${token}` } });
+    if (res.ok) return true;
+    if (res.status !== 401) return false;
+  }
+  const refreshed = await refreshMemberToken();
+  if (!refreshed) { clearMemberSession(); return false; }
+  const retry = await fetch(`${API_URL}/member/wallet`, { headers: { Authorization: `Bearer ${refreshed}` } });
+  if (retry.ok) return true;
+  clearMemberSession();
+  return false;
+}
+
+const loadingPageStyle = { minHeight: '100dvh', display: 'grid', placeItems: 'center', background: '#080808', color: '#fff', padding: 16 } as const;
 const logoStyle = { width: '100%', height: '100%', objectFit: 'cover' as const, borderRadius: 12, display: 'block' };
 const iconImageStyle = { width: 22, height: 22, objectFit: 'cover' as const, borderRadius: 7, display: 'block', flex: '0 0 auto' };
 const disabledPageStyle = { minHeight: 'calc(100dvh - 80px)', display: 'grid', placeItems: 'center', padding: '24px 16px 120px', background: 'linear-gradient(180deg,#080808,#111827)', color: '#fff' } as const;
