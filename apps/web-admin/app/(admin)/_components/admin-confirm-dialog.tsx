@@ -20,7 +20,6 @@ type ConfirmDialogProps = {
 
 export function AdminConfirmDialog({ open, tone = 'warning', title, description, confirmLabel, cancelLabel = 'ยกเลิก', details, loading, onConfirm, onCancel }: ConfirmDialogProps) {
   const dialogRef = useRef<HTMLElement>(null);
-  const cancelButtonRef = useRef<HTMLButtonElement>(null);
   const returnFocusRef = useRef<HTMLElement | null>(null);
   const titleId = useId();
   const descriptionId = useId();
@@ -30,7 +29,7 @@ export function AdminConfirmDialog({ open, tone = 'warning', title, description,
     returnFocusRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
-    window.requestAnimationFrame(() => cancelButtonRef.current?.focus());
+    window.requestAnimationFrame(() => dialogRef.current?.querySelector<HTMLElement>('button:not([disabled])')?.focus());
 
     function handleKeyDown(event: KeyboardEvent) {
       if (event.key === 'Escape' && !loading) { event.preventDefault(); onCancel(); return; }
@@ -63,7 +62,7 @@ export function AdminConfirmDialog({ open, tone = 'warning', title, description,
       </div>
       {details && <div style={detailsStyle}>{details}</div>}
       <div style={actionsStyle}>
-        <AdminButton ref={cancelButtonRef} tone="secondary" disabled={loading} onClick={onCancel}>{cancelLabel}</AdminButton>
+        <AdminButton tone="secondary" disabled={loading} onClick={onCancel}>{cancelLabel}</AdminButton>
         <AdminButton tone={tone === 'success' ? 'success' : tone === 'danger' ? 'danger' : 'primary'} disabled={loading} onClick={onConfirm}>{loading ? 'กำลังทำรายการ...' : confirmLabel}</AdminButton>
       </div>
     </section>
