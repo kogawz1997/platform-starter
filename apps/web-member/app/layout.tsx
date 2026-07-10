@@ -13,6 +13,7 @@ import './member-deposit-flow.css';
 import './member-withdraw-flow.css';
 import './public-auth-shell.css';
 import './public-auth-polish.css';
+import './public-status-page.css';
 import './public-mobile.css';
 import './public-desktop.css';
 import './globals.css';
