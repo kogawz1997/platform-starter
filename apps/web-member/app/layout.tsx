@@ -1,4 +1,5 @@
 import type { Viewport } from 'next';
+import './design-tokens.css';
 import './globals.css';
 import MemberChrome from './member-chrome';
 import { MemberSessionProvider } from './member-session-provider';
