@@ -3,9 +3,10 @@
 import { ReactNode, useEffect, useMemo, useState } from 'react';
 import { usePathname } from 'next/navigation';
 import { API_URL, clearMemberSession, memberApiFetch, refreshMemberToken } from './member-api';
-import { defaultIconSettings, defaultSettings, iconSettings, isIconUrl, loadPublicSiteSettings, memberFeatureFlags, PublicSiteSettings, textSetting } from './site-settings';
+import { defaultIconSettings, iconSettings, isIconUrl, memberFeatureFlags, textSetting } from './site-settings';
 import { activeNavigationHref, navigationFor } from './member-navigation';
 import MemberFooter from './member-footer';
+import { useSiteSettings } from './site-settings-provider';
 
 type MoneyRequest = { status: string };
 type DisabledRoute = { prefix: string; feature: keyof ReturnType<typeof memberFeatureFlags>; label: string };
@@ -31,7 +32,7 @@ export default function MemberChrome({ children }: { children: ReactNode }) {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [pendingCount, setPendingCount] = useState(0);
-  const [settings, setSettings] = useState<PublicSiteSettings>(defaultSettings);
+  const { settings } = useSiteSettings();
 
   const icons = iconSettings(settings);
   const features = memberFeatureFlags(settings);
@@ -45,10 +46,6 @@ export default function MemberChrome({ children }: { children: ReactNode }) {
   const blockedRoute = disabledRoutes.find((route) => pathname.startsWith(route.prefix) && !features[route.feature]);
   const visibleBottomNav = navigationFor('bottom', features);
   const visibleDrawer = navigationFor('drawer', features);
-
-  useEffect(() => {
-    loadPublicSiteSettings().then(setSettings).catch(() => setSettings(defaultSettings));
-  }, []);
 
   useEffect(() => {
     let cancelled = false;
