@@ -1,19 +1,11 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { boolSetting, cmsContentSetting, defaultSettings, iconSettings, loadPublicSiteSettings, memberFeatureFlags, PublicSiteSettings, textSetting } from './site-settings';
+import { boolSetting, cmsContentSetting, iconSettings, memberFeatureFlags, textSetting } from './site-settings';
 import MemberHome from './member-home';
+import { useSiteSettings } from './site-settings-provider';
 
 export default function Page() {
-  const [settings, setSettings] = useState<PublicSiteSettings>(defaultSettings);
-  const [authReady, setAuthReady] = useState(false);
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
-
-  useEffect(() => {
-    setIsLoggedIn(Boolean(window.localStorage.getItem('member_access_token') || window.localStorage.getItem('member_refresh_token')));
-    setAuthReady(true);
-    loadPublicSiteSettings().then(setSettings).catch(() => setSettings(defaultSettings));
-  }, []);
+  const { settings, ready } = useSiteSettings();
 
   const siteName = textSetting(settings, 'website', 'site_name', 'Platform Starter');
   const description = textSetting(settings, 'website', 'site_description', 'Member platform starter');
@@ -36,8 +28,8 @@ export default function Page() {
   const icons = iconSettings(settings);
   const features = memberFeatureFlags(settings);
 
-  if (!authReady || !isLoggedIn) {
-    return <main style={{ minHeight: '100dvh', display: 'grid', placeItems: 'center', background: backgroundColor, color: textColor, padding: 16 }}>กำลังตรวจสอบสิทธิ์...</main>;
+  if (!ready) {
+    return <main style={{ minHeight: '100dvh', display: 'grid', placeItems: 'center', background: backgroundColor, color: textColor, padding: 16 }}>กำลังโหลดการตั้งค่า...</main>;
   }
 
   if (maintenanceEnabled) {
