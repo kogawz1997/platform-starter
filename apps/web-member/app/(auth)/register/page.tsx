@@ -26,6 +26,7 @@ export default function MemberRegisterPage() {
   }, []);
 
   const siteName = textSetting(settings, 'website', 'site_name', 'Platform Starter');
+  const description = textSetting(settings, 'website', 'site_description', 'สมัครครั้งเดียว แล้วจัดการทุกอย่างจากมือถือหรือคอมพิวเตอร์ได้ทันที');
   const primaryColor = textSetting(settings, 'branding', 'primary_color', '#f5c542');
   const backgroundColor = textSetting(settings, 'branding', 'background_color', '#080808');
   const cardColor = textSetting(settings, 'branding', 'card_color', '#181818');
@@ -35,6 +36,7 @@ export default function MemberRegisterPage() {
   const flags = memberFeatureFlags(settings);
   const maintenanceEnabled = Boolean(settings.maintenance?.enabled || settings.maintenance?.member_enabled || settings.website?.maintenance_mode);
   const disabled = !flags.registration || maintenanceEnabled || loading;
+  const cssVars = { '--color-brand': primaryColor, '--color-bg': backgroundColor, '--color-card': cardColor, '--color-text': textColor } as React.CSSProperties;
 
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -49,23 +51,29 @@ export default function MemberRegisterPage() {
     window.localStorage.setItem('member_access_token', data.accessToken);
     window.localStorage.setItem('member_refresh_token', data.refreshToken);
     if (cleanRef) await linkReferralAfterRegister(cleanRef, data.accessToken);
-    setStatus('success'); setMessage(cleanRef ? 'สมัครสมาชิกสำเร็จและบันทึกรหัสแนะนำแล้ว กำลังพาไปหน้าแรก...' : 'สมัครสมาชิกสำเร็จ กำลังพาไปหน้าแรก...');
+    setStatus('success'); setMessage(cleanRef ? 'สมัครสมาชิกสำเร็จและบันทึกรหัสแนะนำแล้ว' : 'สมัครสมาชิกสำเร็จ');
     window.location.replace('/');
   }
 
-  return <main style={{ ...pageStyle, background: backgroundColor, color: textColor }}>
-    <section style={shellStyle}>
-      <form onSubmit={onSubmit} style={{ ...cardStyle, background: cardColor }}>
-        <div style={logoOnlyRowStyle}><div style={{ ...logoStyle, background: primaryColor, color: '#111' }}>{logoUrl ? <img src={logoUrl} alt="" style={logoImageStyle} /> : brandMark}</div></div>
-        {(maintenanceEnabled || !flags.registration) && <div style={alertStyle('error')}>{maintenanceEnabled ? 'ระบบกำลังปรับปรุง' : 'ขณะนี้ปิดรับสมัครสมาชิก'}</div>}
-        <label style={labelStyle}>Username<input value={username} onChange={(e) => setUsername(e.target.value)} placeholder="ตั้งชื่อผู้ใช้" disabled={disabled} autoComplete="username" style={inputStyle} /></label>
-        <label style={labelStyle}>Phone<input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="เบอร์โทรศัพท์" disabled={disabled} autoComplete="tel" inputMode="tel" style={inputStyle} /></label>
-        <label style={labelStyle}>Email <span style={{ opacity: 0.6, fontWeight: 500 }}>(ไม่บังคับ)</span><input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="อีเมล" disabled={disabled} autoComplete="email" type="email" style={inputStyle} /></label>
-        <label style={labelStyle}>Referral code <span style={{ opacity: 0.6, fontWeight: 500 }}>(ไม่บังคับ)</span><input value={referralCode} onChange={(e) => { const value = normalizeReferralCode(e.target.value); setReferralCode(value); if (value) window.localStorage.setItem(REFERRAL_CODE_KEY, value); }} placeholder="รหัสแนะนำ" disabled={disabled} autoComplete="off" style={inputStyle} /></label>
-        <label style={labelStyle}>Password<div style={passwordWrapStyle}><input value={secret} onChange={(e) => setSecret(e.target.value)} placeholder="ตั้ง Password" type={showSecret ? 'text' : 'password'} disabled={disabled} autoComplete="new-password" style={{ ...inputStyle, paddingRight: 58 }} /><button type="button" onClick={() => setShowSecret((v) => !v)} style={eyeButtonStyle} disabled={disabled} aria-label={showSecret ? 'Hide password' : 'Show password'} title={showSecret ? 'Hide password' : 'Show password'}>{showSecret ? '🙈' : '👁️'}</button></div></label>
-        <button type="submit" disabled={disabled} style={{ ...submitStyle, background: primaryColor, color: '#111', opacity: disabled ? .58 : 1 }}>{loading ? 'กำลังสมัคร...' : 'สมัครสมาชิก'}</button>
-        {message && <div style={alertStyle(status)}>{message}</div>}
-        {flags.login && <p style={footerTextStyle}>มีบัญชีแล้ว? <a href="/login" style={{ color: primaryColor, fontWeight: 900 }}>เข้าสู่ระบบ</a></p>}
+  return <main className="public-auth-page" style={cssVars}>
+    <section className="public-auth-shell">
+      <aside className="public-auth-brand">
+        <div className="public-auth-brand__mark">{logoUrl ? <img src={logoUrl} alt="" /> : brandMark}</div>
+        <h1>{siteName}</h1>
+        <p>{description}</p>
+      </aside>
+      <form className="public-auth-card" onSubmit={onSubmit}>
+        <div className="public-auth-card__logo"><span>{logoUrl ? <img src={logoUrl} alt="" /> : brandMark}</span></div>
+        <div className="public-auth-heading"><h2>สมัครสมาชิก</h2><p>กรอกข้อมูลหลักให้ครบ แล้วเริ่มใช้งานได้ทันที</p></div>
+        {(maintenanceEnabled || !flags.registration) && <div className="public-auth-alert public-auth-alert--error">{maintenanceEnabled ? 'ระบบกำลังปรับปรุง' : 'ขณะนี้ปิดรับสมัครสมาชิก'}</div>}
+        <label className="public-auth-field">ชื่อผู้ใช้<input className="public-auth-input" value={username} onChange={(e) => setUsername(e.target.value)} placeholder="ตั้งชื่อผู้ใช้" disabled={disabled} autoComplete="username" /></label>
+        <label className="public-auth-field">เบอร์โทรศัพท์<input className="public-auth-input" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="เบอร์โทรศัพท์" disabled={disabled} autoComplete="tel" inputMode="tel" /></label>
+        <label className="public-auth-field">อีเมล <small>(ไม่บังคับ)</small><input className="public-auth-input" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="อีเมล" disabled={disabled} autoComplete="email" type="email" /></label>
+        <label className="public-auth-field">รหัสแนะนำ <small>(ไม่บังคับ)</small><input className="public-auth-input" value={referralCode} onChange={(e) => { const value = normalizeReferralCode(e.target.value); setReferralCode(value); if (value) window.localStorage.setItem(REFERRAL_CODE_KEY, value); }} placeholder="รหัสแนะนำ" disabled={disabled} autoComplete="off" /></label>
+        <label className="public-auth-field">รหัสผ่าน<div className="public-auth-input-wrap"><input className="public-auth-input" value={secret} onChange={(e) => setSecret(e.target.value)} placeholder="ตั้งรหัสผ่าน" type={showSecret ? 'text' : 'password'} disabled={disabled} autoComplete="new-password" style={{ paddingRight: 58 }} /><button type="button" onClick={() => setShowSecret((value) => !value)} className="public-auth-eye" disabled={disabled} aria-label={showSecret ? 'ซ่อนรหัสผ่าน' : 'แสดงรหัสผ่าน'}>{showSecret ? '🙈' : '👁️'}</button></div></label>
+        <button type="submit" disabled={disabled} className="public-auth-submit">{loading ? 'กำลังสมัคร...' : 'สมัครสมาชิก'}</button>
+        {message && <div className={`public-auth-alert public-auth-alert--${status === 'error' ? 'error' : status === 'success' ? 'success' : 'info'}`}>{message}</div>}
+        {flags.login && <p className="public-auth-footer">มีบัญชีแล้ว? <a href="/login">เข้าสู่ระบบ</a></p>}
       </form>
     </section>
   </main>;
@@ -77,17 +85,7 @@ async function linkReferralAfterRegister(referralCode: string, token?: string) {
   const res = await fetch(`${API_URL}/member/affiliate/link`, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${accessToken}` }, body: JSON.stringify({ referralCode }) });
   if (res.ok) window.localStorage.removeItem(REFERRAL_CODE_KEY);
 }
-function normalizeReferralCode(value: string) { return String(value ?? '').trim().toUpperCase().replace(/[^A-Z0-9_-]+/g, '').slice(0, 24); }
-const pageStyle = { minHeight: '100dvh', padding: 16, display: 'grid', placeItems: 'center' } as const;
-const shellStyle = { width: '100%', maxWidth: 460, margin: '0 auto', display: 'grid', placeItems: 'center' } as const;
-const cardStyle = { width: '100%', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 28, padding: 24, display: 'grid', gap: 14, boxShadow: '0 28px 90px rgba(0,0,0,0.34)', boxSizing: 'border-box' } as const;
-const logoOnlyRowStyle = { display: 'flex', justifyContent: 'center', marginBottom: 4 } as const;
-const logoStyle = { width: 52, height: 52, borderRadius: 18, display: 'grid', placeItems: 'center', fontWeight: 900, fontSize: 22, flex: '0 0 52px', overflow: 'hidden' as const };
-const logoImageStyle = { width: '100%', height: '100%', objectFit: 'cover' as const, display: 'block' };
-const labelStyle = { display: 'grid', gap: 8, fontWeight: 800 } as const;
-const inputStyle = { width: '100%', padding: '13px 14px', borderRadius: 14, border: '1px solid rgba(255,255,255,0.18)', background: 'rgba(255,255,255,0.08)', color: 'inherit', boxSizing: 'border-box', outline: 'none' } as const;
-const passwordWrapStyle = { position: 'relative' } as const;
-const eyeButtonStyle = { position: 'absolute', right: 8, top: 7, width: 38, height: 34, borderRadius: 12, border: '1px solid rgba(255,255,255,.14)', background: 'rgba(255,255,255,.10)', color: 'inherit', cursor: 'pointer', display: 'grid', placeItems: 'center', fontSize: 16 } as const;
-const submitStyle = { border: 0, borderRadius: 14, padding: '14px 16px', fontWeight: 900, cursor: 'pointer' } as const;
-const footerTextStyle = { textAlign: 'center' as const, margin: 0, color: 'rgba(255,255,255,.72)' };
-function alertStyle(status: 'idle' | 'success' | 'error' | 'info') { return { border: '1px solid rgba(255,255,255,0.14)', borderRadius: 14, padding: 12, background: status === 'error' ? 'rgba(255,80,80,0.14)' : status === 'success' ? 'rgba(80,255,140,0.14)' : 'rgba(255,255,255,0.08)' } as const; }
+
+function normalizeReferralCode(value: string) {
+  return String(value ?? '').trim().toUpperCase().replace(/[^A-Z0-9_-]+/g, '').slice(0, 24);
+}
