@@ -2,11 +2,12 @@
 
 import { ReactNode, useEffect, useMemo, useState } from 'react';
 import { usePathname } from 'next/navigation';
-import { API_URL, clearMemberSession, memberApiFetch, refreshMemberToken } from './member-api';
+import { memberApiFetch } from './member-api';
 import { defaultIconSettings, iconSettings, isIconUrl, memberFeatureFlags, textSetting } from './site-settings';
 import { activeNavigationHref, navigationFor } from './member-navigation';
 import MemberFooter from './member-footer';
 import { useSiteSettings } from './site-settings-provider';
+import { useMemberSession } from './member-session-provider';
 
 type MoneyRequest = { status: string };
 type DisabledRoute = { prefix: string; feature: keyof ReturnType<typeof memberFeatureFlags>; label: string };
@@ -28,11 +29,10 @@ const publicPrefixes = ['/login', '/register', '/contact', '/legal'];
 
 export default function MemberChrome({ children }: { children: ReactNode }) {
   const pathname = usePathname();
-  const [ready, setReady] = useState(false);
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [pendingCount, setPendingCount] = useState(0);
   const { settings } = useSiteSettings();
+  const { ready, isLoggedIn, logout } = useMemberSession();
 
   const icons = iconSettings(settings);
   const features = memberFeatureFlags(settings);
@@ -48,29 +48,16 @@ export default function MemberChrome({ children }: { children: ReactNode }) {
   const visibleDrawer = navigationFor('drawer', features);
 
   useEffect(() => {
-    let cancelled = false;
-    async function checkAuth() {
-      if (isPublicRoute) {
-        const ok = await verifyMemberSession();
-        if (cancelled) return;
-        setIsLoggedIn(ok);
-        setReady(true);
-        if ((pathname.startsWith('/login') || pathname.startsWith('/register')) && ok) window.location.replace('/');
-        return;
-      }
-      const ok = await verifyMemberSession();
-      if (cancelled) return;
-      setIsLoggedIn(ok);
-      setReady(true);
-      if (!ok) {
-        const next = encodeURIComponent(`${pathname}${window.location.search}`);
-        window.location.replace(`/login?next=${next}`);
-      }
+    if (!ready) return;
+    if ((pathname.startsWith('/login') || pathname.startsWith('/register')) && isLoggedIn) {
+      window.location.replace('/');
+      return;
     }
-    setReady(false);
-    checkAuth();
-    return () => { cancelled = true; };
-  }, [pathname, isPublicRoute]);
+    if (!isPublicRoute && !isLoggedIn) {
+      const next = encodeURIComponent(`${pathname}${window.location.search}`);
+      window.location.replace(`/login?next=${next}`);
+    }
+  }, [ready, isLoggedIn, isPublicRoute, pathname]);
 
   useEffect(() => {
     if (!isLoggedIn || isPublicRoute) return;
@@ -79,13 +66,15 @@ export default function MemberChrome({ children }: { children: ReactNode }) {
       const responses = await Promise.all([memberApiFetch('/member/topups'), memberApiFetch('/member/withdrawals')]).catch(() => [] as Response[]);
       const [topupRes, withdrawalRes] = responses;
       if (!topupRes || !withdrawalRes || cancelled) return;
-      const topupData = await topupRes.json().catch(() => null);
-      const withdrawalData = await withdrawalRes.json().catch(() => null);
+      const [topupData, withdrawalData] = await Promise.all([
+        topupRes.json().catch(() => null),
+        withdrawalRes.json().catch(() => null),
+      ]);
       const topups = Array.isArray(topupData?.items) ? topupData.items as MoneyRequest[] : [];
       const withdrawals = Array.isArray(withdrawalData?.items) ? withdrawalData.items as MoneyRequest[] : [];
       setPendingCount([...topups, ...withdrawals].filter((item) => item.status === 'PENDING').length);
     }
-    loadPendingCount();
+    void loadPendingCount();
     return () => { cancelled = true; };
   }, [isLoggedIn, isPublicRoute]);
 
@@ -100,11 +89,6 @@ export default function MemberChrome({ children }: { children: ReactNode }) {
       document.documentElement.style.overflow = htmlOverflow;
     };
   }, [menuOpen]);
-
-  function logout() {
-    clearMemberSession();
-    window.location.href = '/login';
-  }
 
   if (isPublicRoute) return <>{children}</>;
   if (!ready || !isLoggedIn) return <main style={loadingPageStyle}>กำลังโหลด...</main>;
@@ -153,22 +137,6 @@ function FeatureDisabled({ label, siteName, primaryColor }: { label: string; sit
 
 function IconValue({ value }: { value: string }) {
   return isIconUrl(value) ? <img src={value} alt="" style={iconImageStyle} /> : <>{value}</>;
-}
-
-async function verifyMemberSession() {
-  const token = window.localStorage.getItem('member_access_token');
-  if (!token && !window.localStorage.getItem('member_refresh_token')) return false;
-  if (token) {
-    const res = await fetch(`${API_URL}/member/wallet`, { headers: { Authorization: `Bearer ${token}` } });
-    if (res.ok) return true;
-    if (res.status !== 401) return false;
-  }
-  const refreshed = await refreshMemberToken();
-  if (!refreshed) { clearMemberSession(); return false; }
-  const retry = await fetch(`${API_URL}/member/wallet`, { headers: { Authorization: `Bearer ${refreshed}` } });
-  if (retry.ok) return true;
-  clearMemberSession();
-  return false;
 }
 
 const loadingPageStyle = { minHeight: '100dvh', display: 'grid', placeItems: 'center', background: '#080808', color: '#fff', padding: 16 } as const;
