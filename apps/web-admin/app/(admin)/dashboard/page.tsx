@@ -43,47 +43,53 @@ export default function OperationDashboardPage() {
   const pendingTotal = summary ? summary.totals.pendingTopUps + summary.totals.pendingWithdrawals : 0;
 
   return (
-    <AdminPage eyebrow="Operation Center" title="Dashboard" description="ศูนย์รวมคิวการเงิน ความเสี่ยง และรายการล่าสุด" actions={<AdminButton onClick={loadSummary}>Refresh</AdminButton>}>
-      {message && <AdminNotice>{message}</AdminNotice>}
-      {summary && <AdminMetricGrid>
-        <AdminMetric title="Pending queues" value={String(pendingTotal)} helper={`${summary.totals.pendingTopUps} topups · ${summary.totals.pendingWithdrawals} withdrawals`} />
-        <AdminMetric title="Available" value={formatMoney(summary.totals.totalAvailableBalance)} helper="ยอดที่สมาชิกใช้ได้รวม" />
-        <AdminMetric title="Locked" value={formatMoney(summary.totals.totalLockedBalance)} helper="ยอดถูกล็อกระหว่างรอดำเนินการ" />
-        <AdminMetric title="Wallets" value={summary.totals.walletCount.toLocaleString('th-TH')} helper="จำนวน wallet ทั้งหมด" />
-        <AdminMetric title="Risk Alerts" value={`${riskSummary.openCount}`} helper={`${riskSummary.criticalCount} high/critical`} />
-      </AdminMetricGrid>}
+    <div className="admin-dashboard">
+      <AdminPage eyebrow="Operation Center" title="Dashboard" description="ศูนย์รวมคิวการเงิน ความเสี่ยง และรายการล่าสุด" actions={<AdminButton onClick={loadSummary}>รีเฟรชข้อมูล</AdminButton>}>
+        {message && <AdminNotice>{message}</AdminNotice>}
 
-      {summary?.today && <AdminCard title="Today Volume" description={`UTC date ${summary.today.date}`} action={<AdminLinkButton href="/reports">Reports</AdminLinkButton>}>
-        <AdminMetricGrid>
-          <AdminMetric title="Top-up today" value={formatMoney(summary.today.topUpAmount)} helper={`${summary.today.topUpCount} approved`} />
-          <AdminMetric title="Withdrawal today" value={formatMoney(summary.today.withdrawalAmount)} helper={`${summary.today.withdrawalCount} completed`} />
-          <AdminMetric title="Net flow" value={formatMoney(summary.today.netFlow)} helper="topup - withdrawal" />
-        </AdminMetricGrid>
-      </AdminCard>}
+        {summary && <div className="admin-dashboard__metrics"><AdminMetricGrid>
+          <AdminMetric title="Pending queues" value={String(pendingTotal)} helper={`${summary.totals.pendingTopUps} ฝาก · ${summary.totals.pendingWithdrawals} ถอน`} />
+          <AdminMetric title="Available" value={formatMoney(summary.totals.totalAvailableBalance)} helper="ยอดที่สมาชิกใช้ได้รวม" />
+          <AdminMetric title="Locked" value={formatMoney(summary.totals.totalLockedBalance)} helper="ยอดถูกล็อกระหว่างรอดำเนินการ" />
+          <AdminMetric title="Wallets" value={summary.totals.walletCount.toLocaleString('th-TH')} helper="จำนวนบัญชีทั้งหมด" />
+          <AdminMetric title="Risk Alerts" value={`${riskSummary.openCount}`} helper={`${riskSummary.criticalCount} ระดับสูง/วิกฤต`} />
+        </AdminMetricGrid></div>}
 
-      <AdminGrid>
-        <QuickCard title="Top-up Review" href="/topups" count={summary?.totals.pendingTopUps ?? 0} tone="warning" />
-        <QuickCard title="Withdrawal Review" href="/withdrawals" count={summary?.totals.pendingWithdrawals ?? 0} tone="danger" />
-        <QuickCard title="Risk Alerts" href="/risk-alerts" count={riskSummary.openCount} tone="danger" />
-        <QuickCard title="Finance Summary" href="/finance" count={summary?.totals.walletCount ?? 0} tone="neutral" />
-      </AdminGrid>
+        <div className="admin-dashboard__quick">
+          <QuickCard title="ตรวจสอบรายการฝาก" href="/topups" count={summary?.totals.pendingTopUps ?? 0} tone="warning" />
+          <QuickCard title="ตรวจสอบรายการถอน" href="/withdrawals" count={summary?.totals.pendingWithdrawals ?? 0} tone="danger" />
+          <QuickCard title="ความเสี่ยง" href="/risk-alerts" count={riskSummary.openCount} tone="danger" />
+          <QuickCard title="ภาพรวมการเงิน" href="/finance" count={summary?.totals.walletCount ?? 0} tone="neutral" />
+        </div>
 
-      <AdminCard title="Risk Alerts" description={`${riskSummary.openCount} open · ${riskSummary.criticalCount} high/critical`} action={<AdminLinkButton href="/risk-alerts">Risk queue</AdminLinkButton>}>
-        <AdminStack>{riskItems.slice(0, 8).map((item) => <AdminRow key={item.id}><div><div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}><AdminBadge tone={riskTone(item.severity)}>{item.severity}</AdminBadge><AdminBadge>{item.type}</AdminBadge></div><strong>{item.title}</strong><p>{new Date(item.createdAt).toLocaleString('th-TH')}</p></div><div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'flex-end' }}>{item.memberId && <AdminLinkButton href={`/members/${item.memberId}`}>Member</AdminLinkButton>}<AdminLinkButton href={`/risk-alerts/${item.id}`}>Detail</AdminLinkButton></div></AdminRow>)}{riskItems.length === 0 && <AdminEmpty>ยังไม่พบ alert สำคัญ</AdminEmpty>}</AdminStack>
-      </AdminCard>
+        {summary?.today && <AdminCard title="ปริมาณวันนี้" description={`วันที่ ${summary.today.date}`} action={<AdminLinkButton href="/reports">ดูรายงาน</AdminLinkButton>}>
+          <AdminMetricGrid>
+            <AdminMetric title="ยอดฝากวันนี้" value={formatMoney(summary.today.topUpAmount)} helper={`${summary.today.topUpCount} รายการอนุมัติ`} />
+            <AdminMetric title="ยอดถอนวันนี้" value={formatMoney(summary.today.withdrawalAmount)} helper={`${summary.today.withdrawalCount} รายการสำเร็จ`} />
+            <AdminMetric title="Net flow" value={formatMoney(summary.today.netFlow)} helper="ยอดฝาก - ยอดถอน" />
+          </AdminMetricGrid>
+        </AdminCard>}
 
-      {summary && <AdminGrid><QueueCard title="Top-up Queue" href="/topups" count={summary.totals.pendingTopUps} items={summary.queues.topUps} /><QueueCard title="Withdrawal Queue" href="/withdrawals" count={summary.totals.pendingWithdrawals} items={summary.queues.withdrawals} /></AdminGrid>}
-      {summary && <AdminCard title="Recent Ledger" description={`Generated ${new Date(summary.generatedAt).toLocaleString('th-TH')}`} action={<AdminLinkButton href="/ledgers">ดูทั้งหมด</AdminLinkButton>}><AdminStack>{summary.recentLedgers.map((item) => <AdminRow key={item.id}><div><strong>{item.type} / {item.direction}</strong><p>{item.user?.username ?? item.user?.shortId ?? '-'}</p></div><div style={{ textAlign: 'right' }}><strong>{formatMoney(item.amount)}</strong><p>{new Date(item.createdAt).toLocaleString('th-TH')}</p></div></AdminRow>)}</AdminStack></AdminCard>}
-    </AdminPage>
+        <div className="admin-dashboard__sections">
+          <AdminCard title="Risk Alerts" description={`${riskSummary.openCount} เปิดอยู่ · ${riskSummary.criticalCount} ระดับสูง/วิกฤต`} action={<AdminLinkButton href="/risk-alerts">เปิดคิวความเสี่ยง</AdminLinkButton>}>
+            <AdminStack>{riskItems.slice(0, 8).map((item) => <AdminRow key={item.id}><div><div className="admin-dashboard__badge-row"><AdminBadge tone={riskTone(item.severity)}>{item.severity}</AdminBadge><AdminBadge>{item.type}</AdminBadge></div><strong>{item.title}</strong><p>{new Date(item.createdAt).toLocaleString('th-TH')}</p></div><div className="admin-dashboard__actions">{item.memberId && <AdminLinkButton href={`/members/${item.memberId}`}>สมาชิก</AdminLinkButton>}<AdminLinkButton href={`/risk-alerts/${item.id}`}>รายละเอียด</AdminLinkButton></div></AdminRow>)}{riskItems.length === 0 && <AdminEmpty>ยังไม่พบ alert สำคัญ</AdminEmpty>}</AdminStack>
+          </AdminCard>
+
+          {summary && <AdminCard title="Recent Ledger" description={`อัปเดต ${new Date(summary.generatedAt).toLocaleString('th-TH')}`} action={<AdminLinkButton href="/ledgers">ดูทั้งหมด</AdminLinkButton>}><AdminStack>{summary.recentLedgers.map((item) => <AdminRow key={item.id}><div><strong>{item.type} / {item.direction}</strong><p>{item.user?.username ?? item.user?.shortId ?? '-'}</p></div><div className="admin-dashboard__money"><strong>{formatMoney(item.amount)}</strong><p>{new Date(item.createdAt).toLocaleString('th-TH')}</p></div></AdminRow>)}</AdminStack></AdminCard>}
+        </div>
+
+        {summary && <AdminGrid><QueueCard title="คิวฝาก" href="/topups" count={summary.totals.pendingTopUps} items={summary.queues.topUps} /><QueueCard title="คิวถอน" href="/withdrawals" count={summary.totals.pendingWithdrawals} items={summary.queues.withdrawals} /></AdminGrid>}
+      </AdminPage>
+    </div>
   );
 }
 
 function QuickCard({ title, href, count, tone }: { title: string; href: string; count: number; tone: 'neutral' | 'warning' | 'danger' }) {
-  return <AdminCard><div style={{ display: 'grid', gap: 12 }}><AdminBadge tone={tone}>{count > 0 ? 'Needs action' : 'Clear'}</AdminBadge><h2 style={{ margin: 0 }}>{title}</h2><strong style={{ fontSize: 34, lineHeight: 1 }}>{count.toLocaleString('th-TH')}</strong><AdminLinkButton href={href}>Open</AdminLinkButton></div></AdminCard>;
+  return <AdminCard><div className="admin-dashboard__quick-card"><AdminBadge tone={tone}>{count > 0 ? 'ต้องดำเนินการ' : 'เรียบร้อย'}</AdminBadge><h2>{title}</h2><strong className="admin-dashboard__quick-value">{count.toLocaleString('th-TH')}</strong><AdminLinkButton href={href}>เปิดดู</AdminLinkButton></div></AdminCard>;
 }
 
 function QueueCard({ title, href, count, items }: { title: string; href: string; count: number; items: QueueItem[] }) {
-  return <AdminCard title={title} description={`${count} pending`} action={<AdminLinkButton href={href}>เปิดคิว</AdminLinkButton>}><AdminStack>{items.slice(0, 5).map((item) => <AdminRow key={item.id}><div><strong>{item.user?.username ?? item.shortUserId}</strong><p>{item.method ?? '-'} · {new Date(item.createdAt).toLocaleString('th-TH')}</p></div><strong>{formatMoney(item.amount)}</strong></AdminRow>)}{items.length === 0 && <AdminEmpty>ไม่มีรายการรอตรวจ</AdminEmpty>}</AdminStack></AdminCard>;
+  return <AdminCard title={title} description={`${count} รายการรอตรวจ`} action={<AdminLinkButton href={href}>เปิดคิว</AdminLinkButton>}><AdminStack>{items.slice(0, 5).map((item) => <AdminRow key={item.id}><div><strong>{item.user?.username ?? item.shortUserId}</strong><p>{item.method ?? '-'} · {new Date(item.createdAt).toLocaleString('th-TH')}</p></div><strong>{formatMoney(item.amount)}</strong></AdminRow>)}{items.length === 0 && <AdminEmpty>ไม่มีรายการรอตรวจ</AdminEmpty>}</AdminStack></AdminCard>;
 }
 
 function riskTone(severity: RiskAlert['severity']) {
