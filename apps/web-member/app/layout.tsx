@@ -1,5 +1,6 @@
 import type { Viewport } from 'next';
 import './design-tokens.css';
+import './member-ui.css';
 import './globals.css';
 import MemberChrome from './member-chrome';
 import { MemberSessionProvider } from './member-session-provider';
@@ -31,10 +32,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           @media (min-width: 761px) {
             .member-shell { padding-bottom: 28px !important; }
           }
-          main[style*="place-items"] { width: 100% !important; min-height: 100dvh !important; padding: 16px !important; box-sizing: border-box !important; display: grid !important; place-items: center !important; overflow-x: hidden !important; }
-          main[style*="place-items"] > section { width: 100% !important; max-width: 520px !important; margin: 0 auto !important; display: grid !important; grid-template-columns: 1fr !important; gap: 16px !important; }
-          main[style*="place-items"] form { max-width: 100% !important; box-sizing: border-box !important; }
-          main[style*="place-items"] h1 { font-size: clamp(28px, 8vw, 38px) !important; line-height: 1 !important; }
         `}</style>
         <SiteSettingsProvider>
           <MemberSessionProvider>
