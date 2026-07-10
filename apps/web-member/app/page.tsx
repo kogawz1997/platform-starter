@@ -45,8 +45,35 @@ export default function Page() {
   }
 
   return (
-    <main data-animation-level={animationLevel} style={{ minHeight: '100vh', background: backgroundColor, color: textColor, overflowX: 'hidden' }}>
-      <MemberHome siteName={siteName} description={description} primaryColor={primaryColor} cardColor={cardColor} textColor={textColor} showBalanceHeader={showBalanceHeader} showButtons={showButtons} showPromotion={showPromotion} showCategories={showCategories} showProviders={showProviders} showRecommended={showRecommended} cmsContent={cmsContent} icons={icons} features={features} />
-    </main>
+    <>
+      <style>{`
+        main[data-animation-level='off'] *,
+        main[data-animation-level='off'] *::before,
+        main[data-animation-level='off'] *::after {
+          animation: none !important;
+          transition: none !important;
+          scroll-behavior: auto !important;
+        }
+        main[data-animation-level='subtle'] .member-status-pill,
+        main[data-animation-level='subtle'] .member-market-badge,
+        main[data-animation-level='subtle'] .member-quick-action em,
+        main[data-animation-level='subtle'] span[style*='position: absolute'] {
+          animation: none !important;
+        }
+        main[data-animation-level='lively'] .member-quick-action:hover,
+        main[data-animation-level='lively'] .member-info-card:hover,
+        main[data-animation-level='lively'] article[style*='border']:hover {
+          transform: translateY(-3px) scale(1.01);
+          box-shadow: 0 22px 70px rgba(0,0,0,.34);
+        }
+        main[data-animation-level='lively'] .member-promo-strip,
+        main[data-animation-level='lively'] article[style*='border'] {
+          animation-duration: .48s !important;
+        }
+      `}</style>
+      <main data-animation-level={animationLevel} style={{ minHeight: '100vh', background: backgroundColor, color: textColor, overflowX: 'hidden' }}>
+        <MemberHome siteName={siteName} description={description} primaryColor={primaryColor} cardColor={cardColor} textColor={textColor} showBalanceHeader={showBalanceHeader} showButtons={showButtons} showPromotion={showPromotion} showCategories={showCategories} showProviders={showProviders} showRecommended={showRecommended} cmsContent={cmsContent} icons={icons} features={features} />
+      </main>
+    </>
   );
 }
