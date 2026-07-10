@@ -1,7 +1,7 @@
 'use client';
 
 import { FormEvent, useEffect, useState } from 'react';
-import { API_URL, PublicSiteSettings, defaultSettings, textSetting } from '../../site-settings';
+import { PublicSiteSettings, defaultSettings, loadPublicSiteSettings, memberFeatureFlags, textSetting } from '../../site-settings';
 
 export default function MemberSignInPage() {
   const [settings, setSettings] = useState<PublicSiteSettings>(defaultSettings);
@@ -14,7 +14,7 @@ export default function MemberSignInPage() {
 
   useEffect(() => {
     if (window.localStorage.getItem('member_access_token') || window.localStorage.getItem('member_refresh_token')) { window.location.replace('/'); return; }
-    fetch(`${API_URL}/public/site-settings`).then((res) => res.json()).then((data) => setSettings({ ...defaultSettings, ...data })).catch(() => setSettings(defaultSettings));
+    loadPublicSiteSettings().then(setSettings).catch(() => setSettings(defaultSettings));
   }, []);
 
   const siteName = textSetting(settings, 'website', 'site_name', 'Member Center');
@@ -22,12 +22,17 @@ export default function MemberSignInPage() {
   const backgroundColor = textSetting(settings, 'branding', 'background_color', '#080808');
   const cardColor = textSetting(settings, 'branding', 'card_color', '#181818');
   const textColor = textSetting(settings, 'branding', 'text_color', '#ffffff');
+  const logoUrl = textSetting(settings, 'branding', 'logo_url', '');
+  const brandMark = textSetting(settings, 'branding', 'brand_mark', siteName.slice(0, 1).toUpperCase() || 'P');
+  const flags = memberFeatureFlags(settings);
+  const disabled = loading || !flags.login;
 
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (!flags.login) { setStatus('error'); setMessage('ขณะนี้ปิดการเข้าสู่ระบบชั่วคราว'); return; }
     if (!identifier.trim() || !secret.trim()) { setStatus('error'); setMessage('กรอกข้อมูลให้ครบ'); return; }
     setLoading(true); setStatus('info'); setMessage('กำลังเข้าสู่ระบบ...');
-    const res = await fetch(`${API_URL}/member/auth/login`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ identifier: identifier.trim(), secret, deviceId: 'web-member' }) });
+    const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000'}/member/auth/login`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ identifier: identifier.trim(), secret, deviceId: 'web-member' }) });
     const data = await res.json().catch(() => null); setLoading(false);
     if (!res.ok) { setStatus('error'); setMessage(data?.message ?? 'เข้าสู่ระบบไม่สำเร็จ'); return; }
     window.localStorage.setItem('member_access_token', data.accessToken);
@@ -39,12 +44,13 @@ export default function MemberSignInPage() {
   return <main style={{ ...pageStyle, background: backgroundColor, color: textColor }}>
     <section style={shellStyle}>
       <form onSubmit={onSubmit} style={{ ...cardStyle, background: cardColor }}>
-        <div style={logoOnlyRowStyle}><div style={{ ...logoStyle, background: primaryColor, color: '#111' }}>{siteName.slice(0, 1).toUpperCase()}</div></div>
-        <label style={labelStyle}>Username / Phone / Email<input value={identifier} onChange={(e) => setIdentifier(e.target.value)} disabled={loading} autoComplete="username" placeholder="กรอกชื่อผู้ใช้ เบอร์ หรืออีเมล" style={inputStyle} /></label>
-        <label style={labelStyle}>Password<div style={passwordWrapStyle}><input value={secret} onChange={(e) => setSecret(e.target.value)} type={showSecret ? 'text' : 'password'} disabled={loading} autoComplete="current-password" placeholder="กรอกรหัสผ่าน" style={{ ...inputStyle, paddingRight: 58 }} /><button type="button" onClick={() => setShowSecret((v) => !v)} style={eyeButtonStyle} disabled={loading} aria-label={showSecret ? 'ซ่อนรหัสผ่าน' : 'แสดงรหัสผ่าน'} title={showSecret ? 'ซ่อนรหัสผ่าน' : 'แสดงรหัสผ่าน'}>{showSecret ? '🙈' : '👁️'}</button></div></label>
-        <button type="submit" disabled={loading} style={{ ...submitStyle, background: primaryColor, color: '#111' }}>{loading ? 'กำลังเข้าสู่ระบบ...' : 'เข้าสู่ระบบ'}</button>
+        <div style={logoOnlyRowStyle}><div style={{ ...logoStyle, background: primaryColor, color: '#111' }}>{logoUrl ? <img src={logoUrl} alt="" style={logoImageStyle} /> : brandMark}</div></div>
+        {!flags.login && <div style={alertStyle('error')}>ขณะนี้ปิดการเข้าสู่ระบบชั่วคราว</div>}
+        <label style={labelStyle}>Username / Phone / Email<input value={identifier} onChange={(e) => setIdentifier(e.target.value)} disabled={disabled} autoComplete="username" placeholder="กรอกชื่อผู้ใช้ เบอร์ หรืออีเมล" style={inputStyle} /></label>
+        <label style={labelStyle}>Password<div style={passwordWrapStyle}><input value={secret} onChange={(e) => setSecret(e.target.value)} type={showSecret ? 'text' : 'password'} disabled={disabled} autoComplete="current-password" placeholder="กรอกรหัสผ่าน" style={{ ...inputStyle, paddingRight: 58 }} /><button type="button" onClick={() => setShowSecret((v) => !v)} style={eyeButtonStyle} disabled={disabled} aria-label={showSecret ? 'ซ่อนรหัสผ่าน' : 'แสดงรหัสผ่าน'} title={showSecret ? 'ซ่อนรหัสผ่าน' : 'แสดงรหัสผ่าน'}>{showSecret ? '🙈' : '👁️'}</button></div></label>
+        <button type="submit" disabled={disabled} style={{ ...submitStyle, background: primaryColor, color: '#111', opacity: disabled ? .58 : 1 }}>{loading ? 'กำลังเข้าสู่ระบบ...' : 'เข้าสู่ระบบ'}</button>
         {message && <div style={alertStyle(status)}>{message}</div>}
-        <p style={footerTextStyle}>ยังไม่มีบัญชี? <a href="/register" style={{ color: primaryColor, fontWeight: 900 }}>สมัครสมาชิก</a></p>
+        {flags.registration && <p style={footerTextStyle}>ยังไม่มีบัญชี? <a href="/register" style={{ color: primaryColor, fontWeight: 900 }}>สมัครสมาชิก</a></p>}
       </form>
     </section>
   </main>;
@@ -54,7 +60,8 @@ const pageStyle = { minHeight: '100dvh', padding: 16, display: 'grid', placeItem
 const shellStyle = { width: '100%', maxWidth: 460, margin: '0 auto', display: 'grid', placeItems: 'center' } as const;
 const cardStyle = { width: '100%', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 28, padding: 24, display: 'grid', gap: 16, boxShadow: '0 28px 90px rgba(0,0,0,0.34)', boxSizing: 'border-box' } as const;
 const logoOnlyRowStyle = { display: 'flex', justifyContent: 'center', marginBottom: 4 } as const;
-const logoStyle = { width: 52, height: 52, borderRadius: 18, display: 'grid', placeItems: 'center', fontWeight: 900, fontSize: 22, flex: '0 0 52px' } as const;
+const logoStyle = { width: 52, height: 52, borderRadius: 18, display: 'grid', placeItems: 'center', fontWeight: 900, fontSize: 22, flex: '0 0 52px', overflow: 'hidden' as const };
+const logoImageStyle = { width: '100%', height: '100%', objectFit: 'cover' as const, display: 'block' };
 const labelStyle = { display: 'grid', gap: 8, fontWeight: 800 } as const;
 const inputStyle = { width: '100%', padding: '13px 14px', borderRadius: 14, border: '1px solid rgba(255,255,255,0.18)', background: 'rgba(255,255,255,0.08)', color: 'inherit', boxSizing: 'border-box', outline: 'none' } as const;
 const passwordWrapStyle = { position: 'relative' } as const;
