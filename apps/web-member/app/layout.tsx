@@ -1,6 +1,7 @@
 import type { Viewport } from 'next';
 import './globals.css';
 import MemberChrome from './member-chrome';
+import { SiteSettingsProvider } from './site-settings-provider';
 
 export const viewport: Viewport = {
   width: 'device-width',
@@ -33,7 +34,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           main[style*="place-items"] form { max-width: 100% !important; box-sizing: border-box !important; }
           main[style*="place-items"] h1 { font-size: clamp(28px, 8vw, 38px) !important; line-height: 1 !important; }
         `}</style>
-        <MemberChrome>{children}</MemberChrome>
+        <SiteSettingsProvider>
+          <MemberChrome>{children}</MemberChrome>
+        </SiteSettingsProvider>
       </body>
     </html>
   );
