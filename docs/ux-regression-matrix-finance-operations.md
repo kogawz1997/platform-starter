@@ -18,8 +18,13 @@
 - ✅ Admin withdrawal queue responsive refactor implemented and build confirmed
 - ✅ Admin members responsive refactor implemented
 - ✅ Admin wallet-ledger responsive refactor implemented
-- 🧪 Members and wallet-ledger deployed regression pending
+- ✅ Login field-level validation and error association implemented
+- ✅ Register field-level validation, backend-aligned password hints and error association implemented
+- ✅ Shared public maintenance, session-expired and legal pages implemented
+- ✅ Admin confirmation dialog focus trap, Escape close, focus return and scroll lock implemented
+- ✅ Member finance confirmation dialog focus trap, Escape close, focus return and scroll lock implemented
 - 🧪 Full six-viewport visual regression pending
+- 🧪 Deployed route and assistive-technology regression pending
 
 ## A. Deposit / Withdraw
 
@@ -34,6 +39,10 @@ Validate on mobile and desktop:
 - Desktop form width remains readable
 - Long bank names and account numbers wrap safely
 - Bonus-blocked withdrawal remains understandable
+- Tab and Shift+Tab remain inside an open confirmation dialog
+- Escape closes a non-loading dialog
+- Closing a dialog returns focus to the control that opened it
+- A loading confirmation dialog cannot be dismissed accidentally
 
 ## B. Transactions / Bank Accounts
 
@@ -58,6 +67,10 @@ Validate on mobile and desktop:
 - Withdrawal account verification and risk summary
 - Complete action only after real payout
 - Reject action returns locked balance
+- Tab and Shift+Tab remain inside an open confirmation dialog
+- Escape closes a non-loading dialog
+- Closing returns focus to the originating queue action
+- Body scroll is restored after close
 
 ## D. Admin Members / Wallet Ledgers
 
@@ -77,10 +90,14 @@ Validate on mobile and desktop:
 - Login and register at every viewport
 - Autofill and password managers
 - Visible focus states
-- Error message announced and readable
+- Error summary announced with `role=alert`
+- Field errors connected with `aria-describedby`
+- Invalid fields expose `aria-invalid=true`
 - Disabled and loading submit states
 - Password reveal has an accessible label
+- Register password hint matches backend minimum of six characters
 - Maintenance and feature-disabled states
+- `/maintenance`, `/session-expired`, `/legal` and existing `/contact` routes
 - Long Thai labels and 200% zoom
 - Reduced-motion mode
 
@@ -97,6 +114,9 @@ Validate on mobile and desktop:
 - Open members and wallet ledgers
 - Member search and status update
 - Wallet-ledger search, direction filter and detail link
+- Open and close member finance confirmation dialog with mouse and keyboard
+- Open and close admin queue confirmation dialog with mouse and keyboard
+- Open maintenance, session-expired, legal and contact routes
 - Build, lint and type-check
 - Verify deployed mobile and desktop screenshots
 
