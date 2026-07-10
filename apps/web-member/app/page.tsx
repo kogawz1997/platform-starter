@@ -1,9 +1,12 @@
 'use client';
 
+import type { CSSProperties } from 'react';
 import type { MemberFeatureFlags } from './site-settings';
 import MemberHome from './member-home';
 import { MemberCard } from './components/member-ui';
 import { useSiteSettings } from './site-settings-provider';
+
+type BrandStyle = CSSProperties & Record<`--${string}`, string>;
 
 export default function Page() {
   const { typedSettings, ready } = useSiteSettings();
@@ -26,6 +29,18 @@ export default function Page() {
 
   const maintenanceEnabled = maintenance.enabled || maintenance.member_enabled || website.maintenance_mode;
   const animationLevel = theme.animation_level ?? 'subtle';
+  const brandStyle: BrandStyle = {
+    minHeight: '100vh',
+    background: branding.background_color,
+    color: branding.text_color,
+    overflowX: 'hidden',
+    '--color-brand': branding.primary_color,
+    '--color-bg': branding.background_color,
+    '--color-card': branding.card_color,
+    '--color-text': branding.text_color,
+    '--color-success': branding.success_color,
+    '--color-danger': branding.danger_color,
+  };
 
   if (!ready) return <main className="member-loading-screen">กำลังโหลดการตั้งค่า...</main>;
 
@@ -33,21 +48,7 @@ export default function Page() {
     return <main className="member-ui-page member-maintenance"><div className="member-ui-container"><MemberCard tone="warning"><p className="member-maintenance__eyebrow">Maintenance</p><h1>{website.site_name}</h1><p>{maintenance.message}</p></MemberCard></div></main>;
   }
 
-  return <main
-    data-animation-level={animationLevel}
-    style={{
-      minHeight: '100vh',
-      background: branding.background_color,
-      color: branding.text_color,
-      overflowX: 'hidden',
-      ['--color-brand' as string]: branding.primary_color,
-      ['--color-bg' as string]: branding.background_color,
-      ['--color-card' as string]: branding.card_color,
-      ['--color-text' as string]: branding.text_color,
-      ['--color-success' as string]: branding.success_color,
-      ['--color-danger' as string]: branding.danger_color,
-    }}
-  >
+  return <main data-animation-level={animationLevel} style={brandStyle}>
     <MemberHome
       siteName={website.site_name}
       description={website.site_description}
