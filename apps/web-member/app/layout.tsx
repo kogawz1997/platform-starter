@@ -8,6 +8,7 @@ import './member-mobile.css';
 import './member-desktop.css';
 import './member-finance-responsive.css';
 import './member-finance-pages.css';
+import './member-finance-flow.css';
 import './public-auth-shell.css';
 import './public-auth-polish.css';
 import './public-mobile.css';
