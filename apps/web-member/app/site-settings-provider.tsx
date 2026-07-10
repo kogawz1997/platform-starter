@@ -2,9 +2,12 @@
 
 import { createContext, ReactNode, useContext, useEffect, useMemo, useState } from 'react';
 import { defaultSettings, loadPublicSiteSettings, PublicSiteSettings } from './site-settings';
+import type { TypedPublicSiteSettings } from './site-settings-types';
+import { normalizeTypedSiteSettings } from './typed-site-settings';
 
 type SiteSettingsContextValue = {
   settings: PublicSiteSettings;
+  typedSettings: TypedPublicSiteSettings;
   ready: boolean;
   reload: () => Promise<void>;
 };
@@ -27,7 +30,8 @@ export function SiteSettingsProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => { reload(); }, []);
 
-  const value = useMemo(() => ({ settings, ready, reload }), [settings, ready]);
+  const typedSettings = useMemo(() => normalizeTypedSiteSettings(settings), [settings]);
+  const value = useMemo(() => ({ settings, typedSettings, ready, reload }), [settings, typedSettings, ready]);
   return <SiteSettingsContext.Provider value={value}>{children}</SiteSettingsContext.Provider>;
 }
 
