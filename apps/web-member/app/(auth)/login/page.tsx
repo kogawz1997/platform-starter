@@ -3,10 +3,13 @@
 import { FormEvent, useEffect, useState } from 'react';
 import { PublicSiteSettings, defaultSettings, loadPublicSiteSettings, memberFeatureFlags, textSetting } from '../../site-settings';
 
+type LoginErrors = { identifier?: string; secret?: string };
+
 export default function MemberSignInPage() {
   const [settings, setSettings] = useState<PublicSiteSettings>(defaultSettings);
   const [identifier, setIdentifier] = useState('');
   const [secret, setSecret] = useState('');
+  const [errors, setErrors] = useState<LoginErrors>({});
   const [message, setMessage] = useState('');
   const [status, setStatus] = useState<'idle' | 'success' | 'error' | 'info'>('idle');
   const [loading, setLoading] = useState(false);
@@ -29,10 +32,18 @@ export default function MemberSignInPage() {
   const disabled = loading || !flags.login;
   const cssVars = { '--color-brand': primaryColor, '--color-bg': backgroundColor, '--color-card': cardColor, '--color-text': textColor } as React.CSSProperties;
 
+  function validate() {
+    const next: LoginErrors = {};
+    if (!identifier.trim()) next.identifier = 'กรุณากรอกชื่อผู้ใช้ เบอร์โทร หรืออีเมล';
+    if (!secret.trim()) next.secret = 'กรุณากรอกรหัสผ่าน';
+    setErrors(next);
+    return Object.keys(next).length === 0;
+  }
+
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!flags.login) { setStatus('error'); setMessage('ขณะนี้ปิดการเข้าสู่ระบบชั่วคราว'); return; }
-    if (!identifier.trim() || !secret.trim()) { setStatus('error'); setMessage('กรอกข้อมูลให้ครบ'); return; }
+    if (!validate()) { setStatus('error'); setMessage('กรุณาตรวจสอบข้อมูลที่ระบุไว้ด้านล่าง'); return; }
     setLoading(true); setStatus('info'); setMessage('กำลังเข้าสู่ระบบ...');
     const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000'}/member/auth/login`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ identifier: identifier.trim(), secret, deviceId: 'web-member' }) });
     const data = await res.json().catch(() => null); setLoading(false);
@@ -50,14 +61,17 @@ export default function MemberSignInPage() {
         <h1>{siteName}</h1>
         <p>{description}</p>
       </aside>
-      <form className="public-auth-card" onSubmit={onSubmit}>
+      <form className="public-auth-card" onSubmit={onSubmit} noValidate>
         <div className="public-auth-card__logo"><span>{logoUrl ? <img src={logoUrl} alt="" /> : brandMark}</span></div>
         <div className="public-auth-heading"><h2>เข้าสู่ระบบ</h2><p>กลับเข้าสู่ศูนย์สมาชิกของคุณ</p></div>
-        {!flags.login && <div className="public-auth-alert public-auth-alert--error">ขณะนี้ปิดการเข้าสู่ระบบชั่วคราว</div>}
-        <label className="public-auth-field">ชื่อผู้ใช้ / เบอร์โทร / อีเมล<input className="public-auth-input" value={identifier} onChange={(e) => setIdentifier(e.target.value)} disabled={disabled} autoComplete="username" placeholder="กรอกข้อมูลบัญชี" /></label>
-        <label className="public-auth-field">รหัสผ่าน<div className="public-auth-input-wrap"><input className="public-auth-input" value={secret} onChange={(e) => setSecret(e.target.value)} type={showSecret ? 'text' : 'password'} disabled={disabled} autoComplete="current-password" placeholder="กรอกรหัสผ่าน" style={{ paddingRight: 58 }} /><button type="button" onClick={() => setShowSecret((value) => !value)} className="public-auth-eye" disabled={disabled} aria-label={showSecret ? 'ซ่อนรหัสผ่าน' : 'แสดงรหัสผ่าน'}>{showSecret ? '🙈' : '👁️'}</button></div></label>
+        {!flags.login && <div className="public-auth-alert public-auth-alert--error" role="alert">ขณะนี้ปิดการเข้าสู่ระบบชั่วคราว</div>}
+        {status === 'error' && message && <div className="public-auth-alert public-auth-alert--error" role="alert" aria-live="assertive">{message}</div>}
+        <label className="public-auth-field" htmlFor="login-identifier">ชื่อผู้ใช้ / เบอร์โทร / อีเมล<input id="login-identifier" className="public-auth-input" value={identifier} onChange={(event) => { setIdentifier(event.target.value); if (errors.identifier) setErrors((current) => ({ ...current, identifier: undefined })); }} disabled={disabled} autoComplete="username" placeholder="กรอกข้อมูลบัญชี" aria-invalid={Boolean(errors.identifier)} aria-describedby={errors.identifier ? 'login-identifier-error' : undefined} /></label>
+        {errors.identifier && <span id="login-identifier-error" className="public-auth-field-error">{errors.identifier}</span>}
+        <label className="public-auth-field" htmlFor="login-secret">รหัสผ่าน<div className="public-auth-input-wrap"><input id="login-secret" className="public-auth-input" value={secret} onChange={(event) => { setSecret(event.target.value); if (errors.secret) setErrors((current) => ({ ...current, secret: undefined })); }} type={showSecret ? 'text' : 'password'} disabled={disabled} autoComplete="current-password" placeholder="กรอกรหัสผ่าน" style={{ paddingRight: 58 }} aria-invalid={Boolean(errors.secret)} aria-describedby={errors.secret ? 'login-secret-error' : undefined} /><button type="button" onClick={() => setShowSecret((value) => !value)} className="public-auth-eye" disabled={disabled} aria-label={showSecret ? 'ซ่อนรหัสผ่าน' : 'แสดงรหัสผ่าน'}>{showSecret ? '🙈' : '👁️'}</button></div></label>
+        {errors.secret && <span id="login-secret-error" className="public-auth-field-error">{errors.secret}</span>}
         <button type="submit" disabled={disabled} className="public-auth-submit">{loading ? 'กำลังเข้าสู่ระบบ...' : 'เข้าสู่ระบบ'}</button>
-        {message && <div className={`public-auth-alert public-auth-alert--${status === 'error' ? 'error' : status === 'success' ? 'success' : 'info'}`}>{message}</div>}
+        {status !== 'error' && message && <div className={`public-auth-alert public-auth-alert--${status === 'success' ? 'success' : 'info'}`} role="status" aria-live="polite">{message}</div>}
         {flags.registration && <p className="public-auth-footer">ยังไม่มีบัญชี? <a href="/register">สมัครสมาชิก</a></p>}
       </form>
     </section>
