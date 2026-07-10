@@ -10,6 +10,7 @@ import './member-finance-responsive.css';
 import './member-finance-pages.css';
 import './member-finance-flow.css';
 import './member-deposit-flow.css';
+import './member-withdraw-flow.css';
 import './public-auth-shell.css';
 import './public-auth-polish.css';
 import './public-mobile.css';
