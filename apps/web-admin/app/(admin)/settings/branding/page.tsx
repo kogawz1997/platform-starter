@@ -8,6 +8,7 @@ export default function BrandingSettingsPage() {
       description="ตั้งค่าโลโก้ สี ไอคอน และตัวอย่างหน้าตาแบรนด์"
       preview="branding"
       fields={[
+        { key: 'brand_mark', label: 'Brand Mark', placeholder: 'เช่น P, K, ★ หรือชื่อย่อ' },
         { key: 'logo_url', label: 'Logo URL' },
         { key: 'logo_dark_url', label: 'Logo Dark URL' },
         { key: 'logo_light_url', label: 'Logo Light URL' },
