@@ -15,7 +15,7 @@ import { MemberCard, MemberLinkButton } from './components/member-ui';
 export default function MemberChrome({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const [menuOpen, setMenuOpen] = useState(false);
-  const { settings, typedSettings } = useSiteSettings();
+  const { typedSettings } = useSiteSettings();
   const { ready, isLoggedIn, logout } = useMemberSession();
   const { website, branding, icons, features: typedFeatures } = typedSettings;
 
@@ -46,7 +46,10 @@ export default function MemberChrome({ children }: { children: ReactNode }) {
   const siteDescription = website.site_description;
   const logoUrl = branding.logo_url ?? '';
   const brandMark = branding.brand_mark || siteName.slice(0, 1).toUpperCase() || 'P';
-  const primaryColor = branding.primary_color;
+
+  useEffect(() => {
+    document.documentElement.style.setProperty('--color-brand', branding.primary_color);
+  }, [branding.primary_color]);
 
   useEffect(() => {
     if (!ready) return;
@@ -75,14 +78,12 @@ export default function MemberChrome({ children }: { children: ReactNode }) {
   if (isPublicRoute) return <>{children}</>;
   if (!ready || !isLoggedIn) return <main className="member-loading-screen">กำลังโหลด...</main>;
 
-  const content = blockedRoute
-    ? <FeatureDisabled label={blockedRoute.label} siteName={siteName} />
-    : children;
+  const content = blockedRoute ? <FeatureDisabled label={blockedRoute.label} siteName={siteName} /> : children;
 
   return <>
-    <header className="member-topbar global-member-topbar" style={{ borderColor: `${primaryColor}33` }}>
+    <header className="member-topbar global-member-topbar">
       <a href="/" className="member-brand">
-        <span className="member-brand-mark" style={{ background: primaryColor }}>{logoUrl ? <img src={logoUrl} alt="" className="member-brand-logo" /> : brandMark}</span>
+        <span className="member-brand-mark">{logoUrl ? <img src={logoUrl} alt="" className="member-brand-logo" /> : brandMark}</span>
         <span className="member-brand-copy"><strong>{siteName}</strong><small>{siteDescription}</small></span>
       </a>
       <div className="member-actions"><button type="button" className="member-menu-button" onClick={() => setMenuOpen(true)} aria-label="เปิดเมนู">☰</button></div>
@@ -103,7 +104,7 @@ export default function MemberChrome({ children }: { children: ReactNode }) {
     </aside>
 
     {content}
-    <MemberFooter settings={settings} />
+    <MemberFooter settings={typedSettings} />
 
     <nav className="member-bottom-nav" aria-label="เมนูหลัก">
       {visibleBottomNav.map((item) => <a key={item.key} href={item.href} className={activeHref === item.href ? 'active' : ''} aria-current={activeHref === item.href ? 'page' : undefined}>
