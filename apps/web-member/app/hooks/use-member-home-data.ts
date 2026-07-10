@@ -2,19 +2,16 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { requestJson } from '../member-api';
-import type { Game, LedgerItem, MoneyRequest } from '../components/member-home-sections';
+import type { Game, GameLobbyPayload, LedgerItem, MoneyRequest, PaginatedItems } from '../types/member-api';
 
 const FAVORITES_KEY = 'member_favorite_game_ids';
 const RECENT_KEY = 'member_recent_game_ids';
-
-type LobbyPayload = { items?: Game[]; featured?: Game[]; newest?: Game[]; popular?: Game[]; categories?: string[] };
-type ItemList<T> = { items?: T[] };
 
 export function useMemberHomeData(gamesEnabled: boolean) {
   const [topups, setTopups] = useState<MoneyRequest[]>([]);
   const [withdrawals, setWithdrawals] = useState<MoneyRequest[]>([]);
   const [ledgers, setLedgers] = useState<LedgerItem[]>([]);
-  const [lobby, setLobby] = useState<LobbyPayload>({});
+  const [lobby, setLobby] = useState<GameLobbyPayload>({});
   const [favoriteIds, setFavoriteIds] = useState<string[]>([]);
   const [recentIds, setRecentIds] = useState<string[]>([]);
   const [activityMessage, setActivityMessage] = useState('');
@@ -22,11 +19,8 @@ export function useMemberHomeData(gamesEnabled: boolean) {
 
   const loadGames = useCallback(async () => {
     if (!gamesEnabled) { setLobby({}); return; }
-    try {
-      setLobby(await requestJson<LobbyPayload>('/member/games'));
-    } catch {
-      setLobby({});
-    }
+    try { setLobby(await requestJson<GameLobbyPayload>('/member/games')); }
+    catch { setLobby({}); }
   }, [gamesEnabled]);
 
   const loadActivity = useCallback(async () => {
@@ -34,9 +28,9 @@ export function useMemberHomeData(gamesEnabled: boolean) {
     setActivityMessage('');
     try {
       const [topupData, withdrawalData, ledgerData] = await Promise.all([
-        requestJson<ItemList<MoneyRequest>>('/member/topups'),
-        requestJson<ItemList<MoneyRequest>>('/member/withdrawals'),
-        requestJson<ItemList<LedgerItem>>('/member/wallet/ledger?limit=5'),
+        requestJson<PaginatedItems<MoneyRequest>>('/member/topups'),
+        requestJson<PaginatedItems<MoneyRequest>>('/member/withdrawals'),
+        requestJson<PaginatedItems<LedgerItem>>('/member/wallet/ledger?limit=5'),
       ]);
       setTopups(Array.isArray(topupData.items) ? topupData.items : []);
       setWithdrawals(Array.isArray(withdrawalData.items) ? withdrawalData.items : []);
@@ -63,19 +57,7 @@ export function useMemberHomeData(gamesEnabled: boolean) {
   const recentGames = recentIds.map((id) => games.find((game) => game.id === id)).filter(Boolean) as Game[];
   const favoriteGames = favoriteIds.map((id) => games.find((game) => game.id === id)).filter(Boolean) as Game[];
 
-  return {
-    pendingTopups,
-    pendingWithdrawals,
-    ledgers,
-    categories: lobby.categories ?? [],
-    featured,
-    popular,
-    recentGames,
-    favoriteGames,
-    activityMessage,
-    isActivityLoading,
-    reloadActivity: loadActivity,
-  };
+  return { pendingTopups, pendingWithdrawals, ledgers, categories: lobby.categories ?? [], featured, popular, recentGames, favoriteGames, activityMessage, isActivityLoading, reloadActivity: loadActivity };
 }
 
 function readIds(key: string) {
