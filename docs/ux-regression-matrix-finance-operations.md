@@ -9,6 +9,18 @@
 - 1024x768
 - 1440x900
 
+## Current implementation status
+
+- ✅ Deposit full responsive refactor implemented
+- ✅ Withdraw full responsive refactor implemented
+- ✅ Deposit and withdraw builds confirmed
+- ✅ Admin top-up queue responsive refactor implemented and build confirmed
+- ✅ Admin withdrawal queue responsive refactor implemented and build confirmed
+- ✅ Admin members responsive refactor implemented
+- ✅ Admin wallet-ledger responsive refactor implemented
+- 🧪 Members and wallet-ledger deployed regression pending
+- 🧪 Full six-viewport visual regression pending
+
 ## A. Deposit / Withdraw
 
 Validate on mobile and desktop:
@@ -43,15 +55,22 @@ Validate on mobile and desktop:
 - Mobile actions stack without clipping
 - Desktop details remain visible without excessive scrolling
 - Empty/loading/error/success states
+- Withdrawal account verification and risk summary
+- Complete action only after real payout
+- Reject action returns locked balance
 
-## D. Admin Members / Transactions
+## D. Admin Members / Wallet Ledgers
 
-- Search/filter/pagination
-- Mobile controls remain reachable
-- Desktop dense information remains scannable
-- Long usernames, phones, ids and amounts wrap safely
-- Table horizontal fallback does not break the page
-- Detail links and row actions preserve 44px targets
+- Member search/filter/pagination
+- Mobile member cards remain readable
+- Desktop member summary and actions remain scannable
+- Long usernames, phones, emails, ids and amounts wrap safely
+- Status quick actions preserve existing endpoint and payload
+- Wallet-ledger search and direction filter
+- Before/amount/after values remain readable
+- Reference and idempotency values wrap without page overflow
+- Metadata details remain keyboard accessible
+- Detail links preserve 44px targets
 
 ## E. Public/Auth final polish
 
@@ -75,7 +94,9 @@ Validate on mobile and desktop:
 - Bank accounts visible
 - Admin login -> dashboard
 - Open top-up queue and withdrawal queue
-- Open members and transactions
+- Open members and wallet ledgers
+- Member search and status update
+- Wallet-ledger search, direction filter and detail link
 - Build, lint and type-check
 - Verify deployed mobile and desktop screenshots
 
