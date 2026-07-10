@@ -1,7 +1,7 @@
 'use client';
 
 import { FormEvent, useEffect, useState } from 'react';
-import { API_URL, PublicSiteSettings, boolSetting, defaultSettings, textSetting } from '../../site-settings';
+import { API_URL, PublicSiteSettings, defaultSettings, loadPublicSiteSettings, memberFeatureFlags, textSetting } from '../../site-settings';
 
 const REFERRAL_CODE_KEY = 'member_pending_referral_code';
 
@@ -22,7 +22,7 @@ export default function MemberRegisterPage() {
     const ref = new URLSearchParams(window.location.search).get('ref') ?? window.localStorage.getItem(REFERRAL_CODE_KEY) ?? '';
     const cleanRef = normalizeReferralCode(ref);
     if (cleanRef) { setReferralCode(cleanRef); window.localStorage.setItem(REFERRAL_CODE_KEY, cleanRef); }
-    fetch(`${API_URL}/public/site-settings`).then((res) => res.json()).then((data) => setSettings({ ...defaultSettings, ...data })).catch(() => setSettings(defaultSettings));
+    loadPublicSiteSettings().then(setSettings).catch(() => setSettings(defaultSettings));
   }, []);
 
   const siteName = textSetting(settings, 'website', 'site_name', 'Platform Starter');
@@ -30,14 +30,16 @@ export default function MemberRegisterPage() {
   const backgroundColor = textSetting(settings, 'branding', 'background_color', '#080808');
   const cardColor = textSetting(settings, 'branding', 'card_color', '#181818');
   const textColor = textSetting(settings, 'branding', 'text_color', '#ffffff');
-  const registrationEnabled = boolSetting(settings, 'features', 'registration_enabled', true) && boolSetting(settings, 'website', 'registration_enabled', true);
-  const maintenanceEnabled = boolSetting(settings, 'maintenance', 'enabled', false) || boolSetting(settings, 'maintenance', 'member_enabled', false) || boolSetting(settings, 'website', 'maintenance_mode', false);
-  const disabled = !registrationEnabled || maintenanceEnabled || loading;
+  const logoUrl = textSetting(settings, 'branding', 'logo_url', '');
+  const brandMark = textSetting(settings, 'branding', 'brand_mark', siteName.slice(0, 1).toUpperCase() || 'P');
+  const flags = memberFeatureFlags(settings);
+  const maintenanceEnabled = Boolean(settings.maintenance?.enabled || settings.maintenance?.member_enabled || settings.website?.maintenance_mode);
+  const disabled = !flags.registration || maintenanceEnabled || loading;
 
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (maintenanceEnabled) { setStatus('error'); setMessage('ระบบกำลังปรับปรุง กรุณาลองใหม่ภายหลัง'); return; }
-    if (!registrationEnabled) { setStatus('error'); setMessage('ขณะนี้ปิดรับสมัครสมาชิก'); return; }
+    if (!flags.registration) { setStatus('error'); setMessage('ขณะนี้ปิดรับสมัครสมาชิก'); return; }
     if (!username.trim() || !phone.trim() || !secret.trim()) { setStatus('error'); setMessage('กรุณากรอกข้อมูลให้ครบ'); return; }
     setLoading(true); setStatus('info'); setMessage('กำลังสมัครสมาชิก...');
     const cleanRef = normalizeReferralCode(referralCode);
@@ -54,16 +56,16 @@ export default function MemberRegisterPage() {
   return <main style={{ ...pageStyle, background: backgroundColor, color: textColor }}>
     <section style={shellStyle}>
       <form onSubmit={onSubmit} style={{ ...cardStyle, background: cardColor }}>
-        <div style={logoOnlyRowStyle}><div style={{ ...logoStyle, background: primaryColor, color: '#111' }}>{siteName.slice(0, 1).toUpperCase()}</div></div>
-        {(maintenanceEnabled || !registrationEnabled) && <div style={alertStyle('error')}>{maintenanceEnabled ? 'ระบบกำลังปรับปรุง' : 'ขณะนี้ปิดรับสมัครสมาชิก'}</div>}
+        <div style={logoOnlyRowStyle}><div style={{ ...logoStyle, background: primaryColor, color: '#111' }}>{logoUrl ? <img src={logoUrl} alt="" style={logoImageStyle} /> : brandMark}</div></div>
+        {(maintenanceEnabled || !flags.registration) && <div style={alertStyle('error')}>{maintenanceEnabled ? 'ระบบกำลังปรับปรุง' : 'ขณะนี้ปิดรับสมัครสมาชิก'}</div>}
         <label style={labelStyle}>Username<input value={username} onChange={(e) => setUsername(e.target.value)} placeholder="ตั้งชื่อผู้ใช้" disabled={disabled} autoComplete="username" style={inputStyle} /></label>
         <label style={labelStyle}>Phone<input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="เบอร์โทรศัพท์" disabled={disabled} autoComplete="tel" inputMode="tel" style={inputStyle} /></label>
         <label style={labelStyle}>Email <span style={{ opacity: 0.6, fontWeight: 500 }}>(ไม่บังคับ)</span><input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="อีเมล" disabled={disabled} autoComplete="email" type="email" style={inputStyle} /></label>
         <label style={labelStyle}>Referral code <span style={{ opacity: 0.6, fontWeight: 500 }}>(ไม่บังคับ)</span><input value={referralCode} onChange={(e) => { const value = normalizeReferralCode(e.target.value); setReferralCode(value); if (value) window.localStorage.setItem(REFERRAL_CODE_KEY, value); }} placeholder="รหัสแนะนำ" disabled={disabled} autoComplete="off" style={inputStyle} /></label>
         <label style={labelStyle}>Password<div style={passwordWrapStyle}><input value={secret} onChange={(e) => setSecret(e.target.value)} placeholder="ตั้ง Password" type={showSecret ? 'text' : 'password'} disabled={disabled} autoComplete="new-password" style={{ ...inputStyle, paddingRight: 58 }} /><button type="button" onClick={() => setShowSecret((v) => !v)} style={eyeButtonStyle} disabled={disabled} aria-label={showSecret ? 'Hide password' : 'Show password'} title={showSecret ? 'Hide password' : 'Show password'}>{showSecret ? '🙈' : '👁️'}</button></div></label>
-        <button type="submit" disabled={disabled} style={{ ...submitStyle, background: primaryColor, color: '#111' }}>{loading ? 'กำลังสมัคร...' : 'สมัครสมาชิก'}</button>
+        <button type="submit" disabled={disabled} style={{ ...submitStyle, background: primaryColor, color: '#111', opacity: disabled ? .58 : 1 }}>{loading ? 'กำลังสมัคร...' : 'สมัครสมาชิก'}</button>
         {message && <div style={alertStyle(status)}>{message}</div>}
-        <p style={footerTextStyle}>มีบัญชีแล้ว? <a href="/login" style={{ color: primaryColor, fontWeight: 900 }}>เข้าสู่ระบบ</a></p>
+        {flags.login && <p style={footerTextStyle}>มีบัญชีแล้ว? <a href="/login" style={{ color: primaryColor, fontWeight: 900 }}>เข้าสู่ระบบ</a></p>}
       </form>
     </section>
   </main>;
@@ -80,7 +82,8 @@ const pageStyle = { minHeight: '100dvh', padding: 16, display: 'grid', placeItem
 const shellStyle = { width: '100%', maxWidth: 460, margin: '0 auto', display: 'grid', placeItems: 'center' } as const;
 const cardStyle = { width: '100%', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 28, padding: 24, display: 'grid', gap: 14, boxShadow: '0 28px 90px rgba(0,0,0,0.34)', boxSizing: 'border-box' } as const;
 const logoOnlyRowStyle = { display: 'flex', justifyContent: 'center', marginBottom: 4 } as const;
-const logoStyle = { width: 52, height: 52, borderRadius: 18, display: 'grid', placeItems: 'center', fontWeight: 900, fontSize: 22, flex: '0 0 52px' } as const;
+const logoStyle = { width: 52, height: 52, borderRadius: 18, display: 'grid', placeItems: 'center', fontWeight: 900, fontSize: 22, flex: '0 0 52px', overflow: 'hidden' as const };
+const logoImageStyle = { width: '100%', height: '100%', objectFit: 'cover' as const, display: 'block' };
 const labelStyle = { display: 'grid', gap: 8, fontWeight: 800 } as const;
 const inputStyle = { width: '100%', padding: '13px 14px', borderRadius: 14, border: '1px solid rgba(255,255,255,0.18)', background: 'rgba(255,255,255,0.08)', color: 'inherit', boxSizing: 'border-box', outline: 'none' } as const;
 const passwordWrapStyle = { position: 'relative' } as const;
