@@ -1,6 +1,7 @@
 import type { Viewport } from 'next';
 import './admin-mobile.css';
 import './admin-desktop.css';
+import './admin-dashboard-responsive.css';
 import './globals.css';
 
 export const viewport: Viewport = {
