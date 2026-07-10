@@ -5,8 +5,9 @@ export default function ThemeSettingsPage() {
     <SettingsSectionPage
       group="theme"
       title="Theme / Layout Settings"
-      description="ตั้งค่า layout ผู้เล่น มือถือ เดสก์ท็อป และเกม"
+      description="ตั้งค่า layout ผู้เล่น มือถือ เดสก์ท็อป เกม และระดับ animation"
       fields={[
+        { key: 'animation_level', label: 'Animation Level', placeholder: 'off / subtle / lively' },
         { key: 'bottom_navigation_enabled', label: 'Bottom Navigation เปิด/ปิด', type: 'checkbox' },
         { key: 'sticky_wallet_enabled', label: 'Sticky Wallet เปิด/ปิด', type: 'checkbox' },
         { key: 'floating_deposit_button_enabled', label: 'Floating Deposit Button เปิด/ปิด', type: 'checkbox' },
