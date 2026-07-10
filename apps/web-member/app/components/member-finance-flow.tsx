@@ -1,4 +1,7 @@
+'use client';
+
 import type { ReactNode } from 'react';
+import { useEffect, useId, useRef } from 'react';
 
 type FinanceStep = {
   key: string;
@@ -31,8 +34,39 @@ export function FinanceEmptyState({ title, description, action }: { title: strin
 }
 
 export function FinanceConfirmDialog({ open, title, description, children, onClose, onConfirm, loading, confirmLabel = 'ยืนยัน' }: { open: boolean; title: string; description?: string; children: ReactNode; onClose: () => void; onConfirm: () => void; loading?: boolean; confirmLabel?: string }) {
+  const dialogRef = useRef<HTMLElement>(null);
+  const returnFocusRef = useRef<HTMLElement | null>(null);
+  const titleId = useId();
+  const descriptionId = useId();
+
+  useEffect(() => {
+    if (!open) return;
+    returnFocusRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    window.requestAnimationFrame(() => dialogRef.current?.querySelector<HTMLElement>('button:not([disabled])')?.focus());
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === 'Escape' && !loading) { event.preventDefault(); onClose(); return; }
+      if (event.key !== 'Tab') return;
+      const focusable = dialogRef.current?.querySelectorAll<HTMLElement>('button:not([disabled]), a[href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])');
+      if (!focusable?.length) { event.preventDefault(); dialogRef.current?.focus(); return; }
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
+      else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
+    }
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+      document.body.style.overflow = previousOverflow;
+      returnFocusRef.current?.focus();
+    };
+  }, [open, loading, onClose]);
+
   if (!open) return null;
-  return <div className="finance-dialog-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}><section className="finance-dialog" role="dialog" aria-modal="true" aria-labelledby="finance-dialog-title"><header><div><h2 id="finance-dialog-title">{title}</h2>{description && <p>{description}</p>}</div><button type="button" onClick={onClose} className="finance-icon-button" aria-label="ปิด">×</button></header><div className="finance-dialog-body">{children}</div><FinanceActionBar><button type="button" onClick={onClose} className="finance-button finance-button--secondary">แก้ไข</button><button type="button" onClick={onConfirm} disabled={loading} className="finance-button finance-button--primary">{loading ? 'กำลังดำเนินการ...' : confirmLabel}</button></FinanceActionBar></section></div>;
+  return <div className="finance-dialog-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget && !loading) onClose(); }}><section ref={dialogRef} tabIndex={-1} className="finance-dialog" role="dialog" aria-modal="true" aria-labelledby={titleId} aria-describedby={description ? descriptionId : undefined}><header><div><h2 id={titleId}>{title}</h2>{description && <p id={descriptionId}>{description}</p>}</div><button type="button" onClick={onClose} disabled={loading} className="finance-icon-button" aria-label="ปิด">×</button></header><div className="finance-dialog-body">{children}</div><FinanceActionBar><button type="button" onClick={onClose} disabled={loading} className="finance-button finance-button--secondary">แก้ไข</button><button type="button" onClick={onConfirm} disabled={loading} className="finance-button finance-button--primary">{loading ? 'กำลังดำเนินการ...' : confirmLabel}</button></FinanceActionBar></section></div>;
 }
 
 export function FinanceStatusBadge({ status }: { status: string }) {
