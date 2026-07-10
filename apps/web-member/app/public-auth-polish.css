@@ -8,6 +8,11 @@
 .public-auth-page button:disabled { cursor: not-allowed; }
 .public-auth-alert[role="alert"] { scroll-margin-top: 16px; }
 .public-auth-card { isolation: isolate; }
+.public-auth-input[aria-invalid="true"]{border-color:#f87171;box-shadow:0 0 0 1px rgba(248,113,113,.32)}
+.public-auth-field-error{display:block;margin-top:-7px;color:#fecaca;font-size:13px;line-height:1.45;font-weight:750}
+.public-auth-field-hint{display:block;margin-top:-7px;color:rgba(255,255,255,.58);font-size:12px;line-height:1.45}
+.public-auth-password-meter{height:6px;margin-top:-7px;border-radius:999px;overflow:hidden;background:rgba(255,255,255,.08)}
+.public-auth-password-meter span{display:block;height:100%;border-radius:inherit;background:var(--color-brand,#f5c542);transition:width .18s ease}
 
 @media (max-width: 767px) {
   .public-auth-page { min-height: 100dvh; padding: 12px 12px calc(24px + env(safe-area-inset-bottom)); }
