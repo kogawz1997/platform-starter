@@ -1,13 +1,14 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { memberApiFetch } from '../member-api';
+import { requestJson } from '../member-api';
 import type { Game, LedgerItem, MoneyRequest } from '../components/member-home-sections';
 
 const FAVORITES_KEY = 'member_favorite_game_ids';
 const RECENT_KEY = 'member_recent_game_ids';
 
 type LobbyPayload = { items?: Game[]; featured?: Game[]; newest?: Game[]; popular?: Game[]; categories?: string[] };
+type ItemList<T> = { items?: T[] };
 
 export function useMemberHomeData(gamesEnabled: boolean) {
   const [topups, setTopups] = useState<MoneyRequest[]>([]);
@@ -21,29 +22,25 @@ export function useMemberHomeData(gamesEnabled: boolean) {
 
   const loadGames = useCallback(async () => {
     if (!gamesEnabled) { setLobby({}); return; }
-    const res = await memberApiFetch('/member/games');
-    const data = await res.json().catch(() => null);
-    if (res.ok) setLobby(data ?? {});
+    try {
+      setLobby(await requestJson<LobbyPayload>('/member/games'));
+    } catch {
+      setLobby({});
+    }
   }, [gamesEnabled]);
 
   const loadActivity = useCallback(async () => {
     setIsActivityLoading(true);
     setActivityMessage('');
     try {
-      const [topupRes, withdrawalRes, ledgerRes] = await Promise.all([
-        memberApiFetch('/member/topups'),
-        memberApiFetch('/member/withdrawals'),
-        memberApiFetch('/member/wallet/ledger?limit=5'),
-      ]);
       const [topupData, withdrawalData, ledgerData] = await Promise.all([
-        topupRes.json().catch(() => null),
-        withdrawalRes.json().catch(() => null),
-        ledgerRes.json().catch(() => null),
+        requestJson<ItemList<MoneyRequest>>('/member/topups'),
+        requestJson<ItemList<MoneyRequest>>('/member/withdrawals'),
+        requestJson<ItemList<LedgerItem>>('/member/wallet/ledger?limit=5'),
       ]);
-      if (topupRes.ok) setTopups(Array.isArray(topupData?.items) ? topupData.items : []);
-      if (withdrawalRes.ok) setWithdrawals(Array.isArray(withdrawalData?.items) ? withdrawalData.items : []);
-      if (ledgerRes.ok) setLedgers(Array.isArray(ledgerData?.items) ? ledgerData.items : []);
-      if (!topupRes.ok || !withdrawalRes.ok || !ledgerRes.ok) setActivityMessage(topupData?.message ?? withdrawalData?.message ?? ledgerData?.message ?? 'โหลดข้อมูลไม่สำเร็จ');
+      setTopups(Array.isArray(topupData.items) ? topupData.items : []);
+      setWithdrawals(Array.isArray(withdrawalData.items) ? withdrawalData.items : []);
+      setLedgers(Array.isArray(ledgerData.items) ? ledgerData.items : []);
     } catch (error) {
       setActivityMessage(error instanceof Error ? error.message : 'โหลดข้อมูลไม่สำเร็จ');
     } finally {
