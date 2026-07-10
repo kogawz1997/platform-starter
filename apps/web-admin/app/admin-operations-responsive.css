@@ -1,4 +1,7 @@
 /* Responsive operation pages: queues, members and transactions. */
+
+.admin-queue-filter{display:grid;gap:6px;min-width:min(260px,100%);font-weight:850}.admin-queue-filter span{color:#cbd5e1;font-size:13px}.admin-queue-filter select{width:100%;min-height:44px;border-radius:12px;border:1px solid rgba(148,163,184,.22);background:#0b1220;color:#f8fafc;padding:0 12px}.admin-queue-pager{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));align-items:center;gap:10px;min-width:min(360px,100%)}.admin-queue-page-label{display:inline-flex;align-items:center;justify-content:center;color:#94a3b8;font-weight:850;min-height:44px}.admin-topup-summary{display:grid;gap:6px;min-width:0}.admin-topup-summary h2{margin:4px 0;font-size:clamp(28px,7vw,34px);line-height:1.05;overflow-wrap:anywhere}.admin-topup-summary p{margin:0;color:#cbd5e1;overflow-wrap:anywhere}.admin-topup-badges{display:flex;gap:8px;flex-wrap:wrap}.admin-topup-bank-card{border:1px solid rgba(245,197,66,.28);border-radius:16px;padding:12px;display:grid;gap:5px;background:rgba(245,197,66,.08);overflow-wrap:anywhere;min-width:0}.admin-topup-account-number{font-size:clamp(18px,5vw,22px);font-weight:950;letter-spacing:.02em;color:#f5c542;overflow-wrap:anywhere}.admin-topup-proof-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(260px,100%),1fr));gap:12px}.admin-topup-proof-panel{border:1px solid rgba(148,163,184,.18);border-radius:16px;padding:12px;background:rgba(255,255,255,.04);min-width:0;display:grid;place-items:center}.admin-topup-proof-panel img{width:100%;max-height:520px;object-fit:contain;border-radius:12px;background:#020617}.admin-topup-proof-panel p{margin:0;color:#94a3b8}.admin-topup-timeline{display:grid;gap:8px;align-content:start}.admin-topup-operations{display:grid;gap:12px;margin-top:14px;min-width:0}.admin-topup-action-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(130px,100%),1fr));gap:10px;min-width:0}.admin-topup-note-field{display:grid;gap:6px;font-weight:850;min-width:0}.admin-topup-note-field textarea{min-height:92px;border-radius:14px;border:1px solid rgba(148,163,184,.22);background:#0b1220;color:#f8fafc;padding:12px;resize:vertical;min-width:0;width:100%;box-sizing:border-box}.admin-topup-modal-details{display:grid;gap:10px;min-width:0}.admin-topup-modal-slip{width:100%;max-height:360px;object-fit:contain;border-radius:14px;border:1px solid rgba(148,163,184,.18);background:#020617}
+
 @media (max-width: 767px) {
   body { overflow-x: hidden; }
   main { padding-inline: 12px !important; }
@@ -17,17 +20,20 @@
   main [style*="justify-content: flex-end"] > * { flex: 1 1 140px; }
   main img { max-width: 100%; height: auto; }
   main table { min-width: 720px; }
+  .admin-queue-pager{grid-template-columns:1fr}.admin-queue-page-label{order:-1}.admin-topup-proof-grid{grid-template-columns:1fr}.admin-topup-action-grid{grid-template-columns:1fr}.admin-topup-action-grid--review{position:sticky;bottom:max(10px,env(safe-area-inset-bottom));z-index:6;padding:10px;border:1px solid rgba(148,163,184,.18);border-radius:16px;background:rgba(2,6,23,.94);backdrop-filter:blur(14px)}
 }
 
 @media (min-width: 768px) and (max-width: 1023px) {
   main { padding-inline: 18px !important; }
   main [style*="grid-template-columns"] { grid-template-columns: repeat(2, minmax(0,1fr)) !important; }
+  .admin-topup-proof-grid{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
 }
 
 @media (min-width: 1024px) {
   main { max-width: 1540px !important; }
   main > header { position: sticky; top: 0; z-index: 8; padding-block: 18px; background: linear-gradient(180deg, rgba(8,8,8,.98), rgba(8,8,8,.88), transparent); backdrop-filter: blur(14px); }
   main [style*="grid-template-columns"] { align-items: start; }
+  .admin-queue-filter{max-width:320px}.admin-queue-pager{margin-left:auto}.admin-topup-proof-grid{grid-template-columns:minmax(320px,.9fr) minmax(0,1.1fr)}.admin-topup-proof-panel{position:sticky;top:110px}.admin-topup-operations{grid-template-columns:minmax(220px,.7fr) minmax(320px,1.3fr);align-items:end}.admin-topup-action-grid--review{grid-column:1/-1}
 }
 
 @media (prefers-reduced-motion: reduce) {
