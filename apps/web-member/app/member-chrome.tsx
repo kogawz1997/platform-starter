@@ -2,54 +2,55 @@
 
 import { ReactNode, useEffect, useMemo, useState } from 'react';
 import { usePathname } from 'next/navigation';
-import { memberApiFetch } from './member-api';
-import { defaultIconSettings, iconSettings, isIconUrl, memberFeatureFlags, textSetting } from './site-settings';
+import type { MemberFeatureFlags } from './site-settings';
+import { defaultIconSettings, isIconUrl } from './site-settings';
 import { activeNavigationHref, navigationFor } from './member-navigation';
+import { disabledMemberRoute, isPublicMemberRoute, routeRuleFor } from './member-routes';
 import MemberFooter from './member-footer';
 import { useSiteSettings } from './site-settings-provider';
 import { useMemberSession } from './member-session-provider';
-
-type MoneyRequest = { status: string };
-type DisabledRoute = { prefix: string; feature: keyof ReturnType<typeof memberFeatureFlags>; label: string };
-
-const disabledRoutes: DisabledRoute[] = [
-  { prefix: '/games', feature: 'games', label: 'เกม' },
-  { prefix: '/deposit', feature: 'deposit', label: 'ฝาก' },
-  { prefix: '/withdraw', feature: 'withdraw', label: 'ถอนเงิน' },
-  { prefix: '/promotions', feature: 'promotion', label: 'โปรโมชัน' },
-  { prefix: '/bonus', feature: 'bonus', label: 'โบนัส' },
-  { prefix: '/affiliate', feature: 'affiliate', label: 'ตัวแทน' },
-  { prefix: '/support', feature: 'support', label: 'ช่วยเหลือ' },
-  { prefix: '/bank-accounts', feature: 'kyc', label: 'บัญชีธนาคาร' },
-  { prefix: '/profile', feature: 'profile', label: 'โปรไฟล์' },
-  { prefix: '/notifications', feature: 'notifications', label: 'แจ้งเตือน' },
-];
-
-const publicPrefixes = ['/login', '/register', '/contact', '/legal'];
+import { usePendingCount } from './hooks/use-pending-count';
+import { MemberCard, MemberLinkButton } from './components/member-ui';
 
 export default function MemberChrome({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const [menuOpen, setMenuOpen] = useState(false);
-  const [pendingCount, setPendingCount] = useState(0);
-  const { settings } = useSiteSettings();
+  const { settings, typedSettings } = useSiteSettings();
   const { ready, isLoggedIn, logout } = useMemberSession();
+  const { website, branding, icons, features: typedFeatures } = typedSettings;
 
-  const icons = iconSettings(settings);
-  const features = memberFeatureFlags(settings);
-  const siteName = textSetting(settings, 'website', 'site_name', 'ศูนย์สมาชิก');
-  const siteDescription = textSetting(settings, 'website', 'site_description', 'เมนูหลักอยู่ด้านล่างจอ');
-  const logoUrl = textSetting(settings, 'branding', 'logo_url', '');
-  const brandMark = textSetting(settings, 'branding', 'brand_mark', siteName.slice(0, 1).toUpperCase() || 'P');
-  const primaryColor = textSetting(settings, 'branding', 'primary_color', '#f5c542');
-  const isPublicRoute = publicPrefixes.some((prefix) => pathname.startsWith(prefix));
+  const features: MemberFeatureFlags = {
+    registration: typedFeatures.registration_enabled,
+    login: typedFeatures.login_enabled,
+    deposit: typedFeatures.deposit_enabled,
+    withdraw: typedFeatures.withdraw_enabled,
+    promotion: typedFeatures.promotion_enabled,
+    bonus: typedFeatures.bonus_enabled,
+    affiliate: typedFeatures.affiliate_enabled,
+    support: typedFeatures.support_enabled,
+    kyc: typedFeatures.kyc_enabled,
+    games: typedFeatures.game_lobby_enabled,
+    profile: typedFeatures.profile_enabled,
+    notifications: typedFeatures.notification_enabled,
+  };
+
+  const isPublicRoute = isPublicMemberRoute(pathname);
+  const currentRule = routeRuleFor(pathname);
+  const blockedRoute = disabledMemberRoute(pathname, features);
   const activeHref = useMemo(() => activeNavigationHref(pathname), [pathname]);
-  const blockedRoute = disabledRoutes.find((route) => pathname.startsWith(route.prefix) && !features[route.feature]);
   const visibleBottomNav = navigationFor('bottom', features);
   const visibleDrawer = navigationFor('drawer', features);
+  const { pendingCount } = usePendingCount(isLoggedIn && !isPublicRoute);
+
+  const siteName = website.site_name;
+  const siteDescription = website.site_description;
+  const logoUrl = branding.logo_url ?? '';
+  const brandMark = branding.brand_mark || siteName.slice(0, 1).toUpperCase() || 'P';
+  const primaryColor = branding.primary_color;
 
   useEffect(() => {
     if (!ready) return;
-    if ((pathname.startsWith('/login') || pathname.startsWith('/register')) && isLoggedIn) {
+    if (currentRule?.authRedirectHome && isLoggedIn) {
       window.location.replace('/');
       return;
     }
@@ -57,26 +58,7 @@ export default function MemberChrome({ children }: { children: ReactNode }) {
       const next = encodeURIComponent(`${pathname}${window.location.search}`);
       window.location.replace(`/login?next=${next}`);
     }
-  }, [ready, isLoggedIn, isPublicRoute, pathname]);
-
-  useEffect(() => {
-    if (!isLoggedIn || isPublicRoute) return;
-    let cancelled = false;
-    async function loadPendingCount() {
-      const responses = await Promise.all([memberApiFetch('/member/topups'), memberApiFetch('/member/withdrawals')]).catch(() => [] as Response[]);
-      const [topupRes, withdrawalRes] = responses;
-      if (!topupRes || !withdrawalRes || cancelled) return;
-      const [topupData, withdrawalData] = await Promise.all([
-        topupRes.json().catch(() => null),
-        withdrawalRes.json().catch(() => null),
-      ]);
-      const topups = Array.isArray(topupData?.items) ? topupData.items as MoneyRequest[] : [];
-      const withdrawals = Array.isArray(withdrawalData?.items) ? withdrawalData.items as MoneyRequest[] : [];
-      setPendingCount([...topups, ...withdrawals].filter((item) => item.status === 'PENDING').length);
-    }
-    void loadPendingCount();
-    return () => { cancelled = true; };
-  }, [isLoggedIn, isPublicRoute]);
+  }, [ready, isLoggedIn, isPublicRoute, pathname, currentRule?.authRedirectHome]);
 
   useEffect(() => {
     if (!menuOpen) return;
@@ -91,14 +73,16 @@ export default function MemberChrome({ children }: { children: ReactNode }) {
   }, [menuOpen]);
 
   if (isPublicRoute) return <>{children}</>;
-  if (!ready || !isLoggedIn) return <main style={loadingPageStyle}>กำลังโหลด...</main>;
+  if (!ready || !isLoggedIn) return <main className="member-loading-screen">กำลังโหลด...</main>;
 
-  const content = blockedRoute ? <FeatureDisabled label={blockedRoute.label} siteName={siteName} primaryColor={primaryColor} /> : children;
+  const content = blockedRoute
+    ? <FeatureDisabled label={blockedRoute.label} siteName={siteName} />
+    : children;
 
   return <>
     <header className="member-topbar global-member-topbar" style={{ borderColor: `${primaryColor}33` }}>
       <a href="/" className="member-brand">
-        <span className="member-brand-mark" style={{ background: primaryColor }}>{logoUrl ? <img src={logoUrl} alt="" style={logoStyle} /> : brandMark}</span>
+        <span className="member-brand-mark" style={{ background: primaryColor }}>{logoUrl ? <img src={logoUrl} alt="" className="member-brand-logo" /> : brandMark}</span>
         <span className="member-brand-copy"><strong>{siteName}</strong><small>{siteDescription}</small></span>
       </a>
       <div className="member-actions"><button type="button" className="member-menu-button" onClick={() => setMenuOpen(true)} aria-label="เปิดเมนู">☰</button></div>
@@ -131,20 +115,10 @@ export default function MemberChrome({ children }: { children: ReactNode }) {
   </>;
 }
 
-function FeatureDisabled({ label, siteName, primaryColor }: { label: string; siteName: string; primaryColor: string }) {
-  return <main style={disabledPageStyle}><section style={disabledCardStyle}><span style={{ ...disabledBadgeStyle, color: primaryColor, borderColor: `${primaryColor}55`, background: `${primaryColor}12` }}>ปิดใช้งานชั่วคราว</span><h1 style={disabledTitleStyle}>{label}</h1><p style={disabledTextStyle}>{siteName} ปิดฟีเจอร์นี้จากการตั้งค่าระบบ กรุณากลับหน้าแรกหรือรอประกาศเปิดใช้งานอีกครั้ง</p><a href="/" style={{ ...disabledButtonStyle, background: primaryColor }}>กลับหน้าแรก</a></section></main>;
+function FeatureDisabled({ label, siteName }: { label: string; siteName: string }) {
+  return <main className="member-feature-disabled"><MemberCard tone="brand" className="member-feature-disabled__card"><span className="member-feature-disabled__badge">ปิดใช้งานชั่วคราว</span><h1>{label}</h1><p>{siteName} ปิดฟีเจอร์นี้จากการตั้งค่าระบบ กรุณากลับหน้าแรกหรือรอประกาศเปิดใช้งานอีกครั้ง</p><MemberLinkButton href="/">กลับหน้าแรก</MemberLinkButton></MemberCard></main>;
 }
 
 function IconValue({ value }: { value: string }) {
-  return isIconUrl(value) ? <img src={value} alt="" style={iconImageStyle} /> : <>{value}</>;
+  return isIconUrl(value) ? <img src={value} alt="" className="member-nav-icon-image" /> : <>{value}</>;
 }
-
-const loadingPageStyle = { minHeight: '100dvh', display: 'grid', placeItems: 'center', background: '#080808', color: '#fff', padding: 16 } as const;
-const logoStyle = { width: '100%', height: '100%', objectFit: 'cover' as const, borderRadius: 12, display: 'block' };
-const iconImageStyle = { width: 22, height: 22, objectFit: 'cover' as const, borderRadius: 7, display: 'block', flex: '0 0 auto' };
-const disabledPageStyle = { minHeight: 'calc(100dvh - 80px)', display: 'grid', placeItems: 'center', padding: '24px 16px 120px', background: 'linear-gradient(180deg,#080808,#111827)', color: '#fff' } as const;
-const disabledCardStyle = { width: 'min(520px,100%)', border: '1px solid rgba(255,255,255,.12)', borderRadius: 26, padding: 22, background: 'rgba(15,23,42,.86)', display: 'grid', gap: 12, textAlign: 'center' as const };
-const disabledBadgeStyle = { justifySelf: 'center', border: '1px solid', borderRadius: 999, padding: '8px 12px', fontWeight: 950, fontSize: 13 } as const;
-const disabledTitleStyle = { margin: 0, fontSize: 34, lineHeight: 1.05 } as const;
-const disabledTextStyle = { margin: 0, color: '#cbd5e1', lineHeight: 1.6 } as const;
-const disabledButtonStyle = { justifySelf: 'center', minHeight: 44, borderRadius: 14, padding: '0 16px', display: 'inline-flex', alignItems: 'center', color: '#111827', textDecoration: 'none', fontWeight: 950 } as const;
