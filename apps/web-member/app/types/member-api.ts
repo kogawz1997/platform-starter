@@ -14,7 +14,10 @@ export type LedgerItem = {
   type: string;
   direction: 'CREDIT' | 'DEBIT' | string;
   amount: string;
+  balanceBefore?: string;
   balanceAfter: string;
+  referenceType?: string | null;
+  referenceId?: string | null;
   createdAt: string;
 };
 
