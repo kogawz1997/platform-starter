@@ -2,12 +2,8 @@
 
 import { CmsContent, MemberFeatureFlags, SiteIconSettings, cmsAssetUrl, isIconUrl } from '../site-settings';
 import { navigationFor } from '../member-navigation';
+import type { Game, LedgerItem, MoneyRequest } from '../types/member-api';
 import { MemberButton, MemberCard, MemberEmptyState, MemberLinkButton, MemberNotice } from './member-ui';
-
-export type MoneyRequest = { id: string; amount: string; currency: string; status: string; method?: string | null; createdAt: string };
-export type LedgerItem = { id: string; type: string; direction: string; amount: string; balanceAfter: string; createdAt: string };
-export type GameMedia = { type: string; sourceUrl?: string | null; cachedUrl?: string | null };
-export type Game = { id: string; providerGameCode: string; name: string; category: string; isFeatured?: boolean; isNew?: boolean; isPopular?: boolean; provider?: { name?: string | null; code?: string | null } | null; media?: GameMedia[] };
 
 export function HomeHero({ siteName, description, content }: { siteName: string; description: string; primaryColor: string; content: CmsContent }) {
   const banner = content.banners.find((item) => item.enabled);
