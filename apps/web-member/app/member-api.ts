@@ -2,6 +2,17 @@ export const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000
 
 type ApiOptions = RequestInit & { skipAuth?: boolean };
 
+export class ApiRequestError extends Error {
+  constructor(
+    message: string,
+    public readonly status: number,
+    public readonly payload: unknown = null,
+  ) {
+    super(message);
+    this.name = 'ApiRequestError';
+  }
+}
+
 export async function memberApiFetch(path: string, options: ApiOptions = {}) {
   const token = window.localStorage.getItem('member_access_token');
   const headers = new Headers(options.headers ?? {});
@@ -27,6 +38,18 @@ export async function memberApiFetch(path: string, options: ApiOptions = {}) {
     window.location.replace(`/login?next=${next}`);
   }
   return retry;
+}
+
+export async function requestJson<T>(path: string, options: ApiOptions = {}): Promise<T> {
+  const response = await memberApiFetch(path, options);
+  const payload = await response.json().catch(() => null) as T | { message?: string } | null;
+  if (!response.ok) {
+    const message = payload && typeof payload === 'object' && 'message' in payload && typeof payload.message === 'string'
+      ? payload.message
+      : `คำขอล้มเหลว (${response.status})`;
+    throw new ApiRequestError(message, response.status, payload);
+  }
+  return payload as T;
 }
 
 export async function refreshMemberToken() {
