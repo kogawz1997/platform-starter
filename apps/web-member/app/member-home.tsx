@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { CmsContent, SiteIconSettings, cmsAssetUrl, defaultIconSettings, isIconUrl } from './site-settings';
+import { CmsContent, MemberFeatureFlags, SiteIconSettings, cmsAssetUrl, defaultFeatureFlags, defaultIconSettings, isIconUrl } from './site-settings';
 import { memberApiFetch } from './member-api';
 import WalletCard from './wallet-card';
 import MemberBottomNav from './member-bottom-nav';
@@ -20,6 +20,7 @@ type MemberHomeProps = {
   showRecommended: boolean;
   cmsContent: CmsContent;
   icons?: SiteIconSettings;
+  features?: MemberFeatureFlags;
 };
 
 type MoneyRequest = { id: string; amount: string; currency: string; status: string; method?: string | null; createdAt: string };
@@ -34,6 +35,7 @@ const POPUP_CLOSED_VERSION_KEY = 'member_cms_popup_closed_version';
 
 export default function MemberHome(props: MemberHomeProps) {
   const icons = props.icons ?? defaultIconSettings;
+  const features = props.features ?? defaultFeatureFlags;
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [topups, setTopups] = useState<MoneyRequest[]>([]);
   const [withdrawals, setWithdrawals] = useState<MoneyRequest[]>([]);
@@ -53,9 +55,9 @@ export default function MemberHome(props: MemberHomeProps) {
     setFavoriteIds(readIds(FAVORITES_KEY));
     setRecentIds(readIds(RECENT_KEY));
     setPopupClosed(window.localStorage.getItem(POPUP_CLOSED_VERSION_KEY) === popupVersion);
-    loadGames();
+    if (features.games) loadGames();
     if (ok) loadActivity();
-  }, [popupVersion]);
+  }, [popupVersion, features.games]);
 
   async function loadGames() {
     const res = await memberApiFetch('/member/games');
@@ -95,18 +97,27 @@ export default function MemberHome(props: MemberHomeProps) {
 
   return (
     <section className="member-shell member-home-shell">
-      {props.showPromotion && <section style={bannerStyle}>{bannerImageUrl && <img src={bannerImageUrl} alt="" style={bannerImageStyle} />}<div><span style={eyebrowStyle}>พร้อมเล่น</span><h1 style={bannerTitleStyle}>{cmsBanner?.title || props.siteName}</h1><p style={mutedStyle}>{cmsBanner?.subtitle || props.description || 'เลือกเกมที่ชอบ ฝาก ถอน และดูประวัติได้จากมือถือเครื่องเดียว'}</p></div><a href={cmsBanner?.href || '/games'} style={{ ...bannerButtonStyle, background: props.primaryColor }}>เข้าเล่นเกม</a></section>}
+      {props.showPromotion && features.games && <section style={bannerStyle}>{bannerImageUrl && <img src={bannerImageUrl} alt="" style={bannerImageStyle} />}<div><span style={eyebrowStyle}>พร้อมเล่น</span><h1 style={bannerTitleStyle}>{cmsBanner?.title || props.siteName}</h1><p style={mutedStyle}>{cmsBanner?.subtitle || props.description || 'เลือกเกมที่ชอบ ฝาก ถอน และดูประวัติได้จากมือถือเครื่องเดียว'}</p></div><a href={cmsBanner?.href || '/games'} style={{ ...bannerButtonStyle, background: props.primaryColor }}>เข้าเล่นเกม</a></section>}
       {announcements.length > 0 && <section className="member-info-card" style={announcementCardStyle}><div style={sectionHeadStyle}><h2>ประกาศ</h2><span style={mutedStyle}>{announcements.length} รายการ</span></div><div style={pendingListStyle}>{announcements.map((item, index) => <div key={`${item.title}-${index}`} style={announcementRowStyle}><strong>{item.title}</strong><span>{item.message}</span></div>)}</div></section>}
-      {props.showBalanceHeader && <WalletCard primaryColor={props.primaryColor} cardColor={props.cardColor} showButtons={props.showButtons && isLoggedIn} />}
-      <section className="member-quick-panel"><QuickAction icon={icons.deposit} href="/deposit" title="ฝาก" subtitle="เพิ่มยอด" /><QuickAction icon={icons.withdraw} href="/withdraw" title="ถอนเงิน" subtitle="ส่งคำขอ" /><QuickAction icon={icons.games} href="/games" title="เกม" subtitle="เข้าเล่น" /><QuickAction icon={icons.bank} href="/bank-accounts" title="บัญชี" subtitle="จัดการ" /><QuickAction icon={icons.promotion} href="/promotions" title="โปร" subtitle="รับสิทธิ์" /><QuickAction icon={icons.bonus} href="/bonus" title="โบนัส" subtitle="ดูเทิร์น" /><QuickAction icon={icons.affiliate} href="/affiliate" title="ตัวแทน" subtitle="แนะนำเพื่อน" /><QuickAction icon={icons.support} href="/support" title="ช่วยเหลือ" subtitle="แจ้งปัญหา" /></section>
-      {isLoggedIn && pendingCount > 0 && <section className="member-info-card" style={alertCardStyle}><div style={sectionHeadStyle}><div><p>รอดำเนินการ</p><h2>{pendingCount} รายการ</h2></div><a href="/transactions" style={{ color: props.primaryColor, fontWeight: 900, textDecoration: 'none' }}>ดูทั้งหมด</a></div><div style={pendingListStyle}>{pendingTopups.map((item) => <ActivityRow key={item.id} title="ฝาก" href="/deposit" item={item} />)}{pendingWithdrawals.map((item) => <ActivityRow key={item.id} title="ถอนเงิน" href="/withdraw" item={item} />)}</div></section>}
-      {props.showRecommended && <GameRail title="เกมแนะนำ" href="/games" items={featured} primaryColor={props.primaryColor} />}
-      {recentGames.length > 0 && <GameRail title="เล่นล่าสุด" href="/games" items={recentGames} primaryColor={props.primaryColor} />}
-      {favoriteGames.length > 0 && <GameRail title="เกมโปรด" href="/games" items={favoriteGames} primaryColor={props.primaryColor} />}
-      {popular.length > 0 && <GameRail title="ยอดนิยม" href="/games" items={popular} primaryColor={props.primaryColor} />}
-      {props.showCategories && <section className="member-info-card"><div style={sectionHeadStyle}><h2>หมวดเกม</h2><a href="/games" style={{ color: props.primaryColor, fontWeight: 900, textDecoration: 'none' }}>ดูทั้งหมด</a></div><div style={categoryGridStyle}>{(lobby.categories ?? []).slice(0, 8).map((item) => <a key={item} href={`/games?category=${encodeURIComponent(item)}`} style={categoryPillStyle}>{categoryLabel(item)}</a>)}{(lobby.categories ?? []).length === 0 && <span style={mutedStyle}>ยังไม่มีหมวดเกม</span>}</div></section>}
+      {props.showBalanceHeader && <WalletCard primaryColor={props.primaryColor} cardColor={props.cardColor} showButtons={props.showButtons && isLoggedIn && (features.deposit || features.withdraw)} />}
+      <section className="member-quick-panel">
+        {features.deposit && <QuickAction icon={icons.deposit} href="/deposit" title="ฝาก" subtitle="เพิ่มยอด" />}
+        {features.withdraw && <QuickAction icon={icons.withdraw} href="/withdraw" title="ถอนเงิน" subtitle="ส่งคำขอ" />}
+        {features.games && <QuickAction icon={icons.games} href="/games" title="เกม" subtitle="เข้าเล่น" />}
+        {features.kyc && <QuickAction icon={icons.bank} href="/bank-accounts" title="บัญชี" subtitle="จัดการ" />}
+        {features.promotion && <QuickAction icon={icons.promotion} href="/promotions" title="โปร" subtitle="รับสิทธิ์" />}
+        {features.bonus && <QuickAction icon={icons.bonus} href="/bonus" title="โบนัส" subtitle="ดูเทิร์น" />}
+        {features.affiliate && <QuickAction icon={icons.affiliate} href="/affiliate" title="ตัวแทน" subtitle="แนะนำเพื่อน" />}
+        {features.support && <QuickAction icon={icons.support} href="/support" title="ช่วยเหลือ" subtitle="แจ้งปัญหา" />}
+      </section>
+      {isLoggedIn && pendingCount > 0 && <section className="member-info-card" style={alertCardStyle}><div style={sectionHeadStyle}><div><p>รอดำเนินการ</p><h2>{pendingCount} รายการ</h2></div><a href="/transactions" style={{ color: props.primaryColor, fontWeight: 900, textDecoration: 'none' }}>ดูทั้งหมด</a></div><div style={pendingListStyle}>{features.deposit && pendingTopups.map((item) => <ActivityRow key={item.id} title="ฝาก" href="/deposit" item={item} />)}{features.withdraw && pendingWithdrawals.map((item) => <ActivityRow key={item.id} title="ถอนเงิน" href="/withdraw" item={item} />)}</div></section>}
+      {features.games && props.showRecommended && <GameRail title="เกมแนะนำ" href="/games" items={featured} primaryColor={props.primaryColor} />}
+      {features.games && recentGames.length > 0 && <GameRail title="เล่นล่าสุด" href="/games" items={recentGames} primaryColor={props.primaryColor} />}
+      {features.games && favoriteGames.length > 0 && <GameRail title="เกมโปรด" href="/games" items={favoriteGames} primaryColor={props.primaryColor} />}
+      {features.games && popular.length > 0 && <GameRail title="ยอดนิยม" href="/games" items={popular} primaryColor={props.primaryColor} />}
+      {features.games && props.showCategories && <section className="member-info-card"><div style={sectionHeadStyle}><h2>หมวดเกม</h2><a href="/games" style={{ color: props.primaryColor, fontWeight: 900, textDecoration: 'none' }}>ดูทั้งหมด</a></div><div style={categoryGridStyle}>{(lobby.categories ?? []).slice(0, 8).map((item) => <a key={item} href={`/games?category=${encodeURIComponent(item)}`} style={categoryPillStyle}>{categoryLabel(item)}</a>)}{(lobby.categories ?? []).length === 0 && <span style={mutedStyle}>ยังไม่มีหมวดเกม</span>}</div></section>}
       {faqs.length > 0 && <section className="member-info-card"><div style={sectionHeadStyle}><h2>คำถามที่พบบ่อย</h2></div><div style={pendingListStyle}>{faqs.map((item, index) => <details key={`${item.question}-${index}`} style={faqStyle}><summary>{item.question}</summary><p style={mutedStyle}>{item.answer}</p></details>)}</div></section>}
-      {isLoggedIn && <section className="member-info-card"><div style={sectionHeadStyle}><h2>ล่าสุด</h2><a href="/transactions" style={{ color: props.primaryColor, fontWeight: 900, textDecoration: 'none' }}>ทั้งหมด</a></div>{isActivityLoading && <div style={noticeStyle}>กำลังโหลด...</div>}{activityMessage && <div style={noticeStyle}><strong>โหลดข้อมูลไม่สำเร็จ</strong><span>{activityMessage}</span><button type="button" onClick={loadActivity} style={retryButtonStyle}>ลองใหม่</button></div>}<div style={pendingListStyle}>{ledgers.slice(0, 5).map((item) => <LedgerRow key={item.id} item={item} />)}{ledgers.length === 0 && !activityMessage && !isActivityLoading && <EmptyState compact title="ยังไม่มีประวัติ" description="เมื่อมีรายการฝาก ถอน หรือปรับยอด รายการล่าสุดจะแสดงตรงนี้" actionHref="/deposit" actionLabel="ฝาก" />}</div></section>}
+      {isLoggedIn && <section className="member-info-card"><div style={sectionHeadStyle}><h2>ล่าสุด</h2><a href="/transactions" style={{ color: props.primaryColor, fontWeight: 900, textDecoration: 'none' }}>ทั้งหมด</a></div>{isActivityLoading && <div style={noticeStyle}>กำลังโหลด...</div>}{activityMessage && <div style={noticeStyle}><strong>โหลดข้อมูลไม่สำเร็จ</strong><span>{activityMessage}</span><button type="button" onClick={loadActivity} style={retryButtonStyle}>ลองใหม่</button></div>}<div style={pendingListStyle}>{ledgers.slice(0, 5).map((item) => <LedgerRow key={item.id} item={item} />)}{ledgers.length === 0 && !activityMessage && !isActivityLoading && <EmptyState compact title="ยังไม่มีประวัติ" description="เมื่อมีรายการฝาก ถอน หรือปรับยอด รายการล่าสุดจะแสดงตรงนี้" actionHref={features.deposit ? '/deposit' : '/'} actionLabel={features.deposit ? 'ฝาก' : 'หน้าแรก'} />}</div></section>}
       {popup.enabled && !popupClosed && <div style={popupOverlayStyle}><section style={popupCardStyle}><button type="button" onClick={closePopup} style={popupCloseStyle}>×</button>{popupImageUrl && <img src={popupImageUrl} alt="" style={popupImageStyle} />}<h2>{popup.title}</h2><p style={mutedStyle}>{popup.message}</p><a href={popup.href} style={{ ...bannerButtonStyle, background: props.primaryColor }}>{popup.ctaLabel}</a></section></div>}
       <MemberBottomNav pendingCount={pendingCount} icons={icons} />
     </section>
