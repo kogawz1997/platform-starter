@@ -11,6 +11,8 @@ const adminProtectedPages = [
   { name: 'admin dashboard', path: '/dashboard' },
   { name: 'admin topups', path: '/topups' },
   { name: 'admin withdrawals', path: '/withdrawals' },
+  { name: 'admin members', path: '/members' },
+  { name: 'admin wallet ledgers', path: '/wallet-ledgers' },
   { name: 'admin reports', path: '/reports' },
   { name: 'admin activity', path: '/activity' },
   { name: 'admin security', path: '/security' },
@@ -19,6 +21,10 @@ const adminProtectedPages = [
 const memberPublicPages = [
   { name: 'member login', path: '/login' },
   { name: 'member register', path: '/register' },
+  { name: 'maintenance', path: '/maintenance' },
+  { name: 'session expired', path: '/session-expired' },
+  { name: 'legal', path: '/legal' },
+  { name: 'contact', path: '/contact' },
 ];
 
 const memberProtectedPages = [
@@ -26,13 +32,19 @@ const memberProtectedPages = [
   { name: 'member deposit', path: '/deposit' },
   { name: 'member withdraw', path: '/withdraw' },
   { name: 'member transactions', path: '/transactions' },
+  { name: 'member bank accounts', path: '/bank-accounts' },
 ];
+
+async function expectHealthyPage(responseStatus: number | undefined, pageName: string) {
+  expect(responseStatus, pageName).toBeDefined();
+  expect(responseStatus, pageName).toBeLessThan(500);
+}
 
 test.describe('admin public smoke', () => {
   for (const pageDef of adminPublicPages) {
     test(`${pageDef.name} loads`, async ({ page }) => {
       const response = await page.goto(`${adminUrl}${pageDef.path}`, { waitUntil: 'domcontentloaded' });
-      expect(response?.status(), pageDef.name).toBeLessThan(500);
+      await expectHealthyPage(response?.status(), pageDef.name);
       await expect(page.locator('body')).toBeVisible();
     });
   }
@@ -42,9 +54,9 @@ test.describe('admin protected smoke', () => {
   for (const pageDef of adminProtectedPages) {
     test(`${pageDef.name} does not server-error when unauthenticated`, async ({ page }) => {
       const response = await page.goto(`${adminUrl}${pageDef.path}`, { waitUntil: 'domcontentloaded' });
-      expect(response?.status(), pageDef.name).toBeLessThan(500);
+      await expectHealthyPage(response?.status(), pageDef.name);
       await expect(page.locator('body')).toBeVisible();
-      await expect(page).toHaveURL(/login|dashboard|topups|withdrawals|reports|activity|security/);
+      await expect(page).toHaveURL(/login|dashboard|topups|withdrawals|members|wallet-ledgers|reports|activity|security/);
     });
   }
 });
@@ -53,7 +65,7 @@ test.describe('member public smoke', () => {
   for (const pageDef of memberPublicPages) {
     test(`${pageDef.name} loads`, async ({ page }) => {
       const response = await page.goto(`${memberUrl}${pageDef.path}`, { waitUntil: 'domcontentloaded' });
-      expect(response?.status(), pageDef.name).toBeLessThan(500);
+      await expectHealthyPage(response?.status(), pageDef.name);
       await expect(page.locator('body')).toBeVisible();
     });
   }
@@ -63,8 +75,9 @@ test.describe('member protected smoke', () => {
   for (const pageDef of memberProtectedPages) {
     test(`${pageDef.name} does not server-error when unauthenticated`, async ({ page }) => {
       const response = await page.goto(`${memberUrl}${pageDef.path}`, { waitUntil: 'domcontentloaded' });
-      expect(response?.status(), pageDef.name).toBeLessThan(500);
+      await expectHealthyPage(response?.status(), pageDef.name);
       await expect(page.locator('body')).toBeVisible();
+      await expect(page).toHaveURL(/login|register|deposit|withdraw|transactions|bank-accounts|^\/$/);
     });
   }
 });
