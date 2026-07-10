@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { boolSetting, cmsContentSetting, defaultSettings, iconSettings, loadPublicSiteSettings, PublicSiteSettings, textSetting } from './site-settings';
+import { boolSetting, cmsContentSetting, defaultSettings, iconSettings, loadPublicSiteSettings, memberFeatureFlags, PublicSiteSettings, textSetting } from './site-settings';
 import MemberHome from './member-home';
 
 export default function Page() {
@@ -30,8 +30,11 @@ export default function Page() {
   const showCategories = boolSetting(settings, 'theme', 'show_game_categories', true);
   const showProviders = boolSetting(settings, 'theme', 'show_popular_providers', true);
   const showRecommended = boolSetting(settings, 'theme', 'show_recommended_games', true);
+  const animationLevelRaw = textSetting(settings, 'theme', 'animation_level', 'subtle');
+  const animationLevel = animationLevelRaw === 'off' || animationLevelRaw === 'lively' ? animationLevelRaw : 'subtle';
   const cmsContent = cmsContentSetting(settings);
   const icons = iconSettings(settings);
+  const features = memberFeatureFlags(settings);
 
   if (!authReady || !isLoggedIn) {
     return <main style={{ minHeight: '100dvh', display: 'grid', placeItems: 'center', background: backgroundColor, color: textColor, padding: 16 }}>กำลังตรวจสอบสิทธิ์...</main>;
@@ -42,8 +45,8 @@ export default function Page() {
   }
 
   return (
-    <main style={{ minHeight: '100vh', background: backgroundColor, color: textColor, overflowX: 'hidden' }}>
-      <MemberHome siteName={siteName} description={description} primaryColor={primaryColor} cardColor={cardColor} textColor={textColor} showBalanceHeader={showBalanceHeader} showButtons={showButtons} showPromotion={showPromotion} showCategories={showCategories} showProviders={showProviders} showRecommended={showRecommended} cmsContent={cmsContent} icons={icons} />
+    <main data-animation-level={animationLevel} style={{ minHeight: '100vh', background: backgroundColor, color: textColor, overflowX: 'hidden' }}>
+      <MemberHome siteName={siteName} description={description} primaryColor={primaryColor} cardColor={cardColor} textColor={textColor} showBalanceHeader={showBalanceHeader} showButtons={showButtons} showPromotion={showPromotion} showCategories={showCategories} showProviders={showProviders} showRecommended={showRecommended} cmsContent={cmsContent} icons={icons} features={features} />
     </main>
   );
 }
