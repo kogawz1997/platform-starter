@@ -1,106 +1,66 @@
 'use client';
 
 import { CmsContent, MemberFeatureFlags, SiteIconSettings, cmsAssetUrl, isIconUrl } from '../site-settings';
+import { navigationFor } from '../member-navigation';
+import { MemberButton, MemberCard, MemberEmptyState, MemberLinkButton, MemberNotice } from './member-ui';
 
 export type MoneyRequest = { id: string; amount: string; currency: string; status: string; method?: string | null; createdAt: string };
 export type LedgerItem = { id: string; type: string; direction: string; amount: string; balanceAfter: string; createdAt: string };
 export type GameMedia = { type: string; sourceUrl?: string | null; cachedUrl?: string | null };
 export type Game = { id: string; providerGameCode: string; name: string; category: string; isFeatured?: boolean; isNew?: boolean; isPopular?: boolean; provider?: { name?: string | null; code?: string | null } | null; media?: GameMedia[] };
 
-export function HomeHero({ siteName, description, primaryColor, content }: { siteName: string; description: string; primaryColor: string; content: CmsContent }) {
+export function HomeHero({ siteName, description, content }: { siteName: string; description: string; primaryColor: string; content: CmsContent }) {
   const banner = content.banners.find((item) => item.enabled);
   const imageUrl = banner ? cmsAssetUrl(content, banner.assetId) || banner.imageUrl : '';
-  return <section style={bannerStyle}>{imageUrl && <img src={imageUrl} alt="" style={bannerImageStyle} />}<div><span style={eyebrowStyle}>พร้อมเล่น</span><h1 style={bannerTitleStyle}>{banner?.title || siteName}</h1><p style={mutedStyle}>{banner?.subtitle || description || 'เลือกเกมที่ชอบ ฝาก ถอน และดูประวัติได้จากมือถือเครื่องเดียว'}</p></div><a href={banner?.href || '/games'} style={{ ...bannerButtonStyle, background: primaryColor }}>เข้าเล่นเกม</a></section>;
+  return <section className="member-home-hero">{imageUrl && <img src={imageUrl} alt="" className="member-home-hero__image" />}<div><span className="member-home-hero__eyebrow">พร้อมเล่น</span><h1>{banner?.title || siteName}</h1><p>{banner?.subtitle || description || 'เลือกเกมที่ชอบ ฝาก ถอน และดูประวัติได้จากมือถือเครื่องเดียว'}</p></div><MemberLinkButton href={banner?.href || '/games'} tone="brand">เข้าเล่นเกม</MemberLinkButton></section>;
 }
 
 export function AnnouncementList({ content }: { content: CmsContent }) {
   const items = content.announcements.filter((item) => item.enabled).slice(0, 3);
   if (!items.length) return null;
-  return <section className="member-info-card" style={announcementCardStyle}><div style={sectionHeadStyle}><h2>ประกาศ</h2><span style={mutedStyle}>{items.length} รายการ</span></div><div style={pendingListStyle}>{items.map((item, index) => <div key={`${item.title}-${index}`} style={announcementRowStyle}><strong>{item.title}</strong><span>{item.message}</span></div>)}</div></section>;
+  return <MemberCard tone="brand"><div className="member-home-section-head"><h2>ประกาศ</h2><span className="member-home-muted">{items.length} รายการ</span></div><div className="member-home-list">{items.map((item, index) => <div key={`${item.title}-${index}`} className="member-home-announcement-row"><strong>{item.title}</strong><span>{item.message}</span></div>)}</div></MemberCard>;
 }
 
 export function QuickActions({ icons, features }: { icons: SiteIconSettings; features: MemberFeatureFlags }) {
-  return <section className="member-quick-panel">
-    {features.deposit && <QuickAction icon={icons.deposit} href="/deposit" title="ฝาก" subtitle="เพิ่มยอด" />}
-    {features.withdraw && <QuickAction icon={icons.withdraw} href="/withdraw" title="ถอนเงิน" subtitle="ส่งคำขอ" />}
-    {features.games && <QuickAction icon={icons.games} href="/games" title="เกม" subtitle="เข้าเล่น" />}
-    {features.kyc && <QuickAction icon={icons.bank} href="/bank-accounts" title="บัญชี" subtitle="จัดการ" />}
-    {features.promotion && <QuickAction icon={icons.promotion} href="/promotions" title="โปร" subtitle="รับสิทธิ์" />}
-    {features.bonus && <QuickAction icon={icons.bonus} href="/bonus" title="โบนัส" subtitle="ดูเทิร์น" />}
-    {features.affiliate && <QuickAction icon={icons.affiliate} href="/affiliate" title="ตัวแทน" subtitle="แนะนำเพื่อน" />}
-    {features.support && <QuickAction icon={icons.support} href="/support" title="ช่วยเหลือ" subtitle="แจ้งปัญหา" />}
-  </section>;
+  const items = navigationFor('home', features);
+  return <section className="member-quick-panel">{items.map((item) => <a key={item.key} href={item.href} className="member-quick-action"><span className="member-home-quick-icon">{isIconUrl(icons[item.iconKey]) ? <img src={icons[item.iconKey]} alt="" /> : icons[item.iconKey]}</span><strong>{item.shortTitle ?? item.title}</strong><span>{item.description}</span></a>)}</section>;
 }
 
-export function PendingRequests({ pendingTopups, pendingWithdrawals, primaryColor, features }: { pendingTopups: MoneyRequest[]; pendingWithdrawals: MoneyRequest[]; primaryColor: string; features: MemberFeatureFlags }) {
+export function PendingRequests({ pendingTopups, pendingWithdrawals, features }: { pendingTopups: MoneyRequest[]; pendingWithdrawals: MoneyRequest[]; primaryColor: string; features: MemberFeatureFlags }) {
   const count = pendingTopups.length + pendingWithdrawals.length;
   if (!count) return null;
-  return <section className="member-info-card" style={alertCardStyle}><div style={sectionHeadStyle}><div><p>รอดำเนินการ</p><h2>{count} รายการ</h2></div><a href="/transactions" style={{ color: primaryColor, fontWeight: 900, textDecoration: 'none' }}>ดูทั้งหมด</a></div><div style={pendingListStyle}>{features.deposit && pendingTopups.map((item) => <ActivityRow key={item.id} title="ฝาก" href="/deposit" item={item} />)}{features.withdraw && pendingWithdrawals.map((item) => <ActivityRow key={item.id} title="ถอนเงิน" href="/withdraw" item={item} />)}</div></section>;
+  return <MemberCard tone="warning" className="member-home-panel--brand"><div className="member-home-section-head"><div><p>รอดำเนินการ</p><h2>{count} รายการ</h2></div><a href="/transactions">ดูทั้งหมด</a></div><div className="member-home-list">{features.deposit && pendingTopups.map((item) => <ActivityRow key={item.id} title="ฝาก" href="/deposit" item={item} />)}{features.withdraw && pendingWithdrawals.map((item) => <ActivityRow key={item.id} title="ถอนเงิน" href="/withdraw" item={item} />)}</div></MemberCard>;
 }
 
-export function GameRail({ title, href, items, primaryColor }: { title: string; href: string; items: Game[]; primaryColor: string }) {
+export function GameRail({ title, href, items }: { title: string; href: string; items: Game[]; primaryColor: string }) {
   if (!items.length) return null;
-  return <section className="member-info-card"><div style={sectionHeadStyle}><h2>{title}</h2><a href={href} style={{ color: primaryColor, fontWeight: 900, textDecoration: 'none' }}>ดูทั้งหมด</a></div><div style={gameRailStyle}>{items.slice(0, 8).map((game) => <a key={game.id} href="/games" style={gameTileStyle}>{pickImage(game) ? <img src={pickImage(game) ?? ''} alt="" style={gameImageStyle} /> : <div style={gameFallbackStyle}>{game.name.slice(0, 2).toUpperCase()}</div>}<strong>{game.name}</strong><span>{game.provider?.name ?? game.providerGameCode}</span></a>)}</div></section>;
+  return <MemberCard><div className="member-home-section-head"><h2>{title}</h2><a href={href}>ดูทั้งหมด</a></div><div className="member-home-game-rail">{items.slice(0, 8).map((game) => <a key={game.id} href="/games" className="member-home-game-tile">{pickImage(game) ? <img src={pickImage(game) ?? ''} alt="" /> : <div className="member-home-game-fallback">{game.name.slice(0, 2).toUpperCase()}</div>}<strong>{game.name}</strong><span>{game.provider?.name ?? game.providerGameCode}</span></a>)}</div></MemberCard>;
 }
 
-export function CategoryList({ categories, primaryColor }: { categories: string[]; primaryColor: string }) {
-  return <section className="member-info-card"><div style={sectionHeadStyle}><h2>หมวดเกม</h2><a href="/games" style={{ color: primaryColor, fontWeight: 900, textDecoration: 'none' }}>ดูทั้งหมด</a></div><div style={categoryGridStyle}>{categories.slice(0, 8).map((item) => <a key={item} href={`/games?category=${encodeURIComponent(item)}`} style={categoryPillStyle}>{categoryLabel(item)}</a>)}{categories.length === 0 && <span style={mutedStyle}>ยังไม่มีหมวดเกม</span>}</div></section>;
+export function CategoryList({ categories }: { categories: string[]; primaryColor: string }) {
+  return <MemberCard><div className="member-home-section-head"><h2>หมวดเกม</h2><a href="/games">ดูทั้งหมด</a></div><div className="member-home-categories">{categories.slice(0, 8).map((item) => <a key={item} href={`/games?category=${encodeURIComponent(item)}`} className="member-home-category-pill">{categoryLabel(item)}</a>)}{categories.length === 0 && <span className="member-home-muted">ยังไม่มีหมวดเกม</span>}</div></MemberCard>;
 }
 
 export function FaqList({ content }: { content: CmsContent }) {
   const items = content.faqs.filter((item) => item.enabled).slice(0, 4);
   if (!items.length) return null;
-  return <section className="member-info-card"><div style={sectionHeadStyle}><h2>คำถามที่พบบ่อย</h2></div><div style={pendingListStyle}>{items.map((item, index) => <details key={`${item.question}-${index}`} style={faqStyle}><summary>{item.question}</summary><p style={mutedStyle}>{item.answer}</p></details>)}</div></section>;
+  return <MemberCard><div className="member-home-section-head"><h2>คำถามที่พบบ่อย</h2></div><div className="member-home-list">{items.map((item, index) => <details key={`${item.question}-${index}`} className="member-home-faq"><summary>{item.question}</summary><p className="member-home-muted">{item.answer}</p></details>)}</div></MemberCard>;
 }
 
-export function RecentActivity({ ledgers, loading, message, onRetry, primaryColor, depositEnabled }: { ledgers: LedgerItem[]; loading: boolean; message: string; onRetry: () => void; primaryColor: string; depositEnabled: boolean }) {
-  return <section className="member-info-card"><div style={sectionHeadStyle}><h2>ล่าสุด</h2><a href="/transactions" style={{ color: primaryColor, fontWeight: 900, textDecoration: 'none' }}>ทั้งหมด</a></div>{loading && <div style={noticeStyle}>กำลังโหลด...</div>}{message && <div style={noticeStyle}><strong>โหลดข้อมูลไม่สำเร็จ</strong><span>{message}</span><button type="button" onClick={onRetry} style={retryButtonStyle}>ลองใหม่</button></div>}<div style={pendingListStyle}>{ledgers.slice(0, 5).map((item) => <LedgerRow key={item.id} item={item} />)}{ledgers.length === 0 && !message && !loading && <EmptyState compact title="ยังไม่มีประวัติ" description="เมื่อมีรายการฝาก ถอน หรือปรับยอด รายการล่าสุดจะแสดงตรงนี้" actionHref={depositEnabled ? '/deposit' : '/'} actionLabel={depositEnabled ? 'ฝาก' : 'หน้าแรก'} />}</div></section>;
+export function RecentActivity({ ledgers, loading, message, onRetry, depositEnabled }: { ledgers: LedgerItem[]; loading: boolean; message: string; onRetry: () => void; primaryColor: string; depositEnabled: boolean }) {
+  return <MemberCard><div className="member-home-section-head"><h2>ล่าสุด</h2><a href="/transactions">ทั้งหมด</a></div>{loading && <MemberNotice>กำลังโหลด...</MemberNotice>}{message && <MemberNotice tone="danger"><strong>โหลดข้อมูลไม่สำเร็จ</strong><span>{message}</span><MemberButton onClick={onRetry}>ลองใหม่</MemberButton></MemberNotice>}<div className="member-home-list">{ledgers.slice(0, 5).map((item) => <LedgerRow key={item.id} item={item} />)}{ledgers.length === 0 && !message && !loading && <MemberEmptyState compact title="ยังไม่มีประวัติ" description="เมื่อมีรายการฝาก ถอน หรือปรับยอด รายการล่าสุดจะแสดงตรงนี้" actionHref={depositEnabled ? '/deposit' : '/'} actionLabel={depositEnabled ? 'ฝาก' : 'หน้าแรก'} />}</div></MemberCard>;
 }
 
-export function CmsPopup({ content, primaryColor, onClose }: { content: CmsContent; primaryColor: string; onClose: () => void }) {
+export function CmsPopup({ content, onClose }: { content: CmsContent; primaryColor: string; onClose: () => void }) {
   const popup = content.popup;
   const imageUrl = cmsAssetUrl(content, popup.assetId) || popup.imageUrl || '';
-  return <div style={popupOverlayStyle}><section style={popupCardStyle}><button type="button" onClick={onClose} style={popupCloseStyle}>×</button>{imageUrl && <img src={imageUrl} alt="" style={popupImageStyle} />}<h2>{popup.title}</h2><p style={mutedStyle}>{popup.message}</p><a href={popup.href} style={{ ...bannerButtonStyle, background: primaryColor }}>{popup.ctaLabel}</a></section></div>;
+  return <div className="member-home-popup"><MemberCard tone="brand" className="member-home-popup__card"><button type="button" onClick={onClose} className="member-home-popup__close">×</button>{imageUrl && <img src={imageUrl} alt="" className="member-home-popup__image" />}<h2>{popup.title}</h2><p className="member-home-muted">{popup.message}</p><MemberLinkButton href={popup.href} tone="brand">{popup.ctaLabel}</MemberLinkButton></MemberCard></div>;
 }
 
-function QuickAction({ href, title, subtitle, icon }: { href: string; title: string; subtitle: string; icon: string }) { return <a href={href} className="member-quick-action"><span style={quickIconStyle}>{isIconUrl(icon) ? <img src={icon} alt="" style={quickIconImageStyle} /> : icon}</span><strong>{title}</strong><span>{subtitle}</span></a>; }
-function ActivityRow({ title, href, item }: { title: string; href: string; item: MoneyRequest }) { return <a href={href} style={rowLinkStyle}><div><strong>{title}</strong><span>{new Date(item.createdAt).toLocaleString('th-TH')}</span></div><div style={rightStyle}><strong>{formatMoney(item.amount, item.currency)}</strong><span>{statusLabel(item.status)}</span></div></a>; }
-function LedgerRow({ item }: { item: LedgerItem }) { return <div style={rowStyle}><div><strong>{ledgerTypeLabel(item.type)}</strong><span>{new Date(item.createdAt).toLocaleString('th-TH')}</span></div><div style={rightStyle}><strong>{item.direction === 'CREDIT' ? '+' : '-'} {formatMoney(item.amount, 'THB')}</strong></div></div>; }
-function EmptyState({ title, description, actionHref, actionLabel, compact = false }: { title: string; description: string; actionHref: string; actionLabel: string; compact?: boolean }) { return <div style={compact ? compactEmptyStyle : emptyStyle}><div><strong>{title}</strong><span>{description}</span></div><a href={actionHref}>{actionLabel}</a></div>; }
+function ActivityRow({ title, href, item }: { title: string; href: string; item: MoneyRequest }) { return <a href={href} className="member-home-row member-home-row--link"><div><strong>{title}</strong><span>{new Date(item.createdAt).toLocaleString('th-TH')}</span></div><div className="member-home-row__right"><strong>{formatMoney(item.amount, item.currency)}</strong><span>{statusLabel(item.status)}</span></div></a>; }
+function LedgerRow({ item }: { item: LedgerItem }) { return <div className="member-home-row"><div><strong>{ledgerTypeLabel(item.type)}</strong><span>{new Date(item.createdAt).toLocaleString('th-TH')}</span></div><div className="member-home-row__right"><strong>{item.direction === 'CREDIT' ? '+' : '-'} {formatMoney(item.amount, 'THB')}</strong></div></div>; }
 function ledgerTypeLabel(type: string) { const upper = type.toUpperCase(); if (upper.includes('DEPOSIT') || upper.includes('TOPUP')) return 'ฝาก'; if (upper.includes('WITHDRAW')) return 'ถอนเงิน'; if (upper.includes('TRANSFER')) return 'โยกเงิน'; if (upper.includes('REVERSAL')) return 'คืนเงิน'; if (upper.includes('ADJUST')) return 'ปรับยอด'; return 'รายการ'; }
 function statusLabel(status: string) { const upper = status.toUpperCase(); if (upper === 'PENDING') return 'รอตรวจสอบ'; if (upper === 'APPROVED' || upper === 'COMPLETED') return 'สำเร็จ'; if (upper === 'REJECTED') return 'ไม่อนุมัติ'; return status; }
 function pickImage(game: Game) { const media = game.media ?? []; return media.find((item) => item.type === 'COVER')?.cachedUrl ?? media.find((item) => item.type === 'COVER')?.sourceUrl ?? media.find((item) => item.type === 'ICON')?.cachedUrl ?? media.find((item) => item.type === 'ICON')?.sourceUrl ?? null; }
 function categoryLabel(value: string) { const map: Record<string, string> = { slot: 'สล็อต', casino: 'คาสิโน', sport: 'กีฬา', fishing: 'ตกปลา', popular: 'ยอดนิยม', new: 'ใหม่' }; return map[value?.toLowerCase?.()] ?? value; }
 function formatMoney(value: string | number, currency: string) { return `${currency} ${Number(value).toLocaleString('th-TH', { minimumFractionDigits: 2 })}`; }
-
-const quickIconStyle = { width: 30, height: 30, borderRadius: 12, display: 'grid', placeItems: 'center', background: 'rgba(245,197,66,.12)', color: '#facc15', fontSize: 18, marginBottom: 2 } as const;
-const quickIconImageStyle = { width: 22, height: 22, objectFit: 'cover' as const, borderRadius: 8, display: 'block' };
-const bannerStyle = { border: '1px solid rgba(245,197,66,.26)', borderRadius: 28, padding: 18, background: 'radial-gradient(circle at top left, rgba(245,197,66,.24), transparent 38%), rgba(255,255,255,.05)', display: 'flex', justifyContent: 'space-between', gap: 14, alignItems: 'center', flexWrap: 'wrap' as const, overflow: 'hidden' as const } as const;
-const bannerImageStyle = { width: 86, height: 86, borderRadius: 20, objectFit: 'cover' as const, border: '1px solid rgba(255,255,255,.14)' };
-const eyebrowStyle = { color: '#facc15', fontWeight: 950, fontSize: 12, letterSpacing: '.1em', textTransform: 'uppercase' as const } as const;
-const bannerTitleStyle = { margin: '4px 0 6px', fontSize: 30, lineHeight: 1.05 } as const;
-const bannerButtonStyle = { minHeight: 44, borderRadius: 14, padding: '0 16px', display: 'inline-flex', alignItems: 'center', color: '#111827', fontWeight: 950, textDecoration: 'none' } as const;
-const alertCardStyle = { borderColor: 'rgba(245,197,66,.32)', background: 'linear-gradient(180deg, rgba(245,197,66,.13), rgba(255,255,255,.04))' } as const;
-const announcementCardStyle = { borderColor: 'rgba(245,197,66,.28)', background: 'rgba(245,197,66,.07)' } as const;
-const announcementRowStyle = { border: '1px solid rgba(255,255,255,.10)', borderRadius: 14, padding: 12, display: 'grid', gap: 4, background: 'rgba(255,255,255,.04)' } as const;
-const pendingListStyle = { display: 'grid', gap: 10, marginTop: 12, minWidth: 0 } as const;
-const sectionHeadStyle = { display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, flexWrap: 'wrap' as const, minWidth: 0 };
-const rowStyle = { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(190px, 100%), 1fr))', gap: 12, border: '1px solid rgba(255,255,255,.10)', borderRadius: 16, padding: 12, background: 'rgba(255,255,255,.045)', minWidth: 0 };
-const rowLinkStyle = { ...rowStyle, color: 'inherit', textDecoration: 'none' } as const;
-const rightStyle = { textAlign: 'left' as const, display: 'grid', gap: 4, minWidth: 0 };
-const noticeStyle = { border: '1px solid rgba(255,255,255,.12)', borderRadius: 16, padding: 12, background: 'rgba(255,255,255,.06)', marginTop: 12, display: 'grid', gap: 6 } as const;
-const retryButtonStyle = { justifySelf: 'start', border: '1px solid rgba(255,255,255,.16)', borderRadius: 999, padding: '8px 12px', background: 'rgba(255,255,255,.08)', color: '#fff', cursor: 'pointer' } as const;
-const emptyStyle = { border: '1px dashed rgba(245,197,66,.34)', borderRadius: 24, padding: 16, background: 'rgba(245,197,66,.07)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap' as const } as const;
-const compactEmptyStyle = { ...emptyStyle, borderColor: 'rgba(255,255,255,.16)', background: 'rgba(255,255,255,.04)' } as const;
-const mutedStyle = { margin: 0, color: '#cbd5e1', lineHeight: 1.55 } as const;
-const gameRailStyle = { display: 'grid', gridAutoFlow: 'column', gridAutoColumns: 'minmax(132px, 38%)', gap: 12, overflowX: 'auto' as const, paddingTop: 12 } as const;
-const gameTileStyle = { color: 'inherit', textDecoration: 'none', border: '1px solid rgba(255,255,255,.10)', borderRadius: 18, overflow: 'hidden', background: 'rgba(15,23,42,.65)', display: 'grid', gap: 6, paddingBottom: 10 } as const;
-const gameImageStyle = { width: '100%', aspectRatio: '4 / 3', objectFit: 'cover' as const, display: 'block' };
-const gameFallbackStyle = { aspectRatio: '4 / 3', display: 'grid', placeItems: 'center', background: 'rgba(245,197,66,.12)', color: '#facc15', fontSize: 26, fontWeight: 950 } as const;
-const categoryGridStyle = { display: 'flex', gap: 10, overflowX: 'auto' as const, paddingTop: 12 } as const;
-const categoryPillStyle = { border: '1px solid rgba(255,255,255,.14)', borderRadius: 999, padding: '10px 14px', color: '#fff', background: 'rgba(255,255,255,.06)', textDecoration: 'none', whiteSpace: 'nowrap' as const, fontWeight: 900 } as const;
-const faqStyle = { border: '1px solid rgba(255,255,255,.10)', borderRadius: 14, padding: 12, background: 'rgba(255,255,255,.04)' } as const;
-const popupOverlayStyle = { position: 'fixed' as const, inset: 0, zIndex: 50, display: 'grid', placeItems: 'center', padding: 18, background: 'rgba(2,6,23,.72)' };
-const popupCardStyle = { width: 'min(420px, 100%)', border: '1px solid rgba(245,197,66,.28)', borderRadius: 24, padding: 20, background: '#111827', display: 'grid', gap: 12, position: 'relative' as const };
-const popupImageStyle = { width: '100%', maxHeight: 180, objectFit: 'cover' as const, borderRadius: 16, border: '1px solid rgba(255,255,255,.12)' };
-const popupCloseStyle = { position: 'absolute' as const, top: 10, right: 10, width: 34, height: 34, borderRadius: 999, border: '1px solid rgba(255,255,255,.16)', background: 'rgba(255,255,255,.06)', color: '#fff', fontSize: 22 };
